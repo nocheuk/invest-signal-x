@@ -10,7 +10,7 @@ export type AssetType =
   | "Roadside"
   | "Convenience";
 
-export type RentReview = "Upward-only" | "Fixed uplift" | "CPI/RPI linked" | "None";
+export type RentReview = "Upward-only" | "Fixed uplift" | "CPI/RPI linked" | "Open market" | "None";
 export type RentSustainability = "Under-rented" | "Market rent" | "Over-rented";
 
 export interface Deal {
