@@ -28,8 +28,9 @@ export function DealRow({ deal }: { deal: Deal }) {
         )}>
           {deal.score}
         </div>
-        <div className="hidden sm:block">
-          <RatingBadge rating={deal.rating} dot={false} />
+        <div className="hidden sm:flex flex-col">
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Your</span>
+          <span className="font-mono text-sm font-semibold tabular text-primary">{yourScore}</span>
         </div>
       </div>
 
