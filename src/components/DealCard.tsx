@@ -1,13 +1,17 @@
 import { Link } from "react-router-dom";
-import { Bookmark, MapPin, TrendingUp, AlertTriangle } from "lucide-react";
+import { Bookmark, MapPin, TrendingUp, AlertTriangle, Sparkles } from "lucide-react";
 import type { Deal } from "@/lib/deals";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { RatingBadge, ScorePill } from "@/components/RatingBadge";
 import { useWatchlist } from "@/lib/watchlist";
+import { useStrategy, personalisedScore, matchReasons } from "@/lib/strategy";
 import { cn } from "@/lib/utils";
 
 export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: "default" | "feature" }) {
   const { isWatched, toggle } = useWatchlist();
+  const { weights } = useStrategy();
+  const yourScore = personalisedScore(deal, weights);
+  const reasons = matchReasons(deal, weights);
   const watched = isWatched(deal.id);
 
   return (
@@ -57,6 +61,24 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
           <Metric label="NIY" value={deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "—"} />
           <Metric label="WAULT" value={deal.wault ? `${deal.wault.toFixed(1)}y` : "—"} />
         </div>
+
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
+            <Sparkles className="h-3 w-3 text-primary" /> Your Score
+          </div>
+          <div className="font-mono text-sm font-semibold tabular text-primary">{yourScore}</div>
+        </div>
+
+        {reasons.length > 0 && (
+          <ul className="space-y-1 pt-1">
+            {reasons.map((r) => (
+              <li key={r} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                <span className="mt-1 h-1 w-1 rounded-full bg-primary shrink-0" />
+                <span>{r}</span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">

@@ -4,10 +4,13 @@ import type { Deal } from "@/lib/deals";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { RatingBadge } from "@/components/RatingBadge";
 import { useWatchlist } from "@/lib/watchlist";
+import { useStrategy, personalisedScore } from "@/lib/strategy";
 import { cn } from "@/lib/utils";
 
 export function DealRow({ deal }: { deal: Deal }) {
   const { isWatched, toggle } = useWatchlist();
+  const { weights } = useStrategy();
+  const yourScore = personalisedScore(deal, weights);
   const watched = isWatched(deal.id);
 
   return (
