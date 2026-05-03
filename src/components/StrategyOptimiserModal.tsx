@@ -89,7 +89,6 @@ export function StrategyOptimiserModal({ open, onOpenChange }: { open: boolean; 
                   step={1}
                   onValueChange={([v]) => {
                     setWeights((w) => ({ ...w, [m.key]: v }));
-                    setPreset("Balanced"); // mark as custom by clearing label match implicitly
                   }}
                 />
                 <p className="text-[11px] text-muted-foreground">{m.helper}</p>
