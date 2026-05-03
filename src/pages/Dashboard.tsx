@@ -4,6 +4,9 @@ import { DEALS, ASSET_TYPES, REGIONS, formatGBP, formatPct, type Rating } from "
 import { DealCard } from "@/components/DealCard";
 import { DealRow } from "@/components/DealRow";
 import { useWatchlist } from "@/lib/watchlist";
+import { useStrategy, personalisedScore } from "@/lib/strategy";
+import { StrategyControl } from "@/components/StrategyControl";
+import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, SlidersHorizontal, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +15,8 @@ import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
   const { ids } = useWatchlist();
+  const { weights } = useStrategy();
+  const [strategyOpen, setStrategyOpen] = useState(false);
   const [region, setRegion] = useState("All UK");
   const [asset, setAsset] = useState<string>("All");
   const [minYield, setMinYield] = useState(0);
@@ -39,13 +44,13 @@ export default function Dashboard() {
       (rating === "all" || d.rating === rating) &&
       (d.netInitialYield >= minYield)
     );
-    if (sort === "score") res = [...res].sort((a, b) => b.score - a.score);
+    if (sort === "score") res = [...res].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights));
     if (sort === "yield") res = [...res].sort((a, b) => b.netInitialYield - a.netInitialYield);
     if (sort === "price") res = [...res].sort((a, b) => a.guidePrice - b.guidePrice);
     return res;
-  }, [region, asset, minYield, rating, sort]);
+  }, [region, asset, minYield, rating, sort, weights]);
 
-  const best = useMemo(() => [...DEALS].sort((a, b) => b.score - a.score).slice(0, 3), []);
+  const best = useMemo(() => [...DEALS].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [weights]);
 
   return (
     <AppLayout>
@@ -93,6 +98,8 @@ export default function Dashboard() {
             <h2 className="font-display text-2xl">All live opportunities</h2>
             <div className="text-xs text-muted-foreground font-mono tabular">{filtered.length} of {DEALS.length} deals</div>
           </div>
+
+          <StrategyControl onOpen={() => setStrategyOpen(true)} />
 
           <div className="ds-card p-3 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><Filter className="h-3.5 w-3.5" />Filters</div>
@@ -142,7 +149,7 @@ export default function Dashboard() {
           <div className="ds-card overflow-hidden">
             {/* Header row */}
             <div className="grid grid-cols-12 gap-3 items-center px-4 py-2.5 bg-surface-2/60 border-b border-border/60 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              <div className="col-span-3 sm:col-span-2">Score</div>
+              <div className="col-span-3 sm:col-span-2">Score / Your</div>
               <div className="col-span-9 sm:col-span-3">Deal</div>
               <div className="hidden sm:block col-span-2 text-right">Guide</div>
               <div className="hidden md:block col-span-1 text-right"><Hint term="NIY">NIY</Hint></div>
@@ -157,6 +164,7 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+      <StrategyOptimiserModal open={strategyOpen} onOpenChange={setStrategyOpen} />
     </AppLayout>
   );
 }

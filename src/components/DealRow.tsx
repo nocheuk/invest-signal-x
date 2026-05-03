@@ -4,10 +4,13 @@ import type { Deal } from "@/lib/deals";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { RatingBadge } from "@/components/RatingBadge";
 import { useWatchlist } from "@/lib/watchlist";
+import { useStrategy, personalisedScore } from "@/lib/strategy";
 import { cn } from "@/lib/utils";
 
 export function DealRow({ deal }: { deal: Deal }) {
   const { isWatched, toggle } = useWatchlist();
+  const { weights } = useStrategy();
+  const yourScore = personalisedScore(deal, weights);
   const watched = isWatched(deal.id);
 
   return (
@@ -25,8 +28,9 @@ export function DealRow({ deal }: { deal: Deal }) {
         )}>
           {deal.score}
         </div>
-        <div className="hidden sm:block">
-          <RatingBadge rating={deal.rating} dot={false} />
+        <div className="hidden sm:flex flex-col">
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Your</span>
+          <span className="font-mono text-sm font-semibold tabular text-primary">{yourScore}</span>
         </div>
       </div>
 
