@@ -99,6 +99,8 @@ export default function Dashboard() {
             <div className="text-xs text-muted-foreground font-mono tabular">{filtered.length} of {DEALS.length} deals</div>
           </div>
 
+          <StrategyControl onOpen={() => setStrategyOpen(true)} />
+
           <div className="ds-card p-3 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><Filter className="h-3.5 w-3.5" />Filters</div>
             <Select value={region} onValueChange={setRegion}>
@@ -147,7 +149,7 @@ export default function Dashboard() {
           <div className="ds-card overflow-hidden">
             {/* Header row */}
             <div className="grid grid-cols-12 gap-3 items-center px-4 py-2.5 bg-surface-2/60 border-b border-border/60 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              <div className="col-span-3 sm:col-span-2">Score</div>
+              <div className="col-span-3 sm:col-span-2">Score / Your</div>
               <div className="col-span-9 sm:col-span-3">Deal</div>
               <div className="hidden sm:block col-span-2 text-right">Guide</div>
               <div className="hidden md:block col-span-1 text-right"><Hint term="NIY">NIY</Hint></div>
@@ -162,6 +164,7 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+      <StrategyOptimiserModal open={strategyOpen} onOpenChange={setStrategyOpen} />
     </AppLayout>
   );
 }
