@@ -236,13 +236,13 @@ export default function Landing() {
       <section className="container py-20 lg:py-28">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="text-xs uppercase tracking-widest text-primary font-medium mb-3">Pricing</div>
-          <h2 className="font-display text-4xl md:text-5xl tracking-tight">Plans that scale with your pipeline.</h2>
+          <h2 className="font-display text-4xl md:text-5xl tracking-tight">Private deal intelligence, priced for serious investors.</h2>
         </div>
         <div className="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
           {[
-            { name: "Scout", price: "£29", d: "Basic alerts, yield calcs, traffic-light scoring.", popular: false },
-            { name: "Investor", price: "£99", d: "AI summaries, comparables, saved searches, priority alerts.", popular: true },
-            { name: "Pro", price: "£299", d: "Team access, advanced scoring, portfolio watchlists, deal sourcing workflow.", popular: false },
+            { name: "Scout", price: "£49", d: "Smarter first-pass filtering with the DealSignal Score and traffic-light ratings.", popular: false },
+            { name: "Investor", price: "£149", d: "Strategy Optimiser, personalised Your Score, advanced filters and priority alerts.", popular: true },
+            { name: "Insider Access", price: "From £500", d: "Curated weekly shortlist, bespoke sourcing briefs and direct introductions.", popular: false },
           ].map((p) => (
             <div key={p.name} className={`ds-card-elevated p-6 ${p.popular ? "border-primary/40 ring-1 ring-primary/30 ds-glow" : ""}`}>
               {p.popular && <div className="text-[10px] uppercase tracking-widest text-primary font-medium mb-2">Most popular</div>}
