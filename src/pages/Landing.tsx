@@ -236,13 +236,13 @@ export default function Landing() {
       <section className="container py-20 lg:py-28">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="text-xs uppercase tracking-widest text-primary font-medium mb-3">Pricing</div>
-          <h2 className="font-display text-4xl md:text-5xl tracking-tight">Plans that scale with your pipeline.</h2>
+          <h2 className="font-display text-4xl md:text-5xl tracking-tight">Private deal intelligence, priced for serious investors.</h2>
         </div>
         <div className="grid md:grid-cols-3 gap-5 max-w-5xl mx-auto">
           {[
-            { name: "Scout", price: "£29", d: "Basic alerts, yield calcs, traffic-light scoring.", popular: false },
-            { name: "Investor", price: "£99", d: "AI summaries, comparables, saved searches, priority alerts.", popular: true },
-            { name: "Pro", price: "£299", d: "Team access, advanced scoring, portfolio watchlists, deal sourcing workflow.", popular: false },
+            { name: "Scout", price: "£49", d: "Smarter first-pass filtering with the DealSignal Score and traffic-light ratings.", popular: false },
+            { name: "Investor", price: "£149", d: "Strategy Optimiser, personalised Your Score, advanced filters and priority alerts.", popular: true },
+            { name: "Insider Access", price: "From £500", d: "Curated weekly shortlist, bespoke sourcing briefs and direct introductions.", popular: false },
           ].map((p) => (
             <div key={p.name} className={`ds-card-elevated p-6 ${p.popular ? "border-primary/40 ring-1 ring-primary/30 ds-glow" : ""}`}>
               {p.popular && <div className="text-[10px] uppercase tracking-widest text-primary font-medium mb-2">Most popular</div>}
@@ -272,7 +272,7 @@ export default function Landing() {
             {[
               { q: "Where does the data come from?", a: "We aggregate listings from major UK commercial agents, the principal auction houses (Allsop, Acuitus, Savills, BidX1) and a growing set of off-market feeds. We never resell raw vendor data." },
               { q: "How accurate is the DealSignal Score?", a: "It is calibrated against historical transaction data and continually back-tested. Treat it as a triage signal, not an investment decision — the score is designed to surface deals worth a second look, and flag ones that aren't." },
-              { q: "Do I need to be an institutional investor?", a: "No. Scout starts at £29/month and is designed for solo investors making their first 1–5 acquisitions. Pro is for teams running structured pipelines." },
+              { q: "Do I need to be an institutional investor?", a: "No. Scout starts at £49/month for early-stage investors. Insider Access is for professional investors, developers and acquisition teams who want curated deal flow and bespoke sourcing support." },
               { q: "Will it tell me when to bid at auction?", a: "We show you a guide-price risk indicator and our own modelled stabilised yield, but bidding is your call. We try hard to flag yield-trap auction lots before you waste time on them." },
               { q: "How are advanced metrics like reversion and exit yield modelled?", a: "We use sector ERV benchmarks, comparable evidence within 2 miles where available, and a Monte Carlo on cap-rate sensitivity. Methodology is documented in the app for every score." },
             ].map((f) => (

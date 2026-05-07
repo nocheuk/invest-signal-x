@@ -1,83 +1,107 @@
-import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const PLANS = [
   {
     name: "Scout",
-    monthly: 29,
-    annual: 23,
-    tag: "For solo investors getting started",
+    price: "£49",
+    suffix: "/month",
+    tag: "For early-stage investors who want smarter first-pass filtering.",
+    cta: "Start with Scout",
     features: [
-      "Daily UK-wide deal scan",
-      "Basic email & in-app alerts",
-      "Yield calculations",
-      "Traffic-light scoring (R/A/G)",
-      "Up to 25 watchlisted deals",
-      "Standard support",
+      "Access to live deal dashboard",
+      "Basic deal filters",
+      "DealSignal Score",
+      "Limited watchlist",
+      "Basic alerts",
+      "Green / Amber / Red ratings",
     ],
   },
   {
     name: "Investor",
-    monthly: 99,
-    annual: 79,
-    tag: "For active acquirers and small funds",
+    price: "£149",
+    suffix: "/month",
+    tag: "For serious investors who want advanced scoring and personalised deal flow.",
     popular: true,
+    cta: "Start free 14-day trial",
     features: [
-      "Everything in Scout",
-      "Full DealSignal Score breakdown",
-      "AI underwriting summaries",
-      "Comparable transaction checks",
-      "Unlimited saved searches",
-      "Priority real-time alerts",
-      "PDF deal memos",
-      "Up to 250 watchlisted deals",
+      "Full deal dashboard",
+      "Strategy Optimiser",
+      "Personalised \u201cYour Score\u201d",
+      "Full deal analysis pages",
+      "Advanced filters",
+      "Saved strategies",
+      "Watchlist and notes",
+      "Priority alerts",
+      "Weekly top deals report",
     ],
   },
   {
-    name: "Pro",
-    monthly: 299,
-    annual: 239,
-    tag: "For deal sourcing teams and funds",
+    name: "Insider Access",
+    price: "From £500",
+    suffix: "/month",
+    tag: "For professional investors, developers and acquisition teams who want curated private deal intelligence.",
+    cta: "Apply for access",
     features: [
       "Everything in Investor",
-      "Up to 5 team seats",
-      "Advanced scoring weighting",
-      "Portfolio-level watchlists",
-      "Off-market deal feed",
-      "Sourcing workflow + assignments",
-      "API access (read)",
-      "Dedicated success manager",
+      "Curated weekly opportunity shortlist",
+      "Priority access to high-conviction deals",
+      "Bespoke sourcing briefs",
+      "Direct introductions where available",
+      "Custom locations and asset-type targeting",
+      "Private investor reports",
+      "Optional call / review support",
     ],
+    footnote:
+      "Certain off-market or directly introduced opportunities may include separate success-based acquisition fees.",
+  },
+];
+
+const FAQS = [
+  {
+    q: "Do you charge fees on completed acquisitions?",
+    a: "Standard platform access is subscription-based. Certain off-market, bespoke, or directly introduced opportunities may include separate success-based acquisition fees, agreed transparently before introduction.",
+  },
+  {
+    q: "Is DealSignal a listing site?",
+    a: "No. DealSignal is designed as a deal intelligence platform. It filters, scores and prioritises opportunities to support faster first-pass underwriting.",
+  },
+  {
+    q: "Which plan is best for serious investors?",
+    a: "Most serious investors should start with Investor. Insider Access is for investors or developers who want curated deal flow, bespoke sourcing and higher-touch support.",
   },
 ];
 
 export default function Pricing() {
-  const [annual, setAnnual] = useState(true);
   return (
     <AppLayout>
-      <div className="container max-w-6xl py-12 space-y-12">
+      <div className="container max-w-6xl py-12 space-y-16">
         <div className="text-center max-w-2xl mx-auto space-y-4">
           <div className="text-xs uppercase tracking-widest text-primary font-medium">Pricing</div>
-          <h1 className="font-display text-5xl">Plans that scale with your pipeline.</h1>
-          <p className="text-muted-foreground">No setup fees, cancel anytime. All plans include the full UK commercial scan.</p>
-          <div className="inline-flex items-center gap-3 bg-surface-2 rounded-full p-1.5 border border-border/60">
-            <button onClick={() => setAnnual(false)} className={cn("px-4 py-1.5 rounded-full text-sm transition-colors", !annual && "bg-surface-3 text-foreground", annual && "text-muted-foreground")}>Monthly</button>
-            <button onClick={() => setAnnual(true)} className={cn("px-4 py-1.5 rounded-full text-sm transition-colors flex items-center gap-2", annual && "bg-surface-3 text-foreground", !annual && "text-muted-foreground")}>
-              Annual <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded font-medium">Save 20%</span>
-            </button>
-          </div>
+          <h1 className="font-display text-5xl">Private deal intelligence, priced for serious investors.</h1>
+          <p className="text-muted-foreground">
+            DealSignal is a curated commercial opportunity intelligence platform — not a listing site.
+            Choose the level of insight and acquisition support that matches your strategy.
+          </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-5">
+        <div className="grid md:grid-cols-3 gap-5 items-stretch">
           {PLANS.map((p) => (
-            <div key={p.name} className={cn(
-              "ds-card-elevated p-6 lg:p-8 space-y-6 relative",
-              p.popular && "border-primary/40 ring-1 ring-primary/30 ds-glow"
-            )}>
+            <div
+              key={p.name}
+              className={cn(
+                "ds-card-elevated p-6 lg:p-8 space-y-6 relative flex flex-col",
+                p.popular && "border-primary/40 ring-1 ring-primary/30 ds-glow"
+              )}
+            >
               {p.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] uppercase tracking-widest font-semibold px-3 py-1 rounded-full">
                   Most popular
@@ -85,19 +109,21 @@ export default function Pricing() {
               )}
               <div>
                 <div className="font-display text-3xl">{p.name}</div>
-                <div className="text-xs text-muted-foreground mt-1">{p.tag}</div>
+                <div className="text-xs text-muted-foreground mt-2 leading-relaxed">{p.tag}</div>
               </div>
               <div>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-display text-5xl">£{annual ? p.annual : p.monthly}</span>
-                  <span className="text-sm text-muted-foreground">/month</span>
+                  <span className="font-display text-5xl">{p.price}</span>
+                  <span className="text-sm text-muted-foreground">{p.suffix}</span>
                 </div>
-                {annual && <div className="text-xs text-muted-foreground mt-1">Billed annually · £{p.annual * 12}/yr</div>}
               </div>
-              <Button className={cn("w-full", p.popular ? "bg-primary text-primary-foreground hover:bg-primary/90" : "")} variant={p.popular ? "default" : "outline"}>
-                {p.popular ? "Start free 14-day trial" : "Choose " + p.name}
+              <Button
+                className={cn("w-full", p.popular ? "bg-primary text-primary-foreground hover:bg-primary/90" : "")}
+                variant={p.popular ? "default" : "outline"}
+              >
+                {p.cta}
               </Button>
-              <ul className="space-y-2.5 pt-4 border-t border-border/60">
+              <ul className="space-y-2.5 pt-4 border-t border-border/60 flex-1">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
                     <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
@@ -105,13 +131,42 @@ export default function Pricing() {
                   </li>
                 ))}
               </ul>
+              {p.footnote && (
+                <p className="text-[11px] text-muted-foreground/80 leading-relaxed border-t border-border/60 pt-4">
+                  {p.footnote}
+                </p>
+              )}
             </div>
           ))}
         </div>
 
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="text-center space-y-2">
+            <div className="text-xs uppercase tracking-widest text-primary font-medium">FAQ</div>
+            <h2 className="font-display text-3xl">Common questions</h2>
+          </div>
+          <div className="ds-card p-2 lg:p-4">
+            <Accordion type="single" collapsible className="w-full">
+              {FAQS.map((f, i) => (
+                <AccordionItem key={i} value={`faq-${i}`} className="border-border/60 last:border-0">
+                  <AccordionTrigger className="px-4 text-left hover:no-underline">
+                    {f.q}
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 text-muted-foreground leading-relaxed">
+                    {f.a}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
+        </div>
+
         <div className="ds-card p-6 lg:p-8 text-center">
-          <h3 className="font-display text-2xl">Need a fund-grade plan?</h3>
-          <p className="text-sm text-muted-foreground mt-2 max-w-xl mx-auto">For funds running £50m+ pipelines, we offer custom seat counts, bespoke scoring weights, and white-glove onboarding.</p>
+          <h3 className="font-display text-2xl">Acquisition teams and funds</h3>
+          <p className="text-sm text-muted-foreground mt-2 max-w-xl mx-auto">
+            For funds and acquisition desks running active pipelines, we offer custom seat counts,
+            bespoke scoring weights, and dedicated sourcing support under Insider Access.
+          </p>
           <Button variant="outline" className="mt-5">Talk to us</Button>
         </div>
       </div>
