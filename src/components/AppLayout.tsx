@@ -1,10 +1,11 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Bookmark, CreditCard, Settings, Search, LogOut, Sparkles } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWatchlist } from "@/lib/watchlist";
+import { useAuth } from "@/lib/auth";
 import { ReactNode } from "react";
 
 const NAV = [
@@ -16,7 +17,14 @@ const NAV = [
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { ids } = useWatchlist();
+  const auth = useAuth();
+
+  const handleSignOut = async () => {
+    await auth.signOut();
+    navigate("/auth", { replace: true });
+  };
 
   return (
     <div className="min-h-screen flex w-full bg-background">
@@ -59,9 +67,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <p className="text-[11px] text-muted-foreground leading-relaxed">AI summaries, comparables and priority alerts active.</p>
             <Link to="/pricing" className="text-[11px] text-primary hover:underline">Manage plan →</Link>
           </div>
-          <Link to="/" className="mt-3 flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+          <button onClick={() => void handleSignOut()} className="mt-3 flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
             <LogOut className="h-3.5 w-3.5" /> Sign out
-          </Link>
+          </button>
         </div>
       </aside>
 

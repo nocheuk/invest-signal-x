@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { DEALS, ASSET_TYPES, REGIONS, formatGBP, formatPct, type Rating } from "@/lib/deals";
+import { ASSET_TYPES, REGIONS, formatPct, type Rating } from "@/lib/deals";
 import { DealCard } from "@/components/DealCard";
 import { DealRow } from "@/components/DealRow";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore } from "@/lib/strategy";
+import { useDeals } from "@/hooks/useDeals";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, SlidersHorizontal, Filter } from "lucide-react";
@@ -13,9 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
 
+const EMPTY_DEALS = [];
+
 export default function Dashboard() {
   const { ids } = useWatchlist();
   const { weights } = useStrategy();
+  const dealsQuery = useDeals();
+  const deals = dealsQuery.data ?? EMPTY_DEALS;
   const [strategyOpen, setStrategyOpen] = useState(false);
   const [region, setRegion] = useState("All UK");
   const [asset, setAsset] = useState<string>("All");
@@ -24,21 +29,21 @@ export default function Dashboard() {
   const [sort, setSort] = useState<"score" | "yield" | "price">("score");
 
   const kpis = useMemo(() => {
-    const greens = DEALS.filter(d => d.rating === "green").length;
-    const yields = DEALS.filter(d => d.netInitialYield > 0).map(d => d.netInitialYield);
+    const greens = deals.filter(d => d.rating === "green").length;
+    const yields = deals.filter(d => d.netInitialYield > 0).map(d => d.netInitialYield);
     const avg = yields.reduce((a, b) => a + b, 0) / yields.length;
-    const top = [...DEALS].sort((a, b) => b.score - a.score)[0];
+    const top = [...deals].sort((a, b) => b.score - a.score)[0];
     return {
       scanned: 14_832,
       greens,
-      avgYield: avg,
-      top: top.score,
+      avgYield: Number.isFinite(avg) ? avg : 0,
+      top: top?.score ?? 0,
       watched: ids.length,
     };
-  }, [ids.length]);
+  }, [deals, ids.length]);
 
   const filtered = useMemo(() => {
-    let res = DEALS.filter(d =>
+    let res = deals.filter(d =>
       (region === "All UK" || d.region === region) &&
       (asset === "All" || d.assetType === asset) &&
       (rating === "all" || d.rating === rating) &&
@@ -48,9 +53,9 @@ export default function Dashboard() {
     if (sort === "yield") res = [...res].sort((a, b) => b.netInitialYield - a.netInitialYield);
     if (sort === "price") res = [...res].sort((a, b) => a.guidePrice - b.guidePrice);
     return res;
-  }, [region, asset, minYield, rating, sort, weights]);
+  }, [deals, region, asset, minYield, rating, sort, weights]);
 
-  const best = useMemo(() => [...DEALS].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [weights]);
+  const best = useMemo(() => [...deals].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [deals, weights]);
 
   return (
     <AppLayout>
@@ -96,7 +101,7 @@ export default function Dashboard() {
         <section className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h2 className="font-display text-2xl">All live opportunities</h2>
-            <div className="text-xs text-muted-foreground font-mono tabular">{filtered.length} of {DEALS.length} deals</div>
+            <div className="text-xs text-muted-foreground font-mono tabular">{dealsQuery.isLoading ? "Loading deals" : `${filtered.length} of ${deals.length} deals`}</div>
           </div>
 
           <StrategyControl onOpen={() => setStrategyOpen(true)} />
@@ -159,7 +164,9 @@ export default function Dashboard() {
             </div>
             {filtered.map(d => <DealRow key={d.id} deal={d} />)}
             {filtered.length === 0 && (
-              <div className="p-12 text-center text-muted-foreground text-sm">No deals match these filters. Loosen criteria to see more.</div>
+              <div className="p-12 text-center text-muted-foreground text-sm">
+                {dealsQuery.isError ? "Could not load live deals. Please try again shortly." : "No deals match these filters. Loosen criteria to see more."}
+              </div>
             )}
           </div>
         </section>

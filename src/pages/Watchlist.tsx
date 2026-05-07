@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { useWatchlist } from "@/lib/watchlist";
-import { DEALS, formatGBP, formatPct } from "@/lib/deals";
+import { formatGBP, formatPct } from "@/lib/deals";
+import { useDeals } from "@/hooks/useDeals";
 import { RatingBadge, ScorePill } from "@/components/RatingBadge";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Bookmark, MapPin, Trash2, AlertTriangle, ArrowRight } from "lucide-react";
 
 export default function Watchlist() {
-  const { ids, notes, setNote, remove } = useWatchlist();
-  const watched = DEALS.filter((d) => ids.includes(d.id));
+  const { ids, notes, setNote, remove, error } = useWatchlist();
+  const dealsQuery = useDeals();
+  const watched = (dealsQuery.data ?? []).filter((d) => ids.includes(d.id));
 
   return (
     <AppLayout>
@@ -19,6 +21,7 @@ export default function Watchlist() {
             <div className="text-xs uppercase tracking-widest text-primary font-medium">Watchlist</div>
             <h1 className="font-display text-4xl mt-1">Saved deals</h1>
             <p className="text-muted-foreground text-sm mt-1">{watched.length} {watched.length === 1 ? "deal" : "deals"} on your watchlist. Notes auto-save.</p>
+            {error && <p className="text-xs text-signal-red mt-1">{error}</p>}
           </div>
         </div>
 
@@ -49,7 +52,7 @@ export default function Watchlist() {
                       <MapPin className="h-3 w-3" />{d.location}
                     </div>
                   </div>
-                  <button onClick={() => remove(d.id)} className="text-muted-foreground hover:text-signal-red transition-colors p-1" aria-label="Remove">
+                  <button onClick={() => void remove(d.id)} className="text-muted-foreground hover:text-signal-red transition-colors p-1" aria-label="Remove">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -69,7 +72,7 @@ export default function Watchlist() {
                 <Textarea
                   placeholder="Notes — viewing booked, target price, contact…"
                   value={notes[d.id] || ""}
-                  onChange={(e) => setNote(d.id, e.target.value)}
+                  onChange={(e) => void setNote(d.id, e.target.value)}
                   className="bg-surface-2 border-border/60 min-h-20 resize-none text-sm"
                 />
 
