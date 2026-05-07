@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
-import { COMPARABLES, formatGBP, formatPct, getDeal } from "@/lib/deals";
+import { COMPARABLES, formatGBP, formatPct } from "@/lib/deals";
+import { useDeal } from "@/hooks/useDeals";
 import { ScorePill, RatingBadge } from "@/components/RatingBadge";
 import { Hint } from "@/components/Hint";
 import { useWatchlist } from "@/lib/watchlist";
@@ -20,14 +21,22 @@ const WEIGHTS = [
 export default function DealDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const deal = getDeal(id || "");
+  const { deal, isLoading, isError } = useDeal(id);
   const { isWatched, toggle, notes, setNote } = useWatchlist();
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="container py-20 text-center text-sm text-muted-foreground">Loading deal...</div>
+      </AppLayout>
+    );
+  }
 
   if (!deal) {
     return (
       <AppLayout>
         <div className="container py-20 text-center">
-          <p className="text-muted-foreground">Deal not found.</p>
+          <p className="text-muted-foreground">{isError ? "Could not load this deal." : "Deal not found."}</p>
           <Button asChild variant="link"><Link to="/dashboard">Back to dashboard</Link></Button>
         </div>
       </AppLayout>
@@ -76,7 +85,7 @@ export default function DealDetail() {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <Button onClick={() => toggle(deal.id)} variant={watched ? "default" : "outline"} className={cn("gap-2", watched && "bg-primary text-primary-foreground hover:bg-primary/90")}>
+              <Button onClick={() => void toggle(deal.id)} variant={watched ? "default" : "outline"} className={cn("gap-2", watched && "bg-primary text-primary-foreground hover:bg-primary/90")}>
                 <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
                 {watched ? "Watching" : "Add to watchlist"}
               </Button>
@@ -251,7 +260,7 @@ export default function DealDetail() {
           <h2 className="font-display text-2xl">Your notes</h2>
           <Textarea
             value={note}
-            onChange={(e) => setNote(deal.id, e.target.value)}
+            onChange={(e) => void setNote(deal.id, e.target.value)}
             placeholder="Add a note — pricing target, viewing date, follow-up actions…"
             className="bg-surface-2 border-border/60 min-h-32 resize-none"
           />

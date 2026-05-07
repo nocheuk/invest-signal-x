@@ -30,10 +30,14 @@ export function StrategyOptimiserModal({ open, onOpenChange }: { open: boolean; 
     setName((cur) => (Object.keys(PRESETS).includes(cur) ? p : cur));
   };
 
-  const handleSave = () => {
-    strategy.save({ name: name.trim() || preset, preset, weights });
-    onOpenChange(false);
-    toast.success("Strategy updated — deals re-ranked around your priorities.");
+  const handleSave = async () => {
+    try {
+      await strategy.save({ name: name.trim() || preset, preset, weights });
+      onOpenChange(false);
+      toast.success("Strategy updated. Deals re-ranked around your priorities.");
+    } catch {
+      toast.error(strategy.error || "Could not save strategy.");
+    }
   };
 
   const handleReset = () => {
@@ -147,8 +151,8 @@ export function StrategyOptimiserModal({ open, onOpenChange }: { open: boolean; 
             <Button variant="outline" onClick={handleReset} className="gap-1.5">
               <RotateCcw className="h-3.5 w-3.5" /> Reset to Balanced
             </Button>
-            <Button onClick={handleSave} className="gap-1.5 bg-primary hover:bg-primary/90">
-              <Save className="h-3.5 w-3.5" /> Save Strategy
+            <Button onClick={() => void handleSave()} disabled={strategy.isSaving} className="gap-1.5 bg-primary hover:bg-primary/90">
+              <Save className="h-3.5 w-3.5" /> {strategy.isSaving ? "Saving" : "Save Strategy"}
             </Button>
           </div>
         </div>
