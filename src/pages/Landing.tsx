@@ -272,7 +272,7 @@ export default function Landing() {
             {[
               { q: "Where does the data come from?", a: "We aggregate listings from major UK commercial agents, the principal auction houses (Allsop, Acuitus, Savills, BidX1) and a growing set of off-market feeds. We never resell raw vendor data." },
               { q: "How accurate is the DealSignal Score?", a: "It is calibrated against historical transaction data and continually back-tested. Treat it as a triage signal, not an investment decision — the score is designed to surface deals worth a second look, and flag ones that aren't." },
-              { q: "Do I need to be an institutional investor?", a: "No. Scout starts at £29/month and is designed for solo investors making their first 1–5 acquisitions. Pro is for teams running structured pipelines." },
+              { q: "Do I need to be an institutional investor?", a: "No. Scout starts at £49/month for early-stage investors. Insider Access is for professional investors, developers and acquisition teams who want curated deal flow and bespoke sourcing support." },
               { q: "Will it tell me when to bid at auction?", a: "We show you a guide-price risk indicator and our own modelled stabilised yield, but bidding is your call. We try hard to flag yield-trap auction lots before you waste time on them." },
               { q: "How are advanced metrics like reversion and exit yield modelled?", a: "We use sector ERV benchmarks, comparable evidence within 2 miles where available, and a Monte Carlo on cap-rate sensitivity. Methodology is documented in the app for every score." },
             ].map((f) => (
