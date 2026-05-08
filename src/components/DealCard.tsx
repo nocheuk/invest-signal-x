@@ -13,6 +13,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
   const yourScore = personalisedScore(deal, weights);
   const reasons = matchReasons(deal, weights);
   const watched = isWatched(deal.id);
+  const sourceLabel = deal.importSourceName ?? deal.source;
 
   return (
     <Link
@@ -48,7 +49,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground uppercase tracking-wide">
             <span>{deal.assetType}</span>
             <span className="opacity-40">•</span>
-            <span>{deal.source}</span>
+            <span className="truncate">{sourceLabel}</span>
           </div>
           <h3 className="font-semibold text-[15px] leading-tight">{deal.title}</h3>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -85,7 +86,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
             <TrendingUp className="h-3 w-3" /> {deal.tenant.length > 22 ? deal.tenant.slice(0, 20) + "…" : deal.tenant}
           </div>
           <div className="flex items-center gap-1 text-[11px] text-signal-amber">
-            <AlertTriangle className="h-3 w-3" /> {deal.mainRiskFlag}
+            <AlertTriangle className="h-3 w-3" /> {deal.needsReview ? "Needs review" : deal.mainRiskFlag}
           </div>
         </div>
       </div>

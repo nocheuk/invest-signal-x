@@ -3,7 +3,40 @@ import type { Database } from "@/lib/supabase/types";
 
 type DealRow = Database["public"]["Tables"]["deals"]["Row"];
 
-export function mapDealRow(row: DealRow): Deal {
+export type DealSourceMetadata = {
+  sourceUrl?: string | null;
+  importSourceName?: string | null;
+  importSourceType?: string | null;
+};
+
+const defaultScoreBreakdown: Deal["scoreBreakdown"] = {
+  incomeQuality: 25,
+  tenantSecurity: 35,
+  marketPricing: 45,
+  upside: 30,
+  riskExit: 40,
+};
+
+const defaultInsights: Deal["insights"] = {
+  mispricing: "Imported listing awaiting analyst review.",
+  couldGoWrong: "Source data has not been fully underwritten.",
+  askAgent: "Confirm lease, rent, title, EPC and tenancy details against source documents.",
+  negotiation: "Set target pricing after validation against comparables.",
+};
+
+export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}): Deal {
+  const guidePrice = safeNumber(row.guide_price);
+  const passingRent = safeNumber(row.passing_rent);
+  const grossYield = safeNumber(row.gross_yield) || (guidePrice > 0 ? (passingRent / guidePrice) * 100 : 0);
+  const netInitialYield = safeNumber(row.net_initial_yield) || Math.max(0, grossYield * 0.93);
+  const score = clampScore(row.score ?? (sourceMetadata.importSourceName ? 39 : 0));
+  const needsReview = Boolean(sourceMetadata.importSourceName) && (
+    netInitialYield === 0 ||
+    !row.tenant ||
+    row.tenant === "Unknown" ||
+    /review/i.test(row.main_risk_flag ?? "")
+  );
+
   return {
     id: row.id,
     title: row.title,
@@ -11,33 +44,37 @@ export function mapDealRow(row: DealRow): Deal {
     region: row.region,
     assetType: row.asset_type as Deal["assetType"],
     source: row.source as Deal["source"],
-    guidePrice: row.guide_price,
-    passingRent: row.passing_rent,
-    sqft: row.sqft,
-    grossYield: row.gross_yield,
-    netInitialYield: row.net_initial_yield,
-    reversionaryYield: row.reversionary_yield,
-    wault: row.wault,
-    leaseLength: row.lease_length,
-    tenant: row.tenant,
+    sourceUrl: sourceMetadata.sourceUrl ?? undefined,
+    importSourceName: sourceMetadata.importSourceName ?? undefined,
+    importSourceType: sourceMetadata.importSourceType ?? undefined,
+    needsReview,
+    guidePrice,
+    passingRent,
+    sqft: safeNumber(row.sqft),
+    grossYield,
+    netInitialYield,
+    reversionaryYield: safeNumber(row.reversionary_yield) || netInitialYield,
+    wault: safeNumber(row.wault),
+    leaseLength: safeNumber(row.lease_length),
+    tenant: row.tenant || "Unknown",
     covenantStrength: row.covenant_strength as Deal["covenantStrength"],
-    tenantHealthScore: row.tenant_health_score,
+    tenantHealthScore: safeNumber(row.tenant_health_score),
     rentSustainability: row.rent_sustainability as Deal["rentSustainability"],
     rentReview: row.rent_review as Deal["rentReview"],
-    pricePerSqft: row.price_per_sqft,
-    planningUpsideScore: row.planning_upside_score,
-    voidRiskScore: row.void_risk_score,
+    pricePerSqft: safeNumber(row.price_per_sqft) || (safeNumber(row.sqft) > 0 ? Math.round(guidePrice / safeNumber(row.sqft)) : 0),
+    planningUpsideScore: safeNumber(row.planning_upside_score),
+    voidRiskScore: safeNumber(row.void_risk_score),
     exitYieldSensitivity: row.exit_yield_sensitivity as Deal["exitYieldSensitivity"],
-    cashflowAfterDebt: row.cashflow_after_debt,
-    returnOnEquity: row.return_on_equity,
+    cashflowAfterDebt: safeNumber(row.cashflow_after_debt),
+    returnOnEquity: safeNumber(row.return_on_equity),
     auctionGuideRisk: row.auction_guide_risk as Deal["auctionGuideRisk"],
     redFlags: row.red_flags ?? [],
-    mainRiskFlag: row.main_risk_flag,
-    score: row.score,
-    rating: row.rating as Deal["rating"],
-    scoreBreakdown: row.score_breakdown as Deal["scoreBreakdown"],
-    insights: row.insights as Deal["insights"],
-    thumbnail: row.thumbnail,
+    mainRiskFlag: needsReview ? "Needs review" : row.main_risk_flag,
+    score,
+    rating: (row.rating || ratingFromScore(score)) as Deal["rating"],
+    scoreBreakdown: (row.score_breakdown as Deal["scoreBreakdown"]) ?? defaultScoreBreakdown,
+    insights: (row.insights as Deal["insights"]) ?? defaultInsights,
+    thumbnail: row.thumbnail || "from-zinc-500/30 to-slate-700/20",
     postedAt: row.posted_at,
   };
 }
@@ -79,4 +116,19 @@ export function mapDealToInsert(deal: Deal) {
     thumbnail: deal.thumbnail,
     posted_at: deal.postedAt,
   };
+}
+
+function safeNumber(value: number | null | undefined) {
+  return Number.isFinite(value) ? Number(value) : 0;
+}
+
+function clampScore(value: number | null | undefined) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(Number(value))));
+}
+
+function ratingFromScore(score: number): Deal["rating"] {
+  if (score >= 78) return "green";
+  if (score >= 60) return "amber";
+  return "red";
 }

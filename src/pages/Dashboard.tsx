@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [asset, setAsset] = useState<string>("All");
   const [minYield, setMinYield] = useState(0);
   const [rating, setRating] = useState<"all" | Rating>("all");
+  const [source, setSource] = useState("All");
   const [sort, setSort] = useState<"score" | "yield" | "price">("score");
 
   const kpis = useMemo(() => {
@@ -51,6 +52,7 @@ export default function Dashboard() {
     let res = deals.filter(d =>
       (region === "All UK" || d.region === region) &&
       (asset === "All" || d.assetType === asset) &&
+      (source === "All" || (d.importSourceName ?? d.source) === source) &&
       (rating === "all" || d.rating === rating) &&
       (d.netInitialYield >= minYield)
     );
@@ -58,9 +60,12 @@ export default function Dashboard() {
     if (sort === "yield") res = [...res].sort((a, b) => b.netInitialYield - a.netInitialYield);
     if (sort === "price") res = [...res].sort((a, b) => a.guidePrice - b.guidePrice);
     return res;
-  }, [deals, region, asset, minYield, rating, sort, weights]);
+  }, [deals, region, asset, source, minYield, rating, sort, weights]);
 
   const best = useMemo(() => [...deals].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [deals, weights]);
+  const sourceOptions = useMemo(() => {
+    return [...new Set(deals.map((deal) => deal.importSourceName ?? deal.source).filter(Boolean))].sort();
+  }, [deals]);
 
   return (
     <AppLayout>
@@ -132,6 +137,13 @@ export default function Dashboard() {
                 <SelectItem value="6">Min 6% NIY</SelectItem>
                 <SelectItem value="7">Min 7% NIY</SelectItem>
                 <SelectItem value="8">Min 8% NIY</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={source} onValueChange={setSource}>
+              <SelectTrigger className="h-9 w-[210px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All sources</SelectItem>
+                {sourceOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={rating} onValueChange={(v) => setRating(v as Rating | "all")}>

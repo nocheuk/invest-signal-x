@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const rows = vi.hoisted(() => ({
-  data: [{
+  deals: [{
     id: "ds-live",
     title: "Live deal",
     location: "Leeds",
@@ -42,16 +42,33 @@ const rows = vi.hoisted(() => ({
     created_at: "2026-05-01T00:00:00Z",
     updated_at: "2026-05-01T00:00:00Z",
   }],
+  links: [{
+    deal_id: "ds-live",
+    source_url: "https://www.rightmove.co.uk/properties/123",
+    import_sources: {
+      name: "Rightmove Commercial Bournemouth",
+      source_type: "apify_rightmove_commercial",
+    },
+  }],
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: true,
   requireSupabase: () => ({
-    from: () => ({
-      select: () => ({
-        order: async () => ({ data: rows.data, error: null }),
-      }),
-    }),
+    from: (table: string) => {
+      if (table === "deals") {
+        return {
+          select: () => ({
+            order: async () => ({ data: rows.deals, error: null }),
+          }),
+        };
+      }
+      return {
+        select: () => ({
+          in: async () => ({ data: rows.links, error: null }),
+        }),
+      };
+    },
   }),
 }));
 
@@ -72,6 +89,8 @@ describe("useDeals", () => {
       title: "Live deal",
       assetType: "Industrial",
       netInitialYield: 7.5,
+      importSourceName: "Rightmove Commercial Bournemouth",
+      sourceUrl: "https://www.rightmove.co.uk/properties/123",
     });
   });
 });

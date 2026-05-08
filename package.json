@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "import:deals": "tsx scripts/import-deals.mjs",
+    "import:rightmove": "node --import tsx scripts/import-rightmove.mjs",
     "seed:deals": "tsx scripts/seed-deals.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
