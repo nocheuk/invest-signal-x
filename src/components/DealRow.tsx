@@ -12,6 +12,7 @@ export function DealRow({ deal }: { deal: Deal }) {
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
   const watched = isWatched(deal.id);
+  const sourceLabel = deal.importSourceName ?? deal.source;
 
   return (
     <Link
@@ -37,7 +38,8 @@ export function DealRow({ deal }: { deal: Deal }) {
       {/* Title */}
       <div className="col-span-9 sm:col-span-3 min-w-0">
         <div className="font-medium truncate group-hover:text-primary transition-colors">{deal.title}</div>
-        <div className="text-[11px] text-muted-foreground truncate">{deal.location} · {deal.assetType}</div>
+        <div className="text-[11px] text-muted-foreground truncate">{deal.location} · {deal.assetType} · {sourceLabel}</div>
+        {deal.needsReview && <div className="text-[10px] uppercase tracking-wide text-signal-amber">Needs review</div>}
       </div>
 
       {/* Numbers — hidden on mobile */}

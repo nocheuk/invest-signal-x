@@ -106,6 +106,62 @@ Raw row statuses are:
 - `failed`
 - `skipped_duplicate`
 
+## Rightmove Commercial Import
+
+Phase 2C connects the existing import pipeline to the Apify Rightmove Commercial actor. The Apify token is server-only and must never be exposed through Vite or frontend code.
+
+Required server-side environment variables:
+
+```bash
+APIFY_TOKEN=...
+RIGHTMOVE_COMMERCIAL_ACTOR_ID=dhrumil/rightmove-commercial-scraper
+VITE_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Dry-run a Rightmove Commercial search URL. This still runs the Apify actor and fetches dataset items, but it does not write to Supabase:
+
+```bash
+npm run import:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/find.html?..." --source-name "Rightmove Commercial Leeds" --dry-run
+```
+
+Run a real import:
+
+```bash
+npm run import:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/find.html?..." --source-name "Rightmove Commercial Leeds"
+```
+
+The Rightmove importer writes through the same tables as CSV imports:
+
+- `import_sources`
+- `import_runs`
+- `raw_imports`
+- `deals`
+- `deal_source_links`
+
+Reliable imported fields where present in the Apify dataset:
+
+- external/property id
+- Rightmove source URL
+- title or display address
+- location/address
+- postcode/outcode when present or extractable from address
+- guide price/rent value
+- passing rent when present
+- sqft/floor area when present
+- property type mapped into DealSignal asset type
+- listed/added date when present
+
+Fields that usually still need enrichment or analyst review:
+
+- tenant and covenant strength
+- lease length and WAULT
+- NIY/reversionary yield when not explicitly listed
+- rent review terms
+- planning upside
+- void risk and exit sensitivity
+- comparable evidence and AI summaries
+
 ## Migration Notes
 
 `20260507120000_phase1_foundation.sql` creates the MVP data model:

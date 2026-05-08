@@ -20,6 +20,10 @@ export interface Deal {
   region: string;
   assetType: AssetType;
   source: "Auction" | "Private treaty" | "Off-market" | "Receiver sale";
+  sourceUrl?: string;
+  importSourceName?: string;
+  importSourceType?: string;
+  needsReview?: boolean;
   guidePrice: number; // £
   passingRent: number; // £ pa
   sqft: number;

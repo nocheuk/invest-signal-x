@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findDuplicate, mapImportToDealInsert, normalizeImportRow, parseDealCsv } from "@/lib/imports/dealImport";
+import { dedupeImportRows, findDuplicate, mapImportToDealInsert, normalizeImportRow, parseDealCsv } from "@/lib/imports/dealImport";
 
 describe("deal import mapping", () => {
   it("parses CSV rows and normalizes aliases", () => {
@@ -83,5 +83,33 @@ describe("deal import dedupe", () => {
       guide_price: "1950000",
     });
     expect(findDuplicate(row.normalized, [{ ...existing[0], location: "Sheffield" }])).toEqual({ dealId: "deal-1", rule: "title_price_location" });
+  });
+
+  it("keeps the first valid source-row occurrence for duplicate import identities", () => {
+    const invalid = normalizeImportRow({
+      external_id: "rm-1",
+      title: "Missing price",
+      location: "Bournemouth, BH1",
+      guide_price: "0",
+    }, 2);
+    const valid = normalizeImportRow({
+      external_id: "rm-1",
+      title: "Valid price",
+      location: "Bournemouth, BH1",
+      guide_price: "1200000",
+    }, 3);
+    const laterDuplicate = normalizeImportRow({
+      external_id: "rm-1",
+      title: "Later duplicate",
+      location: "Bournemouth, BH1",
+      guide_price: "1250000",
+    }, 4);
+
+    const result = dedupeImportRows([invalid, valid, laterDuplicate]);
+
+    expect(result.uniqueRows.map((row) => row.rowNumber)).toEqual([3]);
+    expect(result.duplicateRows.map((duplicate) => duplicate.row.rowNumber)).toEqual([2, 4]);
+    expect(result.duplicateRows[0]).toMatchObject({ duplicateOfRowNumber: 3, rule: "external_id" });
+    expect(result.duplicateRows[1]).toMatchObject({ duplicateOfRowNumber: 3, rule: "external_id" });
   });
 });

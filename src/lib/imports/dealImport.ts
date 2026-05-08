@@ -36,7 +36,7 @@ export type DealImportInput = {
 
 export type ParsedImportRow = {
   rowNumber: number;
-  raw: Record<string, string>;
+  raw: Record<string, unknown>;
   normalized: DealImportInput;
   validationErrors: string[];
   dedupeKeys: {
@@ -57,6 +57,13 @@ export type ExistingDealForDedupe = {
 export type DuplicateMatch = {
   dealId: string;
   rule: "source_url" | "title_postcode" | "title_price_location";
+};
+
+export type ImportRowDuplicate = {
+  row: ParsedImportRow;
+  duplicateOfRowNumber: number;
+  rule: "external_id" | "source_url" | "dedupe_key";
+  key: string;
 };
 
 export const DEAL_IMPORT_HEADERS = [
@@ -144,6 +151,50 @@ export function buildDedupeKeys(row: DealImportInput) {
     titlePostcode: postcode ? `${title}|${postcode}` : undefined,
     titlePriceLocation: row.guidePrice ? `${title}|${moneyKey(row.guidePrice)}|${location}` : undefined,
   };
+}
+
+export function dedupeImportRows(rows: ParsedImportRow[]) {
+  const uniqueRows: ParsedImportRow[] = [];
+  const duplicateRows: ImportRowDuplicate[] = [];
+  const seen = new Map<string, { row: ParsedImportRow; index: number; rule: ImportRowDuplicate["rule"]; key: string }>();
+
+  for (const row of rows) {
+    const key = importRowIdentityKey(row);
+    if (!key) {
+      uniqueRows.push(row);
+      continue;
+    }
+
+    const existing = seen.get(key.identity);
+    if (!existing) {
+      seen.set(key.identity, { row, index: uniqueRows.length, rule: key.rule, key: key.value });
+      uniqueRows.push(row);
+      continue;
+    }
+
+    const existingIsValid = existing.row.validationErrors.length === 0;
+    const currentIsValid = row.validationErrors.length === 0;
+    if (!existingIsValid && currentIsValid) {
+      duplicateRows.push({
+        row: existing.row,
+        duplicateOfRowNumber: row.rowNumber,
+        rule: existing.rule,
+        key: existing.key,
+      });
+      uniqueRows[existing.index] = row;
+      seen.set(key.identity, { row, index: existing.index, rule: key.rule, key: key.value });
+      continue;
+    }
+
+    duplicateRows.push({
+      row,
+      duplicateOfRowNumber: existing.row.rowNumber,
+      rule: key.rule,
+      key: key.value,
+    });
+  }
+
+  return { uniqueRows, duplicateRows };
 }
 
 export function parseDealCsv(csv: string) {
@@ -322,6 +373,20 @@ export function importRowsToCsv(rows: DealImportInput[]) {
     row.mainRiskFlag ?? "",
   ].map(csvEscape).join(","));
   return [header, ...lines].join("\n");
+}
+
+function importRowIdentityKey(row: ParsedImportRow) {
+  if (row.normalized.externalId) {
+    const value = normalizeText(row.normalized.externalId);
+    return { identity: `external_id:${value}`, rule: "external_id" as const, value };
+  }
+  if (row.normalized.sourceUrl) {
+    const value = normalizeText(row.normalized.sourceUrl);
+    return { identity: `source_url:${value}`, rule: "source_url" as const, value };
+  }
+  const fallback = row.dedupeKeys.titlePostcode || row.dedupeKeys.titlePriceLocation;
+  if (!fallback) return null;
+  return { identity: `dedupe_key:${fallback}`, rule: "dedupe_key" as const, value: fallback };
 }
 
 function parseCsvRecords(csv: string) {

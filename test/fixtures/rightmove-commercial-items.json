@@ -1,0 +1,35 @@
+[
+  {
+    "propertyId": "148450001",
+    "propertyUrl": "/properties/148450001#/?channel=COM_BUY",
+    "title": "Trade Counter Investment",
+    "displayAddress": "Leeds, LS11",
+    "propertyType": "Industrial / Warehouse",
+    "price": "1,750,000",
+    "rent": "118,000 pa",
+    "sizeSqFt": "8,500 sq ft",
+    "addedOn": "2026-05-01T09:00:00Z",
+    "agent": {
+      "name": "Example Commercial Agents"
+    }
+  },
+  {
+    "id": "rightmove-office-1",
+    "url": "https://www.rightmove.co.uk/properties/148450002#/?channel=COM_BUY",
+    "summary": "City centre office investment",
+    "address": "Manchester, M4",
+    "type": "Office",
+    "guidePrice": 5400000,
+    "floorArea": 28000
+  },
+  {
+    "propertyId": "148450001",
+    "propertyUrl": "/properties/148450001#/?channel=COM_BUY",
+    "title": "Trade Counter Investment Duplicate",
+    "displayAddress": "Leeds, LS11",
+    "propertyType": "Industrial / Warehouse",
+    "price": "1750000",
+    "rent": "118000 pa",
+    "sizeSqFt": "8500 sq ft"
+  }
+]
