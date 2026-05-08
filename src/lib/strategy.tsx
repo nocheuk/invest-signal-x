@@ -64,7 +64,7 @@ function readLocalStrategy() {
 export function StrategyProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const queryClient = useQueryClient();
-  const [state, setState] = useState<StrategyState>(readLocalStrategy);
+  const [state, setState] = useState<StrategyState>(() => isSupabaseConfigured ? DEFAULT_STRATEGY : readLocalStrategy());
   const [error, setError] = useState<string | null>(null);
 
   const queryKey = ["active-strategy", auth.user?.id];
@@ -99,10 +99,11 @@ export function StrategyProvider({ children }: { children: ReactNode }) {
 
   const saveMutation = useMutation({
     mutationFn: async (next: StrategyState) => {
-      if (!isSupabaseConfigured || !auth.user) {
+      if (!isSupabaseConfigured) {
         localStorage.setItem(KEY, JSON.stringify(next));
         return next;
       }
+      if (!auth.user) throw new Error("Cannot save strategy without an authenticated Supabase user.");
 
       const db = requireSupabase();
       if (!next.id) {

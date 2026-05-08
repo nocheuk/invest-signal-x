@@ -103,8 +103,8 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["import_runs"]["Insert"]>;
       };
       raw_imports: {
-        Row: { id: string; import_run_id: string; external_id: string | null; source_url: string | null; payload: Json; normalized_payload: Json; status: string; error_message: string | null; created_at: string };
-        Insert: { id?: string; import_run_id: string; external_id?: string | null; source_url?: string | null; payload?: Json; normalized_payload?: Json; status?: string; error_message?: string | null };
+        Row: { id: string; import_run_id: string; external_id: string | null; source_url: string | null; payload: Json; normalized_payload: Json; status: string; error_message: string | null; created_at: string; row_number: number | null; deal_id: string | null; validation_errors: Json; dedupe_key: string | null };
+        Insert: { id?: string; import_run_id: string; external_id?: string | null; source_url?: string | null; payload?: Json; normalized_payload?: Json; status?: string; error_message?: string | null; row_number?: number | null; deal_id?: string | null; validation_errors?: Json; dedupe_key?: string | null };
         Update: Partial<Database["public"]["Tables"]["raw_imports"]["Insert"]>;
       };
       deal_source_links: {

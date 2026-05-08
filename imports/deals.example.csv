@@ -1,0 +1,2 @@
+external_id,source_url,title,location,postcode,region,asset_type,source,guide_price,passing_rent,sqft,net_initial_yield,reversionary_yield,wault,tenant,covenant_strength,main_risk_flag
+manual-001,https://example.com/deals/manual-001,Example Trade Counter,"Leeds, LS11",LS11,Yorkshire,Industrial,Private treaty,1750000,118000,8500,6.3,6.9,8.2,Example Tenant Ltd,Good,Imported row for validation

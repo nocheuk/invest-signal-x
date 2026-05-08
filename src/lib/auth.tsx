@@ -18,6 +18,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
@@ -27,15 +28,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
+    Promise.all([supabase.auth.getSession(), supabase.auth.getUser()]).then(([sessionResult, userResult]) => {
       if (!mounted) return;
-      setSession(data.session);
+      setSession(sessionResult.data.session);
+      setUser(userResult.data.user ?? null);
+      setLoading(false);
+    }).catch(() => {
+      if (!mounted) return;
+      setSession(null);
+      setUser(null);
       setLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      setLoading(false);
+      if (!nextSession) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      supabase.auth.getUser().then(({ data }) => {
+        setUser(data.user ?? nextSession.user);
+        setLoading(false);
+      }).catch(() => {
+        setUser(nextSession.user);
+        setLoading(false);
+      });
     });
 
     return () => {
@@ -45,14 +63,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
-    user: session?.user ?? null,
+    user,
     session,
     loading,
     isConfigured: isSupabaseConfigured,
     signIn: async (email, password) => {
       if (!supabase) return;
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      setSession(data.session);
+      setUser(data.user);
     },
     signUp: async (email, password, fullName) => {
       if (!supabase) return { needsConfirmation: false };
@@ -65,6 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
       if (error) throw error;
+      if (data.session && data.user) {
+        setSession(data.session);
+        setUser(data.user);
+      }
       return { needsConfirmation: !data.session };
     },
     resendConfirmation: async (email) => {
@@ -88,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
-  }), [loading, session]);
+  }), [loading, session, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

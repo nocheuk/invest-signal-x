@@ -66,7 +66,7 @@ async function ensureWatchlist(userId: string) {
 export function WatchlistProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const queryClient = useQueryClient();
-  const [state, setState] = useState<WatchlistState>(readLocalState);
+  const [state, setState] = useState<WatchlistState>(() => isSupabaseConfigured ? { ids: [], notes: {} } : readLocalState());
   const [error, setError] = useState<string | null>(null);
   const queryKey = ["watchlist", auth.user?.id];
 
@@ -103,7 +103,8 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 
   const itemMutation = useMutation({
     mutationFn: async ({ dealId, nextIds }: { dealId: string; nextIds: string[] }) => {
-      if (!isSupabaseConfigured || !auth.user) return;
+      if (!isSupabaseConfigured) return;
+      if (!auth.user) throw new Error("Cannot update watchlist without an authenticated Supabase user.");
       const watchlist = state.watchlistId ? { id: state.watchlistId } : await ensureWatchlist(auth.user.id);
       const db = requireSupabase();
       if (nextIds.includes(dealId)) {
@@ -137,7 +138,8 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 
   const noteMutation = useMutation({
     mutationFn: async ({ dealId, note }: { dealId: string; note: string }) => {
-      if (!isSupabaseConfigured || !auth.user) return;
+      if (!isSupabaseConfigured) return;
+      if (!auth.user) throw new Error("Cannot save note without an authenticated Supabase user.");
       const watchlist = state.watchlistId ? { id: state.watchlistId } : await ensureWatchlist(auth.user.id);
       const db = requireSupabase();
       if (note.trim()) {

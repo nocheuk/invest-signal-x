@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "import:deals": "tsx scripts/import-deals.mjs",
     "seed:deals": "tsx scripts/seed-deals.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
