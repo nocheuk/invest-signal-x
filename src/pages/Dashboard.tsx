@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ASSET_TYPES, REGIONS, formatPct, type Rating } from "@/lib/deals";
 import { DealCard } from "@/components/DealCard";
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
+import { buildSourceOptions, filterAndSortDeals } from "@/lib/dashboardFilters";
 
 const EMPTY_DEALS = [];
 
@@ -24,7 +26,9 @@ export default function Dashboard() {
   const dealsQuery = useDeals();
   const auth = useAuth();
   const profile = useProfile();
+  const [searchParams] = useSearchParams();
   const deals = dealsQuery.data ?? EMPTY_DEALS;
+  const search = searchParams.get("q") ?? "";
   const firstName = (profile.data?.full_name || auth.user?.user_metadata?.full_name || auth.user?.email || "there").split(/\s|@/)[0];
   const [strategyOpen, setStrategyOpen] = useState(false);
   const [region, setRegion] = useState("All UK");
@@ -49,23 +53,14 @@ export default function Dashboard() {
   }, [deals, ids.length]);
 
   const filtered = useMemo(() => {
-    let res = deals.filter(d =>
-      (region === "All UK" || d.region === region) &&
-      (asset === "All" || d.assetType === asset) &&
-      (source === "All" || (d.importSourceName ?? d.source) === source) &&
-      (rating === "all" || d.rating === rating) &&
-      (d.netInitialYield >= minYield)
-    );
-    if (sort === "score") res = [...res].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights));
-    if (sort === "yield") res = [...res].sort((a, b) => b.netInitialYield - a.netInitialYield);
-    if (sort === "price") res = [...res].sort((a, b) => a.guidePrice - b.guidePrice);
-    return res;
-  }, [deals, region, asset, source, minYield, rating, sort, weights]);
+    return filterAndSortDeals(deals, { region, asset, source, rating, minYield, search, sort }, weights);
+  }, [deals, region, asset, source, minYield, rating, search, sort, weights]);
 
   const best = useMemo(() => [...deals].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [deals, weights]);
-  const sourceOptions = useMemo(() => {
-    return [...new Set(deals.map((deal) => deal.importSourceName ?? deal.source).filter(Boolean))].sort();
-  }, [deals]);
+  const sourceOptions = useMemo(() => buildSourceOptions(deals), [deals]);
+  const needsReview = useMemo(() => deals.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [deals]);
+  const importedCount = useMemo(() => deals.filter((deal) => deal.isImported || deal.importSourceName).length, [deals]);
+  const showDebugCounts = import.meta.env.DEV || source !== "All" || search.length > 0;
 
   return (
     <AppLayout>
@@ -92,6 +87,24 @@ export default function Dashboard() {
         </div>
 
         {/* Today's best */}
+        {needsReview.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-end justify-between">
+              <div>
+                <h2 className="font-display text-2xl">Needs review</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Sparse imported listings waiting for underwriting.</p>
+              </div>
+              <button onClick={() => setSource("Imported")} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+                View imported <ArrowUpRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              {needsReview.slice(0, 3).map((d) => <DealCard key={d.id} deal={d} variant="feature" />)}
+            </div>
+          </section>
+        )}
+
+        {/* Today's best */}
         <section className="space-y-3">
           <div className="flex items-end justify-between">
             <div>
@@ -113,6 +126,11 @@ export default function Dashboard() {
             <h2 className="font-display text-2xl">All live opportunities</h2>
             <div className="text-xs text-muted-foreground font-mono tabular">{dealsQuery.isLoading ? "Loading deals" : `${filtered.length} of ${deals.length} deals`}</div>
           </div>
+          {showDebugCounts && (
+            <div className="text-[11px] text-muted-foreground font-mono tabular">
+              total fetched: {deals.length} · visible: {filtered.length} · imported: {importedCount}
+            </div>
+          )}
 
           <StrategyControl onOpen={() => setStrategyOpen(true)} />
 
@@ -182,7 +200,7 @@ export default function Dashboard() {
             {filtered.map(d => <DealRow key={d.id} deal={d} />)}
             {filtered.length === 0 && (
               <div className="p-12 text-center text-muted-foreground text-sm">
-                {dealsQuery.isError ? "Could not load live deals. Please try again shortly." : "No deals match these filters. Loosen criteria to see more."}
+                {dealsQuery.isError ? "Could not load live deals. Please try again shortly." : "No deals match these filters."}
               </div>
             )}
           </div>

@@ -23,6 +23,7 @@ export interface Deal {
   sourceUrl?: string;
   importSourceName?: string;
   importSourceType?: string;
+  isImported?: boolean;
   needsReview?: boolean;
   guidePrice: number; // £
   passingRent: number; // £ pa

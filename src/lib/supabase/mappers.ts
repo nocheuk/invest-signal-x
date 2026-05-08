@@ -30,7 +30,8 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
   const grossYield = safeNumber(row.gross_yield) || (guidePrice > 0 ? (passingRent / guidePrice) * 100 : 0);
   const netInitialYield = safeNumber(row.net_initial_yield) || Math.max(0, grossYield * 0.93);
   const score = clampScore(row.score ?? (sourceMetadata.importSourceName ? 39 : 0));
-  const needsReview = Boolean(sourceMetadata.importSourceName) && (
+  const isImported = Boolean(sourceMetadata.importSourceName) || row.id.startsWith("imp-");
+  const needsReview = isImported && (
     netInitialYield === 0 ||
     !row.tenant ||
     row.tenant === "Unknown" ||
@@ -47,6 +48,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     sourceUrl: sourceMetadata.sourceUrl ?? undefined,
     importSourceName: sourceMetadata.importSourceName ?? undefined,
     importSourceType: sourceMetadata.importSourceType ?? undefined,
+    isImported,
     needsReview,
     guidePrice,
     passingRent,

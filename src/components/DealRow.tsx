@@ -12,7 +12,7 @@ export function DealRow({ deal }: { deal: Deal }) {
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
   const watched = isWatched(deal.id);
-  const sourceLabel = deal.importSourceName ?? deal.source;
+  const sourceLabel = deal.importSourceName ?? (deal.isImported ? "Imported" : deal.source);
 
   return (
     <Link
