@@ -63,6 +63,16 @@ async function ensureWatchlist(userId: string) {
   return data;
 }
 
+async function ensureWatchlistItem(watchlistId: string, dealId: string) {
+  const { error } = await requireSupabase()
+    .from("watchlist_items")
+    .upsert(
+      { watchlist_id: watchlistId, deal_id: dealId },
+      { onConflict: "watchlist_id,deal_id" }
+    );
+  if (error) throw error;
+}
+
 export function WatchlistProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const queryClient = useQueryClient();
@@ -110,7 +120,10 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       if (nextIds.includes(dealId)) {
         const { error: insertError } = await db
           .from("watchlist_items")
-          .upsert({ watchlist_id: watchlist.id, deal_id: dealId });
+          .upsert(
+            { watchlist_id: watchlist.id, deal_id: dealId },
+            { onConflict: "watchlist_id,deal_id" }
+          );
         if (insertError) throw insertError;
       } else {
         const { error: deleteError } = await db
@@ -143,9 +156,13 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       const watchlist = state.watchlistId ? { id: state.watchlistId } : await ensureWatchlist(auth.user.id);
       const db = requireSupabase();
       if (note.trim()) {
+        await ensureWatchlistItem(watchlist.id, dealId);
         const { error: upsertError } = await db
           .from("watchlist_notes")
-          .upsert({ watchlist_id: watchlist.id, deal_id: dealId, note });
+          .upsert(
+            { watchlist_id: watchlist.id, deal_id: dealId, note },
+            { onConflict: "watchlist_id,deal_id" }
+          );
         if (upsertError) throw upsertError;
       } else {
         const { error: deleteError } = await db
@@ -160,7 +177,11 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       setError(null);
       await queryClient.cancelQueries({ queryKey });
       const previous = state;
-      const next = { ...state, notes: { ...state.notes, [dealId]: note } };
+      const next = {
+        ...state,
+        ids: note.trim() && !state.ids.includes(dealId) ? [...state.ids, dealId] : state.ids,
+        notes: { ...state.notes, [dealId]: note },
+      };
       if (!note.trim()) delete next.notes[dealId];
       setState(next);
       queryClient.setQueryData(queryKey, next);
