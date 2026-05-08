@@ -18,7 +18,7 @@ const NAV = [
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const { ids } = useWatchlist();
   const auth = useAuth();
@@ -29,10 +29,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const navItems = isAdminUser(auth.user) || !auth.isConfigured
     ? [...NAV, { to: "/admin/import", label: "Import", icon: UploadCloud }]
     : NAV;
+  const searchValue = new URLSearchParams(search).get("q") ?? "";
 
   const handleSignOut = async () => {
     await auth.signOut();
     navigate("/auth", { replace: true });
+  };
+
+  const handleSearch = (value: string) => {
+    const params = new URLSearchParams(pathname === "/dashboard" ? search : "");
+    if (value.trim()) {
+      params.set("q", value);
+    } else {
+      params.delete("q");
+    }
+    const query = params.toString();
+    navigate(`/dashboard${query ? `?${query}` : ""}`, { replace: pathname === "/dashboard" });
   };
 
   return (
@@ -91,7 +103,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="flex-1 max-w-md hidden md:block">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search deals, locations, tenants…" className="pl-9 bg-surface-2 border-border/60 h-9" />
+              <Input
+                value={searchValue}
+                onChange={(event) => handleSearch(event.target.value)}
+                placeholder="Search deals, locations, tenants…"
+                className="pl-9 bg-surface-2 border-border/60 h-9"
+              />
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">

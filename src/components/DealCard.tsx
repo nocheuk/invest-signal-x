@@ -13,7 +13,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
   const yourScore = personalisedScore(deal, weights);
   const reasons = matchReasons(deal, weights);
   const watched = isWatched(deal.id);
-  const sourceLabel = deal.importSourceName ?? deal.source;
+  const sourceLabel = deal.importSourceName ?? (deal.isImported ? "Imported" : deal.source);
 
   return (
     <Link
