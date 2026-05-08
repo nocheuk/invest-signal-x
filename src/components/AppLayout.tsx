@@ -1,11 +1,13 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Bookmark, CreditCard, Settings, Search, LogOut, Sparkles } from "lucide-react";
+import { LayoutDashboard, Bookmark, CreditCard, Settings, Search, LogOut, Sparkles, UploadCloud } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWatchlist } from "@/lib/watchlist";
 import { useAuth } from "@/lib/auth";
+import { isAdminUser } from "@/lib/admin";
+import { useProfile } from "@/hooks/useProfile";
 import { ReactNode } from "react";
 
 const NAV = [
@@ -20,6 +22,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const { ids } = useWatchlist();
   const auth = useAuth();
+  const profile = useProfile();
+  const displayName = profile.data?.full_name || auth.user?.user_metadata?.full_name || auth.user?.email || "Demo user";
+  const displayEmail = auth.user?.email || (auth.isConfigured ? "" : "demo@dealsignal.local");
+  const initials = makeInitials(displayName, displayEmail);
+  const navItems = isAdminUser(auth.user) || !auth.isConfigured
+    ? [...NAV, { to: "/admin/import", label: "Import", icon: UploadCloud }]
+    : NAV;
 
   const handleSignOut = async () => {
     await auth.signOut();
@@ -34,7 +43,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <Logo />
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {NAV.map(({ to, label, icon: Icon }) => {
+          {navItems.map(({ to, label, icon: Icon }) => {
             const active = pathname === to || (to === "/dashboard" && pathname.startsWith("/deal/"));
             return (
               <Link
@@ -90,13 +99,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <span className="h-1.5 w-1.5 rounded-full bg-signal-green animate-pulse" />
               Live scanning
             </Button>
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary-glow grid place-items-center text-[11px] font-semibold text-primary-foreground">JS</div>
+            <div className="hidden sm:block text-right leading-tight">
+              <div className="text-xs font-medium truncate max-w-40">{displayName}</div>
+              {displayEmail && <div className="text-[10px] text-muted-foreground truncate max-w-40">{displayEmail}</div>}
+            </div>
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary-glow grid place-items-center text-[11px] font-semibold text-primary-foreground">{initials}</div>
           </div>
         </header>
 
         {/* Mobile nav */}
         <nav className="lg:hidden flex overflow-x-auto scrollbar-none gap-1 px-3 py-2 border-b border-border/60 bg-background">
-          {NAV.map(({ to, label, icon: Icon }) => {
+          {navItems.map(({ to, label, icon: Icon }) => {
             const active = pathname === to;
             return (
               <Link key={to} to={to} className={cn(
@@ -113,4 +126,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+function makeInitials(name: string, email?: string) {
+  const base = name || email || "DU";
+  const parts = base.includes("@") ? [base[0]] : base.split(/\s+/).filter(Boolean);
+  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "DU";
 }

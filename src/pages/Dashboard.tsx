@@ -6,6 +6,8 @@ import { DealRow } from "@/components/DealRow";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore } from "@/lib/strategy";
 import { useDeals } from "@/hooks/useDeals";
+import { useAuth } from "@/lib/auth";
+import { useProfile } from "@/hooks/useProfile";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, SlidersHorizontal, Filter } from "lucide-react";
@@ -20,7 +22,10 @@ export default function Dashboard() {
   const { ids } = useWatchlist();
   const { weights } = useStrategy();
   const dealsQuery = useDeals();
+  const auth = useAuth();
+  const profile = useProfile();
   const deals = dealsQuery.data ?? EMPTY_DEALS;
+  const firstName = (profile.data?.full_name || auth.user?.user_metadata?.full_name || auth.user?.email || "there").split(/\s|@/)[0];
   const [strategyOpen, setStrategyOpen] = useState(false);
   const [region, setRegion] = useState("All UK");
   const [asset, setAsset] = useState<string>("All");
@@ -64,7 +69,7 @@ export default function Dashboard() {
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
             <div className="text-xs uppercase tracking-widest text-primary font-medium">Today · 30 April 2026</div>
-            <h1 className="font-display text-4xl mt-1">Good morning, Jane.</h1>
+            <h1 className="font-display text-4xl mt-1">Good morning, {firstName}.</h1>
             <p className="text-muted-foreground text-sm mt-1">{kpis.greens} green-rated deals surfaced overnight across your search filters.</p>
           </div>
           <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">

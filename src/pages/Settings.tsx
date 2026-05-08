@@ -7,8 +7,12 @@ import { Switch } from "@/components/ui/switch";
 import { ASSET_TYPES, REGIONS } from "@/lib/deals";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function Settings() {
+  const auth = useAuth();
+  const profile = useProfile();
   const [regions, setRegions] = useState<string[]>(["South East", "North West", "Yorkshire"]);
   const [assets, setAssets] = useState<string[]>(["Industrial", "Convenience", "Healthcare"]);
   const [risk, setRisk] = useState("Balanced");
@@ -31,9 +35,9 @@ export default function Settings() {
 
         <Section title="Profile" desc="Your name and identity inside the workspace.">
           <div className="grid sm:grid-cols-2 gap-4">
-            <Field label="Full name"><Input defaultValue="Jane Sterling" className="bg-surface-2 border-border/60" /></Field>
-            <Field label="Work email"><Input defaultValue="jane@northbank.co.uk" className="bg-surface-2 border-border/60" /></Field>
-            <Field label="Firm"><Input defaultValue="Northbank Capital" className="bg-surface-2 border-border/60" /></Field>
+            <Field label="Full name"><Input value={profile.data?.full_name || auth.user?.user_metadata?.full_name || ""} readOnly className="bg-surface-2 border-border/60" /></Field>
+            <Field label="Work email"><Input value={auth.user?.email || ""} readOnly className="bg-surface-2 border-border/60" /></Field>
+            <Field label="Firm"><Input value={profile.data?.company || ""} readOnly placeholder="Not set" className="bg-surface-2 border-border/60" /></Field>
             <Field label="Role">
               <div className="grid grid-cols-4 gap-1.5">
                 {["Investor", "Developer", "Sourcer", "Agent"].map(r => (

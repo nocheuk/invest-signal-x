@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { COMPARABLES, formatGBP, formatPct } from "@/lib/deals";
 import { useDeal } from "@/hooks/useDeals";
+import { useDealSourceLinks } from "@/hooks/useDealSourceLinks";
 import { ScorePill, RatingBadge } from "@/components/RatingBadge";
 import { Hint } from "@/components/Hint";
 import { useWatchlist } from "@/lib/watchlist";
@@ -22,6 +23,7 @@ export default function DealDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { deal, isLoading, isError } = useDeal(id);
+  const sourceLinks = useDealSourceLinks(deal?.id);
   const { isWatched, toggle, notes, setNote } = useWatchlist();
 
   if (isLoading) {
@@ -210,6 +212,26 @@ export default function DealDetail() {
             <InsightCard label="Negotiation angle" tone="primary" body={deal.insights.negotiation} />
           </div>
         </section>
+
+        {sourceLinks.data && sourceLinks.data.length > 0 && (
+          <section className="ds-card p-6 space-y-3">
+            <h2 className="font-display text-2xl">Source attribution</h2>
+            <div className="space-y-2">
+              {sourceLinks.data.map((link) => (
+                <div key={link.id} className="flex items-center justify-between gap-3 text-sm border-b border-border/40 last:border-0 py-2">
+                  <span className="text-muted-foreground">Imported source</span>
+                  {link.source_url ? (
+                    <a href={link.source_url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate max-w-md">
+                      {link.source_url}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">No source URL recorded</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Comparables + map */}
         <div className="grid lg:grid-cols-3 gap-5">
