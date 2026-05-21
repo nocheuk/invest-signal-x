@@ -110,6 +110,8 @@ Raw row statuses are:
 
 Phase 2C connects the existing import pipeline to the Apify Rightmove Commercial actor. The Apify token is server-only and must never be exposed through Vite or frontend code.
 
+The Apify importer is still available, but DealSignal also includes an experimental custom Rightmove Commercial scraper that does not require Apify. It fetches a Rightmove Commercial search page server-side with conservative request settings, parses listing cards from the returned HTML, and reuses the same validation, dedupe, scoring and import runner.
+
 Required server-side environment variables:
 
 ```bash
@@ -161,6 +163,49 @@ Fields that usually still need enrichment or analyst review:
 - planning upside
 - void risk and exit sensitivity
 - comparable evidence and AI summaries
+
+### Custom Rightmove Commercial Scraper
+
+Dry-run the custom scraper without writing to Supabase:
+
+```bash
+npm run scrape:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html" --source-name "Rightmove Bournemouth Commercial" --dry-run
+```
+
+Run a live import after checking the dry-run output:
+
+```bash
+npm run scrape:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html" --source-name "Rightmove Bournemouth Commercial"
+```
+
+Live mode requires the same server-side Supabase variables as other service-role imports:
+
+```bash
+VITE_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+The custom scraper imports these fields when they are visible in the HTML:
+
+- external/property id
+- listing URL
+- title
+- location/address and extractable postcode
+- guide price
+- passing rent/rent if visible
+- sqft/floor area
+- property type mapped into DealSignal asset type
+- description/snippet
+- first image URL
+- listed date if visible
+
+If Rightmove blocks the request or changes the markup, the script exits cleanly with:
+
+```text
+Rightmove page could not be parsed. The custom scraper may need updating.
+```
+
+The custom scraper is intentionally separate from `npm run import:rightmove` and should be treated as experimental until it has been tested across several Rightmove location/search URL formats.
 
 ## Custom HTML Scraper Template
 

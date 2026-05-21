@@ -32,6 +32,7 @@ export type DealImportInput = {
   auctionGuideRisk?: string;
   redFlags?: string[];
   mainRiskFlag?: string;
+  description?: string;
   postedAt?: string;
 };
 
@@ -245,6 +246,7 @@ export function normalizeImportRow(rawInput: Record<string, string>, rowNumber =
     auctionGuideRisk: asOption(pick(raw, "auction_guide_risk"), EXIT_SENSITIVITY, "") || undefined,
     redFlags: splitList(pick(raw, "red_flags", "risk_flags")),
     mainRiskFlag: pick(raw, "main_risk_flag", "risk") || "Manual import pending review",
+    description: pick(raw, "description", "snippet", "summary") || undefined,
     postedAt: pick(raw, "posted_at", "listed_at") || new Date().toISOString(),
   };
   const validationErrors = validateImportRow(normalized);
