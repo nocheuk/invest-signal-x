@@ -36,8 +36,9 @@ export default function Dashboard() {
   const [asset, setAsset] = useState<string>("All");
   const [minYield, setMinYield] = useState(0);
   const [rating, setRating] = useState<"all" | Rating>("all");
+  const [confidence, setConfidence] = useState<"all" | "high" | "medium" | "low">("all");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
-  const [sort, setSort] = useState<"score" | "yield" | "price">("score");
+  const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence">("score");
 
   const kpis = useMemo(() => {
     const greens = deals.filter(d => d.rating === "green").length;
@@ -54,8 +55,8 @@ export default function Dashboard() {
   }, [deals, ids.length]);
 
   const filtered = useMemo(() => {
-    return filterAndSortDeals(deals, { region, asset, source, rating, minYield, search, sort }, weights);
-  }, [deals, region, asset, source, minYield, rating, search, sort, weights]);
+    return filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, search, sort }, weights);
+  }, [deals, region, asset, source, minYield, rating, confidence, search, sort, weights]);
 
   const best = useMemo(() => [...deals].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [deals, weights]);
   const sourceOptions = useMemo(() => buildSourceOptions(deals), [deals]);
@@ -175,12 +176,22 @@ export default function Dashboard() {
                 <SelectItem value="red">🔴 Red</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={confidence} onValueChange={(v) => setConfidence(v as typeof confidence)}>
+              <SelectTrigger className="h-9 w-[150px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any confidence</SelectItem>
+                <SelectItem value="high">High confidence</SelectItem>
+                <SelectItem value="medium">Medium confidence</SelectItem>
+                <SelectItem value="low">Low confidence</SelectItem>
+              </SelectContent>
+            </Select>
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Sort</span>
               <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
                 <SelectTrigger className="h-9 w-[130px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="score">Highest score</SelectItem>
+                  <SelectItem value="confidence">Highest confidence</SelectItem>
                   <SelectItem value="yield">Highest yield</SelectItem>
                   <SelectItem value="price">Lowest price</SelectItem>
                 </SelectContent>

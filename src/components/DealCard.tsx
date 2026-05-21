@@ -3,6 +3,7 @@ import { Bookmark, MapPin, TrendingUp, AlertTriangle, Sparkles } from "lucide-re
 import type { Deal } from "@/lib/deals";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { RatingBadge, ScorePill } from "@/components/RatingBadge";
+import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore, matchReasons } from "@/lib/strategy";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,9 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
   const reasons = matchReasons(deal, weights);
   const watched = isWatched(deal.id);
   const sourceLabel = deal.importSourceName ?? (deal.isImported ? "Imported" : deal.source);
+  const positiveDrivers = deal.scoreReasons?.positiveDrivers ?? [];
+  const missingWarnings = deal.scoreReasons?.missingDataWarnings ?? [];
+  const cardReasons = positiveDrivers.length > 0 ? positiveDrivers.slice(0, 2) : reasons;
 
   return (
     <Link
@@ -70,15 +74,26 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
           <div className="font-mono text-sm font-semibold tabular text-primary">{yourScore}</div>
         </div>
 
-        {reasons.length > 0 && (
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[11px] text-muted-foreground">Confidence</div>
+          <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} compact />
+        </div>
+
+        {cardReasons.length > 0 && (
           <ul className="space-y-1 pt-1">
-            {reasons.map((r) => (
+            {cardReasons.map((r) => (
               <li key={r} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
                 <span className="mt-1 h-1 w-1 rounded-full bg-primary shrink-0" />
                 <span>{r}</span>
               </li>
             ))}
           </ul>
+        )}
+
+        {missingWarnings.length > 0 && (
+          <div className="text-[11px] text-signal-amber">
+            Missing: {missingWarnings.slice(0, 2).join(", ")}
+          </div>
         )}
 
         <div className="flex items-center justify-between pt-1">

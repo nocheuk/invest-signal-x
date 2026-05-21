@@ -1,4 +1,5 @@
 export type Rating = "green" | "amber" | "red";
+export type ConfidenceLevel = "high" | "medium" | "low";
 export type AssetType =
   | "Retail"
   | "Office"
@@ -26,6 +27,14 @@ export interface Deal {
   isImported?: boolean;
   isSeed?: boolean;
   needsReview?: boolean;
+  dataConfidenceScore?: number;
+  confidenceLevel?: ConfidenceLevel;
+  scoreReasons?: {
+    positiveDrivers: string[];
+    negativeDrivers: string[];
+    missingDataWarnings: string[];
+    verifyBeforeTrusting: string[];
+  };
   guidePrice: number; // £
   passingRent: number; // £ pa
   sqft: number;
