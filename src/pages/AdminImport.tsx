@@ -67,6 +67,9 @@ export default function AdminImport() {
             <div className="space-y-1.5">
               <Label htmlFor="sourceName" className="text-xs">Import source name</Label>
               <Input id="sourceName" value={sourceName} onChange={(event) => setSourceName(event.target.value)} className="bg-surface-2 border-border/60" />
+              <p className="text-[11px] text-muted-foreground">
+                Use a clear source/location name, for example "Rightmove Bournemouth Commercial". Source imports still need the source-specific search URL from that site.
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -148,6 +151,9 @@ export default function AdminImport() {
           <div className="rounded-lg bg-surface-2 border border-border/60 p-3">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Run locally</div>
             <code className="text-xs break-all">{command}</code>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              For Rightmove, copy the exact commercial search URL for the location you want, then run the Rightmove importer with that URL and a source name such as "Rightmove Bournemouth Commercial".
+            </p>
           </div>
         </section>
       </div>

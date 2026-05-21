@@ -95,7 +95,9 @@ describe("dashboard deal filters", () => {
       rating: "all",
       confidence: "all",
       minYield: 0,
+      maxPrice: 0,
       search: "",
+      locationQuery: "",
       sort: "score",
     }, weights);
 
@@ -110,7 +112,9 @@ describe("dashboard deal filters", () => {
       rating: "all",
       confidence: "all",
       minYield: 0,
+      maxPrice: 0,
       search: "",
+      locationQuery: "",
       sort: "score",
     }, weights);
     const rightmove = filterAndSortDeals([demo, imported], {
@@ -120,7 +124,9 @@ describe("dashboard deal filters", () => {
       rating: "all",
       confidence: "all",
       minYield: 0,
+      maxPrice: 0,
       search: "",
+      locationQuery: "",
       sort: "score",
     }, weights);
 
@@ -137,7 +143,9 @@ describe("dashboard deal filters", () => {
       rating: "all",
       confidence: "all",
       minYield: 0,
+      maxPrice: 0,
       search: "",
+      locationQuery: "",
       sort: "score",
     }, weights);
     const demoOnly = filterAndSortDeals([demo, imported], {
@@ -147,7 +155,9 @@ describe("dashboard deal filters", () => {
       rating: "all",
       confidence: "all",
       minYield: 0,
+      maxPrice: 0,
       search: "",
+      locationQuery: "",
       sort: "score",
     }, weights);
 
@@ -163,7 +173,9 @@ describe("dashboard deal filters", () => {
       rating: "all",
       confidence: "all",
       minYield: 0,
+      maxPrice: 0,
       search: "",
+      locationQuery: "",
       sort: "score",
     }, weights);
     const reviewResult = filterAndSortDeals([demo, imported, acuitus], {
@@ -173,7 +185,9 @@ describe("dashboard deal filters", () => {
       rating: "all",
       confidence: "all",
       minYield: 0,
+      maxPrice: 0,
       search: "",
+      locationQuery: "",
       sort: "score",
     }, weights);
 
@@ -182,7 +196,7 @@ describe("dashboard deal filters", () => {
   });
 
   it("searches imported and demo deals across title, location, postcode, asset, tenant, and source", () => {
-    const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, confidence: "all" as const, minYield: 0, sort: "score" as const };
+    const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, confidence: "all" as const, minYield: 0, maxPrice: 0, locationQuery: "", sort: "score" as const };
 
     expect(filterAndSortDeals([demo, imported], { ...base, search: "bournemouth" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(filterAndSortDeals([demo, imported], { ...base, search: "BH1" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
@@ -192,9 +206,19 @@ describe("dashboard deal filters", () => {
   });
 
   it("filters and sorts by confidence", () => {
-    const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, minYield: 0, search: "" };
+    const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, minYield: 0, maxPrice: 0, search: "", locationQuery: "" };
 
     expect(filterAndSortDeals([imported, acuitus], { ...base, confidence: "high", sort: "score" }, weights).map((item) => item.id)).toEqual(["imp-acuitus"]);
     expect(filterAndSortDeals([imported, acuitus], { ...base, confidence: "all", sort: "confidence" }, weights).map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
+  });
+
+  it("filters by dedicated location query across town, postcode, region, and title", () => {
+    const poole = deal({ id: "imp-poole", title: "Dorset industrial unit", location: "Poole, BH15", region: "Dorset", isImported: true });
+    const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, confidence: "all" as const, minYield: 0, maxPrice: 0, search: "", sort: "score" as const };
+
+    expect(filterAndSortDeals([demo, imported, poole], { ...base, locationQuery: "Bournemouth" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
+    expect(filterAndSortDeals([demo, imported, poole], { ...base, locationQuery: "BH15" }, weights).map((item) => item.id)).toEqual(["imp-poole"]);
+    expect(filterAndSortDeals([demo, imported, poole], { ...base, locationQuery: "Dorset" }, weights).map((item) => item.id)).toEqual(["imp-poole"]);
+    expect(filterAndSortDeals([demo, imported, poole], { ...base, locationQuery: "Southampton" }, weights)).toEqual([]);
   });
 });

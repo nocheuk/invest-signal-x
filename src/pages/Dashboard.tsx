@@ -9,10 +9,12 @@ import { useStrategy, personalisedScore } from "@/lib/strategy";
 import { useDeals } from "@/hooks/useDeals";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
+import { useSavedSearches, type SavedSearchFilters } from "@/hooks/useSavedSearches";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
-import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, SlidersHorizontal, Filter } from "lucide-react";
+import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,7 @@ export default function Dashboard() {
   const dealsQuery = useDeals();
   const auth = useAuth();
   const profile = useProfile();
+  const savedSearches = useSavedSearches();
   const [searchParams] = useSearchParams();
   const deals = dealsQuery.data ?? EMPTY_DEALS;
   const search = searchParams.get("q") ?? "";
@@ -35,6 +38,8 @@ export default function Dashboard() {
   const [region, setRegion] = useState("All UK");
   const [asset, setAsset] = useState<string>("All");
   const [minYield, setMinYield] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(0);
+  const [locationQuery, setLocationQuery] = useState("");
   const [rating, setRating] = useState<"all" | Rating>("all");
   const [confidence, setConfidence] = useState<"all" | "high" | "medium" | "low">("all");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
@@ -55,14 +60,31 @@ export default function Dashboard() {
   }, [deals, ids.length]);
 
   const filtered = useMemo(() => {
-    return filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, search, sort }, weights);
-  }, [deals, region, asset, source, minYield, rating, confidence, search, sort, weights]);
+    return filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
+  }, [deals, region, asset, source, minYield, maxPrice, rating, confidence, search, locationQuery, sort, weights]);
 
   const best = useMemo(() => [...deals].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [deals, weights]);
   const sourceOptions = useMemo(() => buildSourceOptions(deals), [deals]);
   const needsReview = useMemo(() => deals.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [deals]);
   const importedCount = useMemo(() => deals.filter((deal) => deal.isImported || deal.importSourceName).length, [deals]);
-  const showDebugCounts = import.meta.env.DEV || source !== "All" || search.length > 0;
+  const showDebugCounts = import.meta.env.DEV || source !== "All" || search.length > 0 || locationQuery.length > 0;
+  const hasLocationFilter = locationQuery.trim().length > 0;
+
+  const currentSavedFilters: SavedSearchFilters = { locationQuery, source, asset, minYield, maxPrice };
+  const saveLocationSearch = async () => {
+    if (!locationQuery.trim()) return;
+    await savedSearches.saveSearch({
+      name: `${locationQuery.trim()}${source !== "All" ? ` · ${source}` : ""}`,
+      filters: currentSavedFilters,
+    });
+  };
+  const applySavedSearch = (filters: SavedSearchFilters) => {
+    setLocationQuery(filters.locationQuery);
+    setSource(filters.source || "All");
+    setAsset(filters.asset || "All");
+    setMinYield(filters.minYield || 0);
+    setMaxPrice(filters.maxPrice || 0);
+  };
 
   return (
     <AppLayout>
@@ -138,6 +160,16 @@ export default function Dashboard() {
 
           <div className="ds-card p-3 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><Filter className="h-3.5 w-3.5" />Filters</div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={locationQuery}
+                onChange={(event) => setLocationQuery(event.target.value)}
+                placeholder="Location, postcode, region"
+                className="h-9 w-[220px] bg-surface-2 border-border/60 pl-8 text-xs"
+                aria-label="Location filter"
+              />
+            </div>
             <Select value={region} onValueChange={setRegion}>
               <SelectTrigger className="h-9 w-[140px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>{REGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
@@ -157,6 +189,17 @@ export default function Dashboard() {
                 <SelectItem value="6">Min 6% NIY</SelectItem>
                 <SelectItem value="7">Min 7% NIY</SelectItem>
                 <SelectItem value="8">Min 8% NIY</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={String(maxPrice)} onValueChange={(v) => setMaxPrice(+v)}>
+              <SelectTrigger className="h-9 w-[140px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Any price</SelectItem>
+                <SelectItem value="500000">Max £500k</SelectItem>
+                <SelectItem value="1000000">Max £1m</SelectItem>
+                <SelectItem value="2500000">Max £2.5m</SelectItem>
+                <SelectItem value="5000000">Max £5m</SelectItem>
+                <SelectItem value="10000000">Max £10m</SelectItem>
               </SelectContent>
             </Select>
             <Select value={source} onValueChange={setSource}>
@@ -186,6 +229,16 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
             <div className="ml-auto flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!locationQuery.trim() || savedSearches.isSaving}
+                onClick={() => void saveLocationSearch()}
+                className="h-9 gap-1.5 text-xs"
+              >
+                <Save className="h-3.5 w-3.5" /> Save
+              </Button>
               <span className="text-xs text-muted-foreground">Sort</span>
               <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
                 <SelectTrigger className="h-9 w-[130px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
@@ -198,6 +251,22 @@ export default function Dashboard() {
               </Select>
             </div>
           </div>
+
+          {savedSearches.savedSearches.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Saved searches</span>
+              {savedSearches.savedSearches.slice(0, 5).map((saved) => (
+                <button
+                  key={saved.id}
+                  type="button"
+                  onClick={() => applySavedSearch(saved.filters)}
+                  className="rounded-md border border-border/60 bg-surface-2 px-2.5 py-1 text-muted-foreground hover:text-foreground"
+                >
+                  {saved.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="ds-card overflow-hidden">
             {/* Header row */}
@@ -213,7 +282,13 @@ export default function Dashboard() {
             {filtered.map(d => <DealRow key={d.id} deal={d} />)}
             {filtered.length === 0 && (
               <div className="p-12 text-center text-muted-foreground text-sm">
-                {dealsQuery.isError ? "Could not load live deals. Please try again shortly." : deals.length === 0 ? "No real deals yet. Run an import to populate the dashboard." : "No deals match these filters."}
+                {dealsQuery.isError
+                  ? "Could not load live deals. Please try again shortly."
+                  : deals.length === 0
+                    ? "No real deals yet. Run an import to populate the dashboard."
+                    : hasLocationFilter
+                      ? "No deals found in this location."
+                      : "No deals match these filters."}
               </div>
             )}
           </div>
