@@ -15,12 +15,15 @@ export type DashboardFilters = {
   rating: "all" | Deal["rating"];
   confidence: "all" | NonNullable<Deal["confidenceLevel"]>;
   minYield: number;
+  maxPrice: number;
   search: string;
+  locationQuery: string;
   sort: "score" | "yield" | "price" | "confidence";
 };
 
 export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, weights: StrategyWeights) {
   const query = normalize(filters.search);
+  const locationQuery = normalize(filters.locationQuery);
   let result = deals.filter((deal) => (
     (filters.region === "All UK" || deal.region === filters.region) &&
     (filters.asset === "All" || deal.assetType === filters.asset) &&
@@ -28,7 +31,9 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
     (filters.rating === "all" || deal.rating === filters.rating) &&
     (filters.confidence === "all" || deal.confidenceLevel === filters.confidence) &&
     (deal.netInitialYield >= filters.minYield) &&
+    (!filters.maxPrice || deal.guidePrice <= filters.maxPrice) &&
     (!query || searchableText(deal).includes(query))
+    && (!locationQuery || locationSearchableText(deal).includes(locationQuery))
   ));
 
   if (filters.sort === "score") result = [...result].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights));
@@ -36,6 +41,15 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
   if (filters.sort === "price") result = [...result].sort((a, b) => a.guidePrice - b.guidePrice);
   if (filters.sort === "confidence") result = [...result].sort((a, b) => (b.dataConfidenceScore ?? 0) - (a.dataConfidenceScore ?? 0));
   return result;
+}
+
+export function locationSearchableText(deal: Deal) {
+  return normalize([
+    deal.location,
+    extractPostcode(deal.location),
+    deal.region,
+    deal.title,
+  ].filter(Boolean).join(" "));
 }
 
 export function sourceMatches(deal: Deal, source: string) {
