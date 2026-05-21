@@ -209,7 +209,14 @@ The custom scraper is intentionally separate from `npm run import:rightmove` and
 
 ### Dashboard Location Search Import
 
-The dashboard location filter first searches deals already in Supabase. When an admin enters a location with no or very few local matches, DealSignal shows a live-search CTA that calls the server-side `/api/location-search` route. The route verifies the Supabase access token, requires `app_metadata.role` of `admin` or `owner`, generates a Rightmove Commercial search URL, then runs the custom Rightmove scraper/import pipeline with source name `Rightmove Commercial`.
+The dashboard location filter first searches deals already in Supabase. When a signed-in user enters a location with no or very few local matches, DealSignal shows a live-search CTA that calls the server-side `/api/location-search` route. The route verifies the Supabase access token with `auth.getUser(jwt)`, generates a Rightmove Commercial search URL, then runs the custom Rightmove scraper/import pipeline with source name `Rightmove Commercial`.
+
+Live location imports are available to authenticated users, with basic abuse protection:
+
+- max 5 live location searches per user per hour
+- max 20 live location searches per user per day
+- 30 minute cooldown before rerunning the same normalized location/source for the same user
+- minimum location query length of 3 characters
 
 The generated URL format is:
 
@@ -236,6 +243,8 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
+
+Manual import tools under `/admin/import` remain admin-only.
 
 ## Custom HTML Scraper Template
 

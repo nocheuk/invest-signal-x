@@ -6,6 +6,8 @@ export type LocationImportResult = {
   locationQuery: string;
   sourceName: string;
   dryRun: boolean;
+  reusedRecentSearch?: boolean;
+  code?: string;
   total: number;
   unique: number;
   imported: number;
