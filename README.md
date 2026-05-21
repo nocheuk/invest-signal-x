@@ -124,13 +124,13 @@ SUPABASE_SERVICE_ROLE_KEY=...
 Dry-run a Rightmove Commercial search URL. This still runs the Apify actor and fetches dataset items, but it does not write to Supabase:
 
 ```bash
-npm run import:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/find.html?..." --source-name "Rightmove Commercial Leeds" --dry-run
+npm run import:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/find.html?..." --source-name "Rightmove Commercial" --dry-run
 ```
 
 Run a real import:
 
 ```bash
-npm run import:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/find.html?..." --source-name "Rightmove Commercial Leeds"
+npm run import:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/find.html?..." --source-name "Rightmove Commercial"
 ```
 
 The Rightmove importer writes through the same tables as CSV imports:
@@ -169,13 +169,13 @@ Fields that usually still need enrichment or analyst review:
 Dry-run the custom scraper without writing to Supabase:
 
 ```bash
-npm run scrape:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html" --source-name "Rightmove Bournemouth Commercial" --dry-run
+npm run scrape:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html" --source-name "Rightmove Commercial" --dry-run
 ```
 
 Run a live import after checking the dry-run output:
 
 ```bash
-npm run scrape:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html" --source-name "Rightmove Bournemouth Commercial"
+npm run scrape:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html" --source-name "Rightmove Commercial"
 ```
 
 Live mode requires the same server-side Supabase variables as other service-role imports:

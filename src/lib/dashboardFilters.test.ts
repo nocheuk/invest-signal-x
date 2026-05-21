@@ -8,7 +8,8 @@ import {
   filterAndSortDeals,
   IMPORTED_SOURCE_FILTER,
   NEEDS_REVIEW_FILTER,
-  RIGHTMOVE_BOURNEMOUTH_SOURCE,
+  RIGHTMOVE_COMMERCIAL_SOURCE,
+  sourceLabel,
 } from "@/lib/dashboardFilters";
 import type { StrategyWeights } from "@/lib/strategy";
 
@@ -59,7 +60,8 @@ const imported = deal({
   location: "Bournemouth, BH1",
   assetType: "Office",
   tenant: "Unknown",
-  importSourceName: RIGHTMOVE_BOURNEMOUTH_SOURCE,
+  importSourceName: "Rightmove Bournemouth Commercial Custom",
+  importSourceType: "custom_rightmove_commercial",
   isImported: true,
   needsReview: true,
   dataConfidenceScore: 38,
@@ -104,7 +106,7 @@ describe("dashboard deal filters", () => {
     expect(result.map((item) => item.id)).toContain("imp-bournemouth");
   });
 
-  it("filters by imported and specific Rightmove source", () => {
+  it("filters by imported and normalized Rightmove source", () => {
     const allImported = filterAndSortDeals([demo, imported, acuitus], {
       region: "All UK",
       asset: "All",
@@ -120,7 +122,7 @@ describe("dashboard deal filters", () => {
     const rightmove = filterAndSortDeals([demo, imported], {
       region: "All UK",
       asset: "All",
-      source: RIGHTMOVE_BOURNEMOUTH_SOURCE,
+      source: RIGHTMOVE_COMMERCIAL_SOURCE,
       rating: "all",
       confidence: "all",
       minYield: 0,
@@ -132,7 +134,8 @@ describe("dashboard deal filters", () => {
 
     expect(allImported.map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
     expect(rightmove.map((item) => item.id)).toEqual(["imp-bournemouth"]);
-    expect(buildSourceOptions([demo, imported])).toContain(RIGHTMOVE_BOURNEMOUTH_SOURCE);
+    expect(buildSourceOptions([demo, imported])).toContain(RIGHTMOVE_COMMERCIAL_SOURCE);
+    expect(buildSourceOptions([demo, imported])).not.toContain("Rightmove Bournemouth Commercial Custom");
   });
 
   it("hides seed/demo deals from the all real deals filter while demo mode can still show them", () => {
@@ -202,7 +205,7 @@ describe("dashboard deal filters", () => {
     expect(filterAndSortDeals([demo, imported], { ...base, search: "BH1" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(filterAndSortDeals([demo, imported], { ...base, search: "office" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(filterAndSortDeals([demo, imported], { ...base, search: "tesco" }, weights).map((item) => item.id)).toEqual(["ds-demo"]);
-    expect(filterAndSortDeals([demo, imported], { ...base, search: "Rightmove Commercial Bournemouth" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
+    expect(filterAndSortDeals([demo, imported], { ...base, search: "Rightmove Commercial" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
   });
 
   it("filters and sorts by confidence", () => {
@@ -213,12 +216,33 @@ describe("dashboard deal filters", () => {
   });
 
   it("filters by dedicated location query across town, postcode, region, and title", () => {
-    const poole = deal({ id: "imp-poole", title: "Dorset industrial unit", location: "Poole, BH15", region: "Dorset", isImported: true });
+    const poole = deal({
+      id: "imp-poole",
+      title: "Dorset industrial unit",
+      location: "Poole, BH15",
+      region: "Dorset",
+      importSourceName: "Rightmove Poole Commercial Custom",
+      importSourceType: "custom_rightmove_commercial",
+      isImported: true,
+    });
     const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, confidence: "all" as const, minYield: 0, maxPrice: 0, search: "", sort: "score" as const };
 
     expect(filterAndSortDeals([demo, imported, poole], { ...base, locationQuery: "Bournemouth" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(filterAndSortDeals([demo, imported, poole], { ...base, locationQuery: "BH15" }, weights).map((item) => item.id)).toEqual(["imp-poole"]);
     expect(filterAndSortDeals([demo, imported, poole], { ...base, locationQuery: "Dorset" }, weights).map((item) => item.id)).toEqual(["imp-poole"]);
     expect(filterAndSortDeals([demo, imported, poole], { ...base, locationQuery: "Southampton" }, weights)).toEqual([]);
+  });
+
+  it("displays all Rightmove custom source names as Rightmove Commercial", () => {
+    const poole = deal({
+      id: "imp-poole",
+      location: "Poole, BH15",
+      importSourceName: "Rightmove Poole Commercial Custom",
+      importSourceType: "custom_rightmove_commercial",
+      isImported: true,
+    });
+
+    expect(sourceLabel(imported)).toBe(RIGHTMOVE_COMMERCIAL_SOURCE);
+    expect(sourceLabel(poole)).toBe(RIGHTMOVE_COMMERCIAL_SOURCE);
   });
 });
