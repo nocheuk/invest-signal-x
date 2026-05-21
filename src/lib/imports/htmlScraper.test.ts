@@ -11,6 +11,7 @@ const config = {
     locationSelector: ".listing-location",
     priceSelector: ".listing-price",
     rentSelector: ".listing-rent",
+    yieldSelector: ".listing-yield",
     sizeSelector: ".listing-size",
     propertyTypeSelector: ".listing-type",
     descriptionSelector: ".listing-description",
@@ -24,6 +25,7 @@ const html = `
     <div class="listing-location">Bournemouth, BH1</div>
     <div class="listing-price">£1,250,000</div>
     <div class="listing-rent">£92,500 pa</div>
+    <div class="listing-yield">7.40%</div>
     <div class="listing-size">6,400 sq ft</div>
     <div class="listing-type">Retail</div>
     <p class="listing-description">Prime retail parade.</p>
@@ -60,6 +62,7 @@ describe("custom HTML scraper", () => {
       postcode: "BH1",
       guidePrice: 1250000,
       passingRent: 92500,
+      netInitialYield: 7.4,
       sqft: 6400,
       assetType: "Retail",
     });
@@ -75,6 +78,55 @@ describe("custom HTML scraper", () => {
 
     expect(rows[0].validationErrors).toContain("location is required");
     expect(rows[0].validationErrors).toContain("guide_price must be greater than 0");
+  });
+
+  it("maps Acuitus-style listing cards with line-break addresses and yield", () => {
+    const rows = scrapeHtmlToImportRows({
+      html: `
+        <ul class="proplist-grid">
+          <li class="auction available">
+            <a href="https://www.acuitus.co.uk/property/5760/">
+              <div class="proplist-sector">Office, Residential, Development, Receivership</div>
+              <div class="proplist-grid-address">33 Clarges Street<br>Mayfair<br>London<br>W1J 7EE<br></div>
+              <dl class="proplist-grid-status">
+                <dt>Status</dt><dd>Available</dd>
+                <dt>Auction</dt><dd>11/06/2026</dd>
+                <dt class="lotlabel">&nbsp;</dt><dd>&nbsp;</dd>
+                <dt>Guide*</dt><dd>£5,250,000</dd>
+                <dt>Yield</dt><dd>0.00%</dd>
+              </dl>
+            </a>
+          </li>
+        </ul>
+      `,
+      pageUrl: "https://www.acuitus.co.uk/find-a-property/",
+      config: {
+        selectors: {
+          listingCardSelector: "ul.proplist-grid > li.auction",
+          titleSelector: ".proplist-sector",
+          urlSelector: { selector: "a:first", attribute: "href" },
+          locationSelector: ".proplist-grid-address",
+          priceSelector: ".proplist-grid-status dd:nth-of-type(4)",
+          yieldSelector: ".proplist-grid-status dd:nth-of-type(5)",
+          propertyTypeSelector: ".proplist-sector",
+          descriptionSelector: ".proplist-sector",
+        },
+        defaults: { source: "Auction" },
+      },
+      sourceName: "Acuitus",
+    });
+
+    expect(rows[0].normalized).toMatchObject({
+      title: "Office, Residential, Development, Receivership",
+      sourceUrl: "https://www.acuitus.co.uk/property/5760/",
+      location: "33 Clarges Street Mayfair London W1J 7EE",
+      postcode: "W1J 7EE",
+      guidePrice: 5250000,
+      netInitialYield: 0,
+      assetType: "Office",
+      source: "Auction",
+    });
+    expect(rows[0].validationErrors).toEqual([]);
   });
 
   it("dedupes duplicate scraper rows using the shared import identity rules", () => {

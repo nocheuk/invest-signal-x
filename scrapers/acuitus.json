@@ -1,0 +1,18 @@
+{
+  "selectors": {
+    "listingCardSelector": "ul.proplist-grid > li.auction",
+    "titleSelector": ".proplist-sector",
+    "urlSelector": { "selector": "a:first", "attribute": "href" },
+    "locationSelector": ".proplist-grid-address",
+    "priceSelector": ".proplist-grid-status dd:nth-of-type(4)",
+    "rentSelector": "",
+    "yieldSelector": ".proplist-grid-status dd:nth-of-type(5)",
+    "sizeSelector": "",
+    "propertyTypeSelector": ".proplist-sector",
+    "descriptionSelector": ".proplist-sector"
+  },
+  "defaults": {
+    "region": "All UK",
+    "source": "Auction"
+  }
+}

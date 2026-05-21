@@ -178,6 +178,12 @@ Run a live import:
 npm run scrape:site -- --url "https://example-agent-site.com/commercial" --source-name "Example Agent" --selector-config ./scrapers/example-agent.json
 ```
 
+Acuitus example:
+
+```bash
+npm run scrape:site -- --url "https://www.acuitus.co.uk/find-a-property/" --source-name "Acuitus" --selector-config ./scrapers/acuitus.json --dry-run
+```
+
 Live imports require:
 
 ```bash

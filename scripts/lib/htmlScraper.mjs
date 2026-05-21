@@ -31,6 +31,7 @@ export function scrapeHtmlToImportRows({ html, pageUrl, config, sourceName = "Cu
       location: readText($, $card, normalizedConfig.locationSelector),
       guide_price: readText($, $card, normalizedConfig.priceSelector),
       passing_rent: readText($, $card, normalizedConfig.rentSelector),
+      net_initial_yield: readText($, $card, normalizedConfig.yieldSelector),
       sqft: readText($, $card, normalizedConfig.sizeSelector),
       asset_type: readText($, $card, normalizedConfig.propertyTypeSelector),
       description: readText($, $card, normalizedConfig.descriptionSelector),
@@ -46,6 +47,7 @@ export function scrapeHtmlToImportRows({ html, pageUrl, config, sourceName = "Cu
       source: normalizedConfig.source || "Private treaty",
       guidePrice: parseNumber(raw.guide_price),
       passingRent: parseNumber(raw.passing_rent),
+      netInitialYield: parseNumber(raw.net_initial_yield),
       sqft: parseNumber(raw.sqft),
       tenant: "Unknown",
       covenantStrength: "Moderate",
@@ -75,6 +77,7 @@ export function normalizeSelectorConfig(config) {
     locationSelector: normalizeFieldSelector(selectors.locationSelector ?? selectors.location),
     priceSelector: normalizeFieldSelector(selectors.priceSelector ?? selectors.price),
     rentSelector: normalizeFieldSelector(selectors.rentSelector ?? selectors.rent),
+    yieldSelector: normalizeFieldSelector(selectors.yieldSelector ?? selectors.yield),
     sizeSelector: normalizeFieldSelector(selectors.sizeSelector ?? selectors.size),
     propertyTypeSelector: normalizeFieldSelector(selectors.propertyTypeSelector ?? selectors.propertyType),
     descriptionSelector: normalizeFieldSelector(selectors.descriptionSelector ?? selectors.description),
@@ -93,6 +96,8 @@ function readText($, $card, field) {
   if (!field?.selector) return "";
   const element = $card.find(field.selector).first();
   if (field.attribute) return clean(element.attr(field.attribute) ?? "");
+  const html = element.html();
+  if (html) return clean(load(`<div>${html.replace(/<br\s*\/?>/gi, " ")}</div>`)("div").text());
   return clean(element.text());
 }
 
