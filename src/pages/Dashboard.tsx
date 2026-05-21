@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
-import { buildSourceOptions, filterAndSortDeals } from "@/lib/dashboardFilters";
+import { ALL_REAL_DEALS_FILTER, buildSourceOptions, filterAndSortDeals } from "@/lib/dashboardFilters";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 const EMPTY_DEALS = [];
 
@@ -35,7 +36,7 @@ export default function Dashboard() {
   const [asset, setAsset] = useState<string>("All");
   const [minYield, setMinYield] = useState(0);
   const [rating, setRating] = useState<"all" | Rating>("all");
-  const [source, setSource] = useState("All");
+  const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
   const [sort, setSort] = useState<"score" | "yield" | "price">("score");
 
   const kpis = useMemo(() => {
@@ -161,6 +162,7 @@ export default function Dashboard() {
               <SelectTrigger className="h-9 w-[210px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All sources</SelectItem>
+                {isSupabaseConfigured && <SelectItem value={ALL_REAL_DEALS_FILTER}>All real deals</SelectItem>}
                 {sourceOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -200,7 +202,7 @@ export default function Dashboard() {
             {filtered.map(d => <DealRow key={d.id} deal={d} />)}
             {filtered.length === 0 && (
               <div className="p-12 text-center text-muted-foreground text-sm">
-                {dealsQuery.isError ? "Could not load live deals. Please try again shortly." : "No deals match these filters."}
+                {dealsQuery.isError ? "Could not load live deals. Please try again shortly." : deals.length === 0 ? "No real deals yet. Run an import to populate the dashboard." : "No deals match these filters."}
               </div>
             )}
           </div>

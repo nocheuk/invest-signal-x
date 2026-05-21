@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const rows = vi.hoisted(() => ({
   deals: [{
-    id: "ds-live",
+    id: "imp-live",
     title: "Live deal",
     location: "Leeds",
     region: "Yorkshire",
@@ -43,7 +43,7 @@ const rows = vi.hoisted(() => ({
     updated_at: "2026-05-01T00:00:00Z",
   }],
   links: [{
-    deal_id: "ds-live",
+    deal_id: "imp-live",
     source_url: "https://www.rightmove.co.uk/properties/123",
     import_sources: {
       name: "Rightmove Commercial Bournemouth",
@@ -85,11 +85,12 @@ describe("useDeals", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.[0]).toMatchObject({
-      id: "ds-live",
+      id: "imp-live",
       title: "Live deal",
       assetType: "Industrial",
       netInitialYield: 7.5,
       importSourceName: "Rightmove Commercial Bournemouth",
+      isImported: true,
       sourceUrl: "https://www.rightmove.co.uk/properties/123",
     });
   });

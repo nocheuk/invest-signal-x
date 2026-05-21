@@ -31,6 +31,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
   const netInitialYield = safeNumber(row.net_initial_yield) || Math.max(0, grossYield * 0.93);
   const score = clampScore(row.score ?? (sourceMetadata.importSourceName ? 39 : 0));
   const isImported = Boolean(sourceMetadata.importSourceName) || row.id.startsWith("imp-");
+  const isSeed = !isImported && row.id.startsWith("ds-");
   const needsReview = isImported && (
     netInitialYield === 0 ||
     !row.tenant ||
@@ -49,6 +50,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     importSourceName: sourceMetadata.importSourceName ?? undefined,
     importSourceType: sourceMetadata.importSourceType ?? undefined,
     isImported,
+    isSeed,
     needsReview,
     guidePrice,
     passingRent,
