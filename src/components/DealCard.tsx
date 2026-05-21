@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bookmark, MapPin, TrendingUp, AlertTriangle, Sparkles } from "lucide-react";
 import type { Deal } from "@/lib/deals";
@@ -18,6 +19,11 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
   const positiveDrivers = deal.scoreReasons?.positiveDrivers ?? [];
   const missingWarnings = deal.scoreReasons?.missingDataWarnings ?? [];
   const cardReasons = positiveDrivers.length > 0 ? positiveDrivers.slice(0, 2) : reasons;
+  const [imageAvailable, setImageAvailable] = useState(Boolean(deal.imageUrl));
+
+  useEffect(() => {
+    setImageAvailable(Boolean(deal.imageUrl));
+  }, [deal.imageUrl]);
 
   return (
     <Link
@@ -28,8 +34,17 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
       )}
     >
       {/* Top visual */}
-      <div className={cn("relative h-28 bg-gradient-to-br overflow-hidden ds-noise", deal.thumbnail)}>
-        <div className="absolute inset-0 ds-grid-bg opacity-40" />
+      <div data-testid="deal-card-media" className={cn("relative h-28 bg-gradient-to-br overflow-hidden ds-noise", deal.thumbnail)}>
+        {deal.imageUrl && imageAvailable && (
+          <img
+            src={deal.imageUrl}
+            alt={deal.title}
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            onError={() => setImageAvailable(false)}
+          />
+        )}
+        <div className={cn("absolute inset-0 ds-grid-bg opacity-40", deal.imageUrl && imageAvailable && "bg-background/20")} />
         <div className="absolute top-3 left-3">
           <RatingBadge rating={deal.rating} />
         </div>
@@ -43,7 +58,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
         >
           <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
         </button>
-        <div className="absolute -bottom-5 right-4">
+        <div data-testid="deal-card-score-badge" className="absolute bottom-3 right-3">
           <ScorePill score={deal.score} rating={deal.rating} />
         </div>
       </div>

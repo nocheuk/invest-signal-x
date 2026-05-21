@@ -37,11 +37,24 @@ export function mapRightmoveItemToImportRow(item: RightmoveItem, rowNumber = 1):
   const sqft = firstNumber(item, ["sizeSqFt", "sizeSqft", "sqft", "floorArea", "areaSqFt"]);
   const propertyType = firstString(item, ["propertyType", "type", "commercialPropertyType"]);
   const postedAt = firstString(item, ["listedAt", "firstVisibleDate", "addedOn", "dateAdded"]);
+  const imageUrl = firstImageUrl(item, [
+    "imageUrl",
+    "image",
+    "photo",
+    "photoUrl",
+    "thumbnail",
+    "thumbnailUrl",
+    "propertyImage",
+    "propertyImages",
+    "images",
+    "photos",
+  ]);
 
   const explicitPostcode = firstString(item, ["postcode", "outcode"]) || undefined;
   const normalized: DealImportInput = {
     externalId: firstString(item, ["id", "propertyId", "listingId"]) || sourceUrl || undefined,
     sourceUrl,
+    imageUrl,
     title: title || location || "Rightmove commercial listing",
     location,
     postcode: extractPostcode(location, explicitPostcode),
@@ -86,6 +99,32 @@ function firstNumber(item: RightmoveItem, keys: string[]) {
     const value = readPath(item, key);
     const parsed = parseMoney(value);
     if (parsed !== undefined) return parsed;
+  }
+  return undefined;
+}
+
+function firstImageUrl(item: RightmoveItem, keys: string[]) {
+  for (const key of keys) {
+    const value = readPath(item, key);
+    const url = extractImageUrl(value);
+    if (url) return url;
+  }
+  return undefined;
+}
+
+function extractImageUrl(value: unknown): string | undefined {
+  if (typeof value === "string" && /^https?:\/\//i.test(value)) return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const url = extractImageUrl(item);
+      if (url) return url;
+    }
+  }
+  if (value && typeof value === "object") {
+    for (const key of ["url", "src", "imageUrl", "image", "thumbnailUrl", "mainImage"]) {
+      const url = extractImageUrl((value as Record<string, unknown>)[key]);
+      if (url) return url;
+    }
   }
   return undefined;
 }

@@ -28,6 +28,7 @@ export function scrapeHtmlToImportRows({ html, pageUrl, config, sourceName = "Cu
       page_url: pageUrl,
       title: readText($, $card, normalizedConfig.titleSelector),
       source_url: readUrl($, $card, normalizedConfig.urlSelector, pageUrl),
+      image_url: readUrl($, $card, normalizedConfig.imageSelector, pageUrl),
       location: readText($, $card, normalizedConfig.locationSelector),
       guide_price: readText($, $card, normalizedConfig.priceSelector),
       passing_rent: readText($, $card, normalizedConfig.rentSelector),
@@ -39,6 +40,7 @@ export function scrapeHtmlToImportRows({ html, pageUrl, config, sourceName = "Cu
     const normalized = {
       externalId: raw.source_url || `${pageUrl}#row-${index + 1}`,
       sourceUrl: raw.source_url || undefined,
+      imageUrl: raw.image_url || undefined,
       title: raw.title || raw.description || "Imported commercial listing",
       location: raw.location,
       postcode: extractPostcode(raw.location),
@@ -74,6 +76,7 @@ export function normalizeSelectorConfig(config) {
     listingCardSelector: selectors.listingCardSelector ?? selectors.listing,
     titleSelector: normalizeFieldSelector(selectors.titleSelector ?? selectors.title),
     urlSelector: normalizeFieldSelector(selectors.urlSelector ?? selectors.url),
+    imageSelector: normalizeFieldSelector(selectors.imageSelector ?? selectors.image),
     locationSelector: normalizeFieldSelector(selectors.locationSelector ?? selectors.location),
     priceSelector: normalizeFieldSelector(selectors.priceSelector ?? selectors.price),
     rentSelector: normalizeFieldSelector(selectors.rentSelector ?? selectors.rent),

@@ -8,6 +8,7 @@ const config = {
     listingCardSelector: ".listing-card",
     titleSelector: ".listing-title",
     urlSelector: { selector: "a.listing-link", attribute: "href" },
+    imageSelector: { selector: "img.listing-image", attribute: "src" },
     locationSelector: ".listing-location",
     priceSelector: ".listing-price",
     rentSelector: ".listing-rent",
@@ -21,6 +22,7 @@ const config = {
 const html = `
   <article class="listing-card">
     <a class="listing-link" href="/commercial/1">View</a>
+    <img class="listing-image" src="/images/retail.jpg" alt="">
     <h2 class="listing-title">High Street Retail Investment</h2>
     <div class="listing-location">Bournemouth, BH1</div>
     <div class="listing-price">£1,250,000</div>
@@ -65,6 +67,7 @@ describe("custom HTML scraper", () => {
       netInitialYield: 7.4,
       sqft: 6400,
       assetType: "Retail",
+      imageUrl: "https://example-agent-site.com/images/retail.jpg",
     });
     expect(rows[0].validationErrors).toEqual([]);
   });

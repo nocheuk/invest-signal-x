@@ -18,6 +18,7 @@ describe("Rightmove Apify import mapping", () => {
       guidePrice: 1750000,
       passingRent: 118000,
       sqft: 8500,
+      imageUrl: "https://media.rightmove.co.uk/1.jpg",
     });
     expect(rows[0].validationErrors).toEqual([]);
   });

@@ -8,6 +8,7 @@ export type DealSourceMetadata = {
   sourceUrl?: string | null;
   importSourceName?: string | null;
   importSourceType?: string | null;
+  imageUrl?: string | null;
 };
 
 const defaultScoreBreakdown: Deal["scoreBreakdown"] = {
@@ -35,6 +36,8 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
   const score = clampScore(row.score ?? (sourceMetadata.importSourceName ? 39 : 0));
   const isImported = Boolean(sourceMetadata.importSourceName) || row.id.startsWith("imp-");
   const isSeed = !isImported && row.id.startsWith("ds-");
+  const thumbnailImageUrl = isUrl(row.thumbnail) ? row.thumbnail : undefined;
+  const imageUrl = sourceMetadata.imageUrl ?? thumbnailImageUrl;
   const baseNeedsReview = isImported && (
     netInitialYield === 0 ||
     !row.tenant ||
@@ -47,6 +50,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     assetType: row.asset_type as Deal["assetType"],
     source: row.source as Deal["source"],
     sourceUrl: sourceMetadata.sourceUrl ?? undefined,
+    imageUrl: imageUrl ?? undefined,
     importSourceName: sourceMetadata.importSourceName ?? undefined,
     importSourceType: sourceMetadata.importSourceType ?? undefined,
     guidePrice,
@@ -83,6 +87,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     assetType: row.asset_type as Deal["assetType"],
     source: row.source as Deal["source"],
     sourceUrl: sourceMetadata.sourceUrl ?? undefined,
+    imageUrl: imageUrl ?? undefined,
     importSourceName: sourceMetadata.importSourceName ?? undefined,
     importSourceType: sourceMetadata.importSourceType ?? undefined,
     isImported,
@@ -117,7 +122,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     rating: finalRating,
     scoreBreakdown: importedScore?.scoreBreakdown ?? ((row.score_breakdown as Deal["scoreBreakdown"]) ?? defaultScoreBreakdown),
     insights: (row.insights as Deal["insights"]) ?? defaultInsights,
-    thumbnail: row.thumbnail || "from-zinc-500/30 to-slate-700/20",
+    thumbnail: thumbnailImageUrl ? "from-zinc-500/30 to-slate-700/20" : row.thumbnail || "from-zinc-500/30 to-slate-700/20",
     postedAt: row.posted_at,
   };
 }
@@ -174,4 +179,8 @@ function ratingFromScore(score: number): Deal["rating"] {
   if (score >= 78) return "green";
   if (score >= 60) return "amber";
   return "red";
+}
+
+function isUrl(value: string | null | undefined) {
+  return Boolean(value && /^https?:\/\//i.test(value));
 }

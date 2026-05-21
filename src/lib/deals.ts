@@ -27,6 +27,7 @@ export interface Deal {
   isImported?: boolean;
   isSeed?: boolean;
   needsReview?: boolean;
+  imageUrl?: string;
   dataConfidenceScore?: number;
   confidenceLevel?: ConfidenceLevel;
   scoreReasons?: {

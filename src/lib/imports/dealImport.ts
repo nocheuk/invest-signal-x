@@ -3,6 +3,7 @@ export type ImportStatus = "pending" | "processed" | "failed" | "skipped_duplica
 export type DealImportInput = {
   externalId?: string;
   sourceUrl?: string;
+  imageUrl?: string;
   title: string;
   location: string;
   postcode?: string;
@@ -69,6 +70,7 @@ export type ImportRowDuplicate = {
 export const DEAL_IMPORT_HEADERS = [
   "external_id",
   "source_url",
+  "image_url",
   "title",
   "location",
   "postcode",
@@ -214,6 +216,7 @@ export function normalizeImportRow(rawInput: Record<string, string>, rowNumber =
   const normalized: DealImportInput = {
     externalId: pick(raw, "external_id", "external id", "id") || undefined,
     sourceUrl: pick(raw, "source_url", "url", "listing_url") || undefined,
+    imageUrl: pick(raw, "image_url", "image", "photo", "photo_url", "thumbnail", "thumbnail_url") || undefined,
     title: pick(raw, "title", "deal_title", "property_title"),
     location,
     postcode: extractPostcode(location, explicitPostcode),
@@ -256,6 +259,7 @@ export function validateImportRow(row: DealImportInput) {
   if (row.assetType && !ASSET_TYPES.includes(row.assetType)) errors.push(`asset_type must be one of: ${ASSET_TYPES.join(", ")}`);
   if (row.source && !SOURCES.includes(row.source)) errors.push(`source must be one of: ${SOURCES.join(", ")}`);
   if (row.sourceUrl && !/^https?:\/\//i.test(row.sourceUrl)) errors.push("source_url must start with http:// or https://");
+  if (row.imageUrl && !/^https?:\/\//i.test(row.imageUrl)) errors.push("image_url must start with http:// or https://");
   return errors;
 }
 
@@ -345,7 +349,7 @@ export function mapImportToDealInsert(row: DealImportInput, sourceName = "Manual
       askAgent: "Confirm lease, rent, title, EPC and tenancy details against source documents.",
       negotiation: "Set target pricing after validation against comparables.",
     },
-    thumbnail: "from-cyan-500/30 to-blue-700/20",
+    thumbnail: row.imageUrl || "from-cyan-500/30 to-blue-700/20",
     posted_at: row.postedAt || new Date().toISOString(),
     import_source_name: sourceName,
   };
@@ -356,6 +360,7 @@ export function importRowsToCsv(rows: DealImportInput[]) {
   const lines = rows.map((row) => [
     row.externalId ?? "",
     row.sourceUrl ?? "",
+    row.imageUrl ?? "",
     row.title,
     row.location,
     row.postcode ?? "",
