@@ -207,6 +207,36 @@ Rightmove page could not be parsed. The custom scraper may need updating.
 
 The custom scraper is intentionally separate from `npm run import:rightmove` and should be treated as experimental until it has been tested across several Rightmove location/search URL formats.
 
+### Dashboard Location Search Import
+
+The dashboard location filter first searches deals already in Supabase. When an admin enters a location with no or very few local matches, DealSignal shows a live-search CTA that calls the server-side `/api/location-search` route. The route verifies the Supabase access token, requires `app_metadata.role` of `admin` or `owner`, generates a Rightmove Commercial search URL, then runs the custom Rightmove scraper/import pipeline with source name `Rightmove Commercial`.
+
+The generated URL format is:
+
+```text
+https://www.rightmove.co.uk/commercial-property-for-sale/{Location}.html
+```
+
+For example, `Bournemouth` becomes:
+
+```text
+https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html
+```
+
+This supports locations that Rightmove accepts in that URL format. If the generated URL cannot be parsed, use the manual scraper command with a copied Rightmove search URL:
+
+```bash
+npm run scrape:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html" --source-name "Rightmove Commercial" --dry-run
+```
+
+Vercel/server-side environment variables required for live dashboard imports:
+
+```bash
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
 ## Custom HTML Scraper Template
 
 Custom scrapers are server-side only and reuse the same import pipeline as CSV and Rightmove imports. They fetch a listing page, parse listing cards with a selector config, normalize rows, validate, dedupe, write `raw_imports`, upsert `deals`, and create `deal_source_links`.
