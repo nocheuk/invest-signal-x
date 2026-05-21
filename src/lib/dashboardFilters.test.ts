@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { Deal } from "@/lib/deals";
-import { buildSourceOptions, filterAndSortDeals, IMPORTED_SOURCE_FILTER, RIGHTMOVE_BOURNEMOUTH_SOURCE } from "@/lib/dashboardFilters";
+import {
+  ACUITUS_SOURCE,
+  ALL_REAL_DEALS_FILTER,
+  buildSourceOptions,
+  DEMO_SOURCE_FILTER,
+  filterAndSortDeals,
+  IMPORTED_SOURCE_FILTER,
+  NEEDS_REVIEW_FILTER,
+  RIGHTMOVE_BOURNEMOUTH_SOURCE,
+} from "@/lib/dashboardFilters";
 import type { StrategyWeights } from "@/lib/strategy";
 
 const weights: StrategyWeights = { yield: 50, growth: 50, discount: 50, risk: 50, demand: 50 };
@@ -58,6 +67,19 @@ const imported = deal({
   netInitialYield: 0,
 });
 
+const acuitus = deal({
+  id: "imp-acuitus",
+  title: "Acuitus Auction Lot",
+  location: "London, W1J 7EE",
+  assetType: "Office",
+  importSourceName: ACUITUS_SOURCE,
+  isImported: true,
+  needsReview: true,
+  score: 39,
+  rating: "red",
+  netInitialYield: 0,
+});
+
 const demo = deal({ id: "ds-demo" });
 
 describe("dashboard deal filters", () => {
@@ -76,7 +98,7 @@ describe("dashboard deal filters", () => {
   });
 
   it("filters by imported and specific Rightmove source", () => {
-    const allImported = filterAndSortDeals([demo, imported], {
+    const allImported = filterAndSortDeals([demo, imported, acuitus], {
       region: "All UK",
       asset: "All",
       source: IMPORTED_SOURCE_FILTER,
@@ -95,9 +117,57 @@ describe("dashboard deal filters", () => {
       sort: "score",
     }, weights);
 
-    expect(allImported.map((item) => item.id)).toEqual(["imp-bournemouth"]);
+    expect(allImported.map((item) => item.id)).toEqual(["imp-bournemouth", "imp-acuitus"]);
     expect(rightmove.map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(buildSourceOptions([demo, imported])).toContain(RIGHTMOVE_BOURNEMOUTH_SOURCE);
+  });
+
+  it("hides seed/demo deals from the all real deals filter while demo mode can still show them", () => {
+    const allReal = filterAndSortDeals([demo, imported], {
+      region: "All UK",
+      asset: "All",
+      source: ALL_REAL_DEALS_FILTER,
+      rating: "all",
+      minYield: 0,
+      search: "",
+      sort: "score",
+    }, weights);
+    const demoOnly = filterAndSortDeals([demo, imported], {
+      region: "All UK",
+      asset: "All",
+      source: DEMO_SOURCE_FILTER,
+      rating: "all",
+      minYield: 0,
+      search: "",
+      sort: "score",
+    }, weights);
+
+    expect(allReal.map((item) => item.id)).toEqual(["imp-bournemouth"]);
+    expect(demoOnly.map((item) => item.id)).toEqual(["ds-demo"]);
+  });
+
+  it("filters imported Acuitus and needs-review deals", () => {
+    const sourceResult = filterAndSortDeals([demo, imported, acuitus], {
+      region: "All UK",
+      asset: "All",
+      source: ACUITUS_SOURCE,
+      rating: "all",
+      minYield: 0,
+      search: "",
+      sort: "score",
+    }, weights);
+    const reviewResult = filterAndSortDeals([demo, imported, acuitus], {
+      region: "All UK",
+      asset: "All",
+      source: NEEDS_REVIEW_FILTER,
+      rating: "all",
+      minYield: 0,
+      search: "",
+      sort: "score",
+    }, weights);
+
+    expect(sourceResult.map((item) => item.id)).toEqual(["imp-acuitus"]);
+    expect(reviewResult.map((item) => item.id)).toEqual(["imp-bournemouth", "imp-acuitus"]);
   });
 
   it("searches imported and demo deals across title, location, postcode, asset, tenant, and source", () => {

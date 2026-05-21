@@ -24,6 +24,7 @@ export interface Deal {
   importSourceName?: string;
   importSourceType?: string;
   isImported?: boolean;
+  isSeed?: boolean;
   needsReview?: boolean;
   guidePrice: number; // £
   passingRent: number; // £ pa

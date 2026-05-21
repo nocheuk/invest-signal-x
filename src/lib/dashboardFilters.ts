@@ -3,6 +3,9 @@ import { personalisedScore, type StrategyWeights } from "@/lib/strategy";
 
 export const IMPORTED_SOURCE_FILTER = "Imported";
 export const DEMO_SOURCE_FILTER = "Demo/Seed";
+export const ALL_REAL_DEALS_FILTER = "All real deals";
+export const NEEDS_REVIEW_FILTER = "Needs review";
+export const ACUITUS_SOURCE = "Acuitus";
 export const RIGHTMOVE_BOURNEMOUTH_SOURCE = "Rightmove Commercial Bournemouth";
 
 export type DashboardFilters = {
@@ -34,9 +37,15 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
 
 export function sourceMatches(deal: Deal, source: string) {
   if (source === "All") return true;
+  if (source === ALL_REAL_DEALS_FILTER) return !isSeedDeal(deal);
   if (source === IMPORTED_SOURCE_FILTER) return Boolean(deal.isImported || deal.importSourceName);
-  if (source === DEMO_SOURCE_FILTER) return !deal.isImported && !deal.importSourceName;
+  if (source === NEEDS_REVIEW_FILTER) return Boolean(deal.needsReview);
+  if (source === DEMO_SOURCE_FILTER) return isSeedDeal(deal) || (!deal.isImported && !deal.importSourceName);
   return sourceLabel(deal) === source;
+}
+
+function isSeedDeal(deal: Deal) {
+  return Boolean(deal.isSeed || deal.id.startsWith("ds-"));
 }
 
 export function sourceLabel(deal: Deal) {
@@ -49,8 +58,10 @@ export function buildSourceOptions(deals: Deal[]) {
   const dynamic = deals.map(sourceLabel).filter(Boolean);
   return [...new Set([
     IMPORTED_SOURCE_FILTER,
-    DEMO_SOURCE_FILTER,
+    NEEDS_REVIEW_FILTER,
+    ACUITUS_SOURCE,
     RIGHTMOVE_BOURNEMOUTH_SOURCE,
+    DEMO_SOURCE_FILTER,
     ...dynamic,
   ])];
 }
