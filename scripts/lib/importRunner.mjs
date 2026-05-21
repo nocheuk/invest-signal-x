@@ -187,6 +187,7 @@ async function linkSource({ supabase, dryRun, source, dealId, rawImportId, row }
           deal_id: dealId,
           raw_import_id: rawImportId,
           import_source_id: source.id,
+          source_url: row.normalized.sourceUrl,
           confidence: 1,
         })
         .eq("id", existing.id);
