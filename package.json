@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "import:deals": "tsx scripts/import-deals.mjs",
     "import:rightmove": "node --import tsx scripts/import-rightmove.mjs",
+    "scrape:rightmove": "node --import tsx scripts/scrape-rightmove.mjs",
     "scrape:site": "node --import tsx scripts/scrape-site.mjs",
     "seed:deals": "tsx scripts/seed-deals.mjs",
     "test": "vitest run",
