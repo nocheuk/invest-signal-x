@@ -55,7 +55,7 @@ vi.mock("@/lib/auth", () => ({
     isConfigured: true,
     loading: false,
     session: { access_token: "user-token" },
-    user: { id: "admin-1", email: "admin@example.com", app_metadata: { role: "admin" }, user_metadata: {} },
+    user: { id: "user-1", email: "user@example.com", app_metadata: { role: "member" }, user_metadata: {} },
   }),
 }));
 
@@ -110,7 +110,8 @@ describe("Dashboard live location search", () => {
     fireEvent.change(screen.getByLabelText("Location filter"), { target: { value: "Bournemouth" } });
 
     expect(screen.getByText("Search live sources for this location")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /search rightmove commercial/i }));
+    expect(screen.queryByText(/admin-only/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /search live sources/i }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith("/api/location-search", expect.objectContaining({

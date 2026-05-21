@@ -21,7 +21,6 @@ import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
 import { ALL_REAL_DEALS_FILTER, buildSourceOptions, filterAndSortDeals } from "@/lib/dashboardFilters";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { isAdminUser } from "@/lib/admin";
 
 const EMPTY_DEALS = [];
 
@@ -74,7 +73,7 @@ export default function Dashboard() {
   const showDebugCounts = import.meta.env.DEV || source !== "All" || search.length > 0 || locationQuery.length > 0;
   const hasLocationFilter = locationQuery.trim().length > 0;
   const showLocationSearchCta = isSupabaseConfigured && hasLocationFilter && filtered.length < 3;
-  const canRunLiveLocationSearch = isAdminUser(auth.user);
+  const canRunLiveLocationSearch = Boolean(auth.user && auth.session?.access_token);
 
   const currentSavedFilters: SavedSearchFilters = { locationQuery, source, asset, minYield, maxPrice };
   const saveLocationSearch = async () => {
@@ -302,10 +301,10 @@ export default function Dashboard() {
                 onClick={() => void runLiveLocationSearch()}
                 className="h-9 gap-1.5 text-xs"
               >
-                <Search className="h-3.5 w-3.5" /> Search Rightmove Commercial
+                <Search className="h-3.5 w-3.5" /> Search live sources
               </Button>
               {!canRunLiveLocationSearch && (
-                <div className="basis-full text-[11px] text-muted-foreground">Live imports are admin-only in this release.</div>
+                <div className="basis-full text-[11px] text-muted-foreground">Sign in to search live sources.</div>
               )}
               {locationImport.isError && (
                 <div className="basis-full rounded-md border border-signal-amber/40 bg-signal-amber/10 px-3 py-2 text-xs text-muted-foreground">
