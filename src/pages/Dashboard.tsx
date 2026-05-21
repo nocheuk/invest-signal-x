@@ -10,6 +10,7 @@ import { useDeals } from "@/hooks/useDeals";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavedSearches, type SavedSearchFilters } from "@/hooks/useSavedSearches";
+import { useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save } from "lucide-react";
@@ -20,6 +21,7 @@ import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
 import { ALL_REAL_DEALS_FILTER, buildSourceOptions, filterAndSortDeals } from "@/lib/dashboardFilters";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { isAdminUser } from "@/lib/admin";
 
 const EMPTY_DEALS = [];
 
@@ -30,6 +32,7 @@ export default function Dashboard() {
   const auth = useAuth();
   const profile = useProfile();
   const savedSearches = useSavedSearches();
+  const locationImport = useLocationImport();
   const [searchParams] = useSearchParams();
   const deals = dealsQuery.data ?? EMPTY_DEALS;
   const search = searchParams.get("q") ?? "";
@@ -44,6 +47,7 @@ export default function Dashboard() {
   const [confidence, setConfidence] = useState<"all" | "high" | "medium" | "low">("all");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
   const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence">("score");
+  const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
 
   const kpis = useMemo(() => {
     const greens = deals.filter(d => d.rating === "green").length;
@@ -69,6 +73,8 @@ export default function Dashboard() {
   const importedCount = useMemo(() => deals.filter((deal) => deal.isImported || deal.importSourceName).length, [deals]);
   const showDebugCounts = import.meta.env.DEV || source !== "All" || search.length > 0 || locationQuery.length > 0;
   const hasLocationFilter = locationQuery.trim().length > 0;
+  const showLocationSearchCta = isSupabaseConfigured && hasLocationFilter && filtered.length < 3;
+  const canRunLiveLocationSearch = isAdminUser(auth.user);
 
   const currentSavedFilters: SavedSearchFilters = { locationQuery, source, asset, minYield, maxPrice };
   const saveLocationSearch = async () => {
@@ -84,6 +90,16 @@ export default function Dashboard() {
     setAsset(filters.asset || "All");
     setMinYield(filters.minYield || 0);
     setMaxPrice(filters.maxPrice || 0);
+  };
+  const runLiveLocationSearch = async () => {
+    if (!locationQuery.trim()) return;
+    setLocationImportResult(null);
+    try {
+      const result = await locationImport.mutateAsync({ locationQuery: locationQuery.trim() });
+      setLocationImportResult(result);
+    } catch {
+      // The mutation state renders the user-facing error message.
+    }
   };
 
   return (
@@ -265,6 +281,42 @@ export default function Dashboard() {
                   {saved.name}
                 </button>
               ))}
+            </div>
+          )}
+
+          {showLocationSearchCta && (
+            <div className="ds-card p-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Search live sources for this location</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {locationImport.isPending
+                    ? `Searching Rightmove Commercial for ${locationQuery.trim()}...`
+                    : `Only ${filtered.length} local ${filtered.length === 1 ? "deal" : "deals"} found for ${locationQuery.trim()}.`}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={locationImport.isPending || !canRunLiveLocationSearch}
+                onClick={() => void runLiveLocationSearch()}
+                className="h-9 gap-1.5 text-xs"
+              >
+                <Search className="h-3.5 w-3.5" /> Search Rightmove Commercial
+              </Button>
+              {!canRunLiveLocationSearch && (
+                <div className="basis-full text-[11px] text-muted-foreground">Live imports are admin-only in this release.</div>
+              )}
+              {locationImport.isError && (
+                <div className="basis-full rounded-md border border-signal-amber/40 bg-signal-amber/10 px-3 py-2 text-xs text-muted-foreground">
+                  {locationImport.error.message || "Couldn't search this location yet. Try a Rightmove search URL instead."}
+                </div>
+              )}
+              {locationImportResult && (
+                <div className="basis-full rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-muted-foreground">
+                  Imported {locationImportResult.imported} new deals, {locationImportResult.existing} already existed, {locationImportResult.failed} failed.
+                </div>
+              )}
             </div>
           )}
 
