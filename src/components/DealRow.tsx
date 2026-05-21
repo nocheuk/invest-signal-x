@@ -6,6 +6,7 @@ import { RatingBadge } from "@/components/RatingBadge";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore } from "@/lib/strategy";
+import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { cn } from "@/lib/utils";
 
 export function DealRow({ deal }: { deal: Deal }) {
@@ -13,7 +14,7 @@ export function DealRow({ deal }: { deal: Deal }) {
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
   const watched = isWatched(deal.id);
-  const sourceLabel = deal.importSourceName ?? (deal.isImported ? "Imported" : deal.source);
+  const sourceLabel = getSourceLabel(deal);
 
   return (
     <Link

@@ -10,11 +10,11 @@ loadEnv();
 
 const args = parseArgs(process.argv.slice(2));
 const searchUrl = readStringArg(args, "url") || args._[0];
-const sourceName = readStringArg(args, "source-name") || args._[1] || "Rightmove Commercial Custom";
+const sourceName = readStringArg(args, "source-name") || args._[1] || "Rightmove Commercial";
 const dryRun = readBooleanFlag(args, "dry-run", process.argv);
 
 if (!searchUrl) {
-  console.error("Usage: npm run scrape:rightmove -- --url \"https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html\" --source-name \"Rightmove Bournemouth Commercial\" --dry-run");
+  console.error("Usage: npm run scrape:rightmove -- --url \"https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html\" --source-name \"Rightmove Commercial\" --dry-run");
   process.exit(1);
 }
 

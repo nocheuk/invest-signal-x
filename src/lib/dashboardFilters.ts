@@ -6,7 +6,7 @@ export const DEMO_SOURCE_FILTER = "Demo/Seed";
 export const ALL_REAL_DEALS_FILTER = "All real deals";
 export const NEEDS_REVIEW_FILTER = "Needs review";
 export const ACUITUS_SOURCE = "Acuitus";
-export const RIGHTMOVE_BOURNEMOUTH_SOURCE = "Rightmove Commercial Bournemouth";
+export const RIGHTMOVE_COMMERCIAL_SOURCE = "Rightmove Commercial";
 
 export type DashboardFilters = {
   region: string;
@@ -66,7 +66,7 @@ function isSeedDeal(deal: Deal) {
 }
 
 export function sourceLabel(deal: Deal) {
-  if (deal.importSourceName) return deal.importSourceName;
+  if (deal.importSourceName) return normalizeSourceLabel(deal.importSourceName, deal.importSourceType);
   if (deal.isImported) return IMPORTED_SOURCE_FILTER;
   return deal.source;
 }
@@ -74,10 +74,10 @@ export function sourceLabel(deal: Deal) {
 export function buildSourceOptions(deals: Deal[]) {
   const dynamic = deals.map(sourceLabel).filter(Boolean);
   return [...new Set([
+    RIGHTMOVE_COMMERCIAL_SOURCE,
+    ACUITUS_SOURCE,
     IMPORTED_SOURCE_FILTER,
     NEEDS_REVIEW_FILTER,
-    ACUITUS_SOURCE,
-    RIGHTMOVE_BOURNEMOUTH_SOURCE,
     DEMO_SOURCE_FILTER,
     ...dynamic,
   ])];
@@ -103,4 +103,11 @@ export function extractPostcode(location: string) {
 
 function normalize(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizeSourceLabel(name: string, sourceType?: string) {
+  const value = `${name} ${sourceType ?? ""}`.toLowerCase();
+  if (value.includes("rightmove")) return RIGHTMOVE_COMMERCIAL_SOURCE;
+  if (value.includes("acuitus")) return ACUITUS_SOURCE;
+  return name;
 }
