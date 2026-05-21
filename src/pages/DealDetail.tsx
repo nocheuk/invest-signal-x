@@ -4,6 +4,7 @@ import { COMPARABLES, formatGBP, formatPct } from "@/lib/deals";
 import { useDeal } from "@/hooks/useDeals";
 import { useDealSourceLinks } from "@/hooks/useDealSourceLinks";
 import { ScorePill, RatingBadge } from "@/components/RatingBadge";
+import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { Hint } from "@/components/Hint";
 import { useWatchlist } from "@/lib/watchlist";
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,11 @@ import { ArrowLeft, Bookmark, MapPin, Building2, Sparkles, AlertTriangle, Shield
 import { cn } from "@/lib/utils";
 
 const WEIGHTS = [
-  { key: "incomeQuality", label: "Yield & income quality", w: 25 },
-  { key: "tenantSecurity", label: "Tenant & lease security", w: 25 },
-  { key: "marketPricing", label: "Market pricing & comparables", w: 20 },
-  { key: "upside", label: "Upside, planning & reversion", w: 15 },
-  { key: "riskExit", label: "Risk & exit liquidity", w: 15 },
+  { key: "incomeQuality", label: "Yield & income quality", w: 30 },
+  { key: "marketPricing", label: "Price & value signal", w: 20 },
+  { key: "tenantSecurity", label: "Asset & location signal", w: 15 },
+  { key: "upside", label: "Upside signal", w: 15 },
+  { key: "riskExit", label: "Risk & data confidence", w: 20 },
 ] as const;
 
 export default function DealDetail() {
@@ -74,6 +75,9 @@ export default function DealDetail() {
                 <div className="text-right">
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground">DealSignal Score</div>
                   <div className="font-display text-6xl text-gradient-primary leading-none mt-1">{deal.score}</div>
+                  <div className="mt-2 flex justify-end">
+                    <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} />
+                  </div>
                 </div>
                 <ScorePill score={deal.score} rating={deal.rating} size="lg" />
               </div>
@@ -154,6 +158,21 @@ export default function DealDetail() {
             )}
           </div>
         </div>
+
+        {deal.scoreReasons && (
+          <section className="ds-card p-6 space-y-4">
+            <div>
+              <h2 className="font-display text-2xl">Scoring notes</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">What DealSignal can verify from imported source data today.</p>
+            </div>
+            <div className="grid md:grid-cols-4 gap-3">
+              <ReasonList title="Why this scored well" items={deal.scoreReasons.positiveDrivers} fallback="No strong positive drivers found yet." tone="primary" />
+              <ReasonList title="Negative drivers" items={deal.scoreReasons.negativeDrivers} fallback="No extra negative drivers found yet." tone="red" />
+              <ReasonList title="What is missing" items={deal.scoreReasons.missingDataWarnings} fallback="No major missing fields flagged." tone="amber" />
+              <ReasonList title="Verify before trusting" items={deal.scoreReasons.verifyBeforeTrusting} fallback="Standard title, lease and comparable checks still apply." tone="default" />
+            </div>
+          </section>
+        )}
 
         {/* Underwriting breakdown grid */}
         <section className="space-y-3">
@@ -334,6 +353,25 @@ function InsightCard({ label, body, tone }: { label: string; body: string; tone:
     <div className={cn("rounded-xl border p-5", accent)}>
       <div className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{label}</div>
       <p className="text-sm leading-relaxed mt-2">{body}</p>
+    </div>
+  );
+}
+
+function ReasonList({ title, items, fallback, tone }: { title: string; items: string[]; fallback: string; tone: "primary" | "amber" | "red" | "default" }) {
+  const dot = tone === "primary" ? "bg-primary" : tone === "amber" ? "bg-signal-amber" : tone === "red" ? "bg-signal-red" : "bg-muted-foreground";
+  const shown = items.length > 0 ? items : [fallback];
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-surface-2/40 p-4 space-y-2">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{title}</div>
+      <ul className="space-y-1.5">
+        {shown.map((item) => (
+          <li key={item} className="flex items-start gap-2 text-xs text-muted-foreground">
+            <span className={cn("mt-1.5 h-1.5 w-1.5 rounded-full shrink-0", dot)} />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

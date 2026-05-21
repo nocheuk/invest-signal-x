@@ -1,4 +1,5 @@
 import type { Deal } from "@/lib/deals";
+import { confidenceLevelForScore, scoreImportedDeal } from "@/lib/scoring";
 import type { Database } from "@/lib/supabase/types";
 
 type DealRow = Database["public"]["Tables"]["deals"]["Row"];
@@ -27,17 +28,52 @@ const defaultInsights: Deal["insights"] = {
 export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}): Deal {
   const guidePrice = safeNumber(row.guide_price);
   const passingRent = safeNumber(row.passing_rent);
+  const sqft = safeNumber(row.sqft);
   const grossYield = safeNumber(row.gross_yield) || (guidePrice > 0 ? (passingRent / guidePrice) * 100 : 0);
   const netInitialYield = safeNumber(row.net_initial_yield) || Math.max(0, grossYield * 0.93);
+  const pricePerSqft = safeNumber(row.price_per_sqft) || (sqft > 0 && guidePrice > 0 ? Math.round(guidePrice / sqft) : 0);
   const score = clampScore(row.score ?? (sourceMetadata.importSourceName ? 39 : 0));
   const isImported = Boolean(sourceMetadata.importSourceName) || row.id.startsWith("imp-");
   const isSeed = !isImported && row.id.startsWith("ds-");
-  const needsReview = isImported && (
+  const baseNeedsReview = isImported && (
     netInitialYield === 0 ||
     !row.tenant ||
     row.tenant === "Unknown" ||
     /review/i.test(row.main_risk_flag ?? "")
   );
+  const importedScore = isImported ? scoreImportedDeal({
+    title: row.title,
+    location: row.location,
+    assetType: row.asset_type as Deal["assetType"],
+    source: row.source as Deal["source"],
+    sourceUrl: sourceMetadata.sourceUrl ?? undefined,
+    importSourceName: sourceMetadata.importSourceName ?? undefined,
+    importSourceType: sourceMetadata.importSourceType ?? undefined,
+    guidePrice,
+    passingRent,
+    sqft,
+    grossYield,
+    netInitialYield,
+    reversionaryYield: safeNumber(row.reversionary_yield) || netInitialYield,
+    wault: safeNumber(row.wault),
+    leaseLength: safeNumber(row.lease_length),
+    tenant: row.tenant || "Unknown",
+    pricePerSqft,
+    planningUpsideScore: safeNumber(row.planning_upside_score),
+    voidRiskScore: safeNumber(row.void_risk_score),
+    exitYieldSensitivity: row.exit_yield_sensitivity as Deal["exitYieldSensitivity"],
+    postedAt: row.posted_at,
+    descriptionText: [
+      row.main_risk_flag,
+      ...(row.red_flags ?? []),
+      (row.insights as Deal["insights"] | null | undefined)?.mispricing,
+      (row.insights as Deal["insights"] | null | undefined)?.askAgent,
+    ].filter(Boolean).join(" "),
+  }) : null;
+  const finalScore = importedScore?.dealSignalScore ?? score;
+  const finalConfidence = importedScore?.dataConfidenceScore ?? (isSeed ? 100 : 85);
+  const finalRating = importedScore?.rating ?? ((row.rating || ratingFromScore(score)) as Deal["rating"]);
+  const finalNeedsReview = importedScore?.needsReview ?? baseNeedsReview;
 
   return {
     id: row.id,
@@ -51,12 +87,15 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     importSourceType: sourceMetadata.importSourceType ?? undefined,
     isImported,
     isSeed,
-    needsReview,
+    needsReview: finalNeedsReview,
+    dataConfidenceScore: finalConfidence,
+    confidenceLevel: importedScore?.confidenceLevel ?? confidenceLevelForScore(finalConfidence),
+    scoreReasons: importedScore?.reasons,
     guidePrice,
     passingRent,
-    sqft: safeNumber(row.sqft),
-    grossYield,
-    netInitialYield,
+    sqft,
+    grossYield: importedScore?.grossYield ?? grossYield,
+    netInitialYield: importedScore?.netInitialYield ?? netInitialYield,
     reversionaryYield: safeNumber(row.reversionary_yield) || netInitialYield,
     wault: safeNumber(row.wault),
     leaseLength: safeNumber(row.lease_length),
@@ -65,7 +104,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     tenantHealthScore: safeNumber(row.tenant_health_score),
     rentSustainability: row.rent_sustainability as Deal["rentSustainability"],
     rentReview: row.rent_review as Deal["rentReview"],
-    pricePerSqft: safeNumber(row.price_per_sqft) || (safeNumber(row.sqft) > 0 ? Math.round(guidePrice / safeNumber(row.sqft)) : 0),
+    pricePerSqft: importedScore?.pricePerSqft ?? pricePerSqft,
     planningUpsideScore: safeNumber(row.planning_upside_score),
     voidRiskScore: safeNumber(row.void_risk_score),
     exitYieldSensitivity: row.exit_yield_sensitivity as Deal["exitYieldSensitivity"],
@@ -73,10 +112,10 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     returnOnEquity: safeNumber(row.return_on_equity),
     auctionGuideRisk: row.auction_guide_risk as Deal["auctionGuideRisk"],
     redFlags: row.red_flags ?? [],
-    mainRiskFlag: needsReview ? "Needs review" : row.main_risk_flag,
-    score,
-    rating: (row.rating || ratingFromScore(score)) as Deal["rating"],
-    scoreBreakdown: (row.score_breakdown as Deal["scoreBreakdown"]) ?? defaultScoreBreakdown,
+    mainRiskFlag: importedScore?.mainRiskFlag ?? (finalNeedsReview ? "Needs review" : row.main_risk_flag),
+    score: finalScore,
+    rating: finalRating,
+    scoreBreakdown: importedScore?.scoreBreakdown ?? ((row.score_breakdown as Deal["scoreBreakdown"]) ?? defaultScoreBreakdown),
     insights: (row.insights as Deal["insights"]) ?? defaultInsights,
     thumbnail: row.thumbnail || "from-zinc-500/30 to-slate-700/20",
     postedAt: row.posted_at,

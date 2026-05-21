@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Deal } from "@/lib/deals";
 import { useAuth } from "@/lib/auth";
+import { applyConfidenceCap } from "@/lib/scoring";
 import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
 
 export type StrategyWeights = {
@@ -183,7 +184,7 @@ export function personalisedScore(deal: Deal, w: StrategyWeights) {
   const totalW = w.yield + w.growth + w.discount + w.risk + w.demand;
   if (totalW === 0) return deal.score;
   const raw = c.yield * w.yield + c.growth * w.growth + c.discount * w.discount + c.risk * w.risk + c.demand * w.demand;
-  return Math.round(raw / totalW);
+  return applyConfidenceCap(Math.round(raw / totalW), deal.dataConfidenceScore);
 }
 
 export function matchReasons(deal: Deal, w: StrategyWeights): string[] {

@@ -3,6 +3,7 @@ import { Bookmark } from "lucide-react";
 import type { Deal } from "@/lib/deals";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { RatingBadge } from "@/components/RatingBadge";
+import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore } from "@/lib/strategy";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,10 @@ export function DealRow({ deal }: { deal: Deal }) {
       <div className="col-span-9 sm:col-span-3 min-w-0">
         <div className="font-medium truncate group-hover:text-primary transition-colors">{deal.title}</div>
         <div className="text-[11px] text-muted-foreground truncate">{deal.location} · {deal.assetType} · {sourceLabel}</div>
-        {deal.needsReview && <div className="text-[10px] uppercase tracking-wide text-signal-amber">Needs review</div>}
+        <div className="flex items-center gap-1.5 mt-1">
+          <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} compact />
+          {deal.needsReview && <div className="text-[10px] uppercase tracking-wide text-signal-amber">Needs review</div>}
+        </div>
       </div>
 
       {/* Numbers — hidden on mobile */}

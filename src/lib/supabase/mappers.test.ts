@@ -57,8 +57,9 @@ describe("mapDealRow", () => {
       sourceUrl: "https://www.rightmove.co.uk/properties/123",
       needsReview: true,
       mainRiskFlag: "Needs review",
-      score: 39,
       rating: "red",
+      confidenceLevel: "medium",
     });
+    expect(deal.scoreReasons?.missingDataWarnings).toContain("Passing rent missing");
   });
 });

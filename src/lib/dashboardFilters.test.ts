@@ -62,6 +62,8 @@ const imported = deal({
   importSourceName: RIGHTMOVE_BOURNEMOUTH_SOURCE,
   isImported: true,
   needsReview: true,
+  dataConfidenceScore: 38,
+  confidenceLevel: "low",
   score: 39,
   rating: "red",
   netInitialYield: 0,
@@ -75,6 +77,8 @@ const acuitus = deal({
   importSourceName: ACUITUS_SOURCE,
   isImported: true,
   needsReview: true,
+  dataConfidenceScore: 82,
+  confidenceLevel: "high",
   score: 39,
   rating: "red",
   netInitialYield: 0,
@@ -89,6 +93,7 @@ describe("dashboard deal filters", () => {
       asset: "All",
       source: "All",
       rating: "all",
+      confidence: "all",
       minYield: 0,
       search: "",
       sort: "score",
@@ -103,6 +108,7 @@ describe("dashboard deal filters", () => {
       asset: "All",
       source: IMPORTED_SOURCE_FILTER,
       rating: "all",
+      confidence: "all",
       minYield: 0,
       search: "",
       sort: "score",
@@ -112,12 +118,13 @@ describe("dashboard deal filters", () => {
       asset: "All",
       source: RIGHTMOVE_BOURNEMOUTH_SOURCE,
       rating: "all",
+      confidence: "all",
       minYield: 0,
       search: "",
       sort: "score",
     }, weights);
 
-    expect(allImported.map((item) => item.id)).toEqual(["imp-bournemouth", "imp-acuitus"]);
+    expect(allImported.map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
     expect(rightmove.map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(buildSourceOptions([demo, imported])).toContain(RIGHTMOVE_BOURNEMOUTH_SOURCE);
   });
@@ -128,6 +135,7 @@ describe("dashboard deal filters", () => {
       asset: "All",
       source: ALL_REAL_DEALS_FILTER,
       rating: "all",
+      confidence: "all",
       minYield: 0,
       search: "",
       sort: "score",
@@ -137,6 +145,7 @@ describe("dashboard deal filters", () => {
       asset: "All",
       source: DEMO_SOURCE_FILTER,
       rating: "all",
+      confidence: "all",
       minYield: 0,
       search: "",
       sort: "score",
@@ -152,6 +161,7 @@ describe("dashboard deal filters", () => {
       asset: "All",
       source: ACUITUS_SOURCE,
       rating: "all",
+      confidence: "all",
       minYield: 0,
       search: "",
       sort: "score",
@@ -161,22 +171,30 @@ describe("dashboard deal filters", () => {
       asset: "All",
       source: NEEDS_REVIEW_FILTER,
       rating: "all",
+      confidence: "all",
       minYield: 0,
       search: "",
       sort: "score",
     }, weights);
 
     expect(sourceResult.map((item) => item.id)).toEqual(["imp-acuitus"]);
-    expect(reviewResult.map((item) => item.id)).toEqual(["imp-bournemouth", "imp-acuitus"]);
+    expect(reviewResult.map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
   });
 
   it("searches imported and demo deals across title, location, postcode, asset, tenant, and source", () => {
-    const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, minYield: 0, sort: "score" as const };
+    const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, confidence: "all" as const, minYield: 0, sort: "score" as const };
 
     expect(filterAndSortDeals([demo, imported], { ...base, search: "bournemouth" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(filterAndSortDeals([demo, imported], { ...base, search: "BH1" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(filterAndSortDeals([demo, imported], { ...base, search: "office" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(filterAndSortDeals([demo, imported], { ...base, search: "tesco" }, weights).map((item) => item.id)).toEqual(["ds-demo"]);
     expect(filterAndSortDeals([demo, imported], { ...base, search: "Rightmove Commercial Bournemouth" }, weights).map((item) => item.id)).toEqual(["imp-bournemouth"]);
+  });
+
+  it("filters and sorts by confidence", () => {
+    const base = { region: "All UK", asset: "All", source: "All", rating: "all" as const, minYield: 0, search: "" };
+
+    expect(filterAndSortDeals([imported, acuitus], { ...base, confidence: "high", sort: "score" }, weights).map((item) => item.id)).toEqual(["imp-acuitus"]);
+    expect(filterAndSortDeals([imported, acuitus], { ...base, confidence: "all", sort: "confidence" }, weights).map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
   });
 });

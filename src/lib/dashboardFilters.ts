@@ -13,9 +13,10 @@ export type DashboardFilters = {
   asset: string;
   source: string;
   rating: "all" | Deal["rating"];
+  confidence: "all" | NonNullable<Deal["confidenceLevel"]>;
   minYield: number;
   search: string;
-  sort: "score" | "yield" | "price";
+  sort: "score" | "yield" | "price" | "confidence";
 };
 
 export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, weights: StrategyWeights) {
@@ -25,6 +26,7 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
     (filters.asset === "All" || deal.assetType === filters.asset) &&
     sourceMatches(deal, filters.source) &&
     (filters.rating === "all" || deal.rating === filters.rating) &&
+    (filters.confidence === "all" || deal.confidenceLevel === filters.confidence) &&
     (deal.netInitialYield >= filters.minYield) &&
     (!query || searchableText(deal).includes(query))
   ));
@@ -32,6 +34,7 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
   if (filters.sort === "score") result = [...result].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights));
   if (filters.sort === "yield") result = [...result].sort((a, b) => b.netInitialYield - a.netInitialYield);
   if (filters.sort === "price") result = [...result].sort((a, b) => a.guidePrice - b.guidePrice);
+  if (filters.sort === "confidence") result = [...result].sort((a, b) => (b.dataConfidenceScore ?? 0) - (a.dataConfidenceScore ?? 0));
   return result;
 }
 
