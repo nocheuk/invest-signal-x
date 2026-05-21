@@ -8,6 +8,11 @@
     "price": "1,750,000",
     "rent": "118,000 pa",
     "sizeSqFt": "8,500 sq ft",
+    "propertyImages": [
+      {
+        "url": "https://media.rightmove.co.uk/1.jpg"
+      }
+    ],
     "addedOn": "2026-05-01T09:00:00Z",
     "agent": {
       "name": "Example Commercial Agents"

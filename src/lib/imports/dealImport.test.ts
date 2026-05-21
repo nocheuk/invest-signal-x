@@ -3,13 +3,14 @@ import { dedupeImportRows, findDuplicate, mapImportToDealInsert, normalizeImport
 
 describe("deal import mapping", () => {
   it("parses CSV rows and normalizes aliases", () => {
-    const rows = parseDealCsv("Title,Location,Price,URL\nTesco Express,\"Sheffield, S10\",1950000,https://example.com/a");
+    const rows = parseDealCsv("Title,Location,Price,URL,Image URL\nTesco Express,\"Sheffield, S10\",1950000,https://example.com/a,https://example.com/a.jpg");
     expect(rows).toHaveLength(1);
     expect(rows[0].normalized).toMatchObject({
       title: "Tesco Express",
       location: "Sheffield, S10",
       guidePrice: 1950000,
       sourceUrl: "https://example.com/a",
+      imageUrl: "https://example.com/a.jpg",
       postcode: "S10",
     });
     expect(rows[0].validationErrors).toEqual([]);

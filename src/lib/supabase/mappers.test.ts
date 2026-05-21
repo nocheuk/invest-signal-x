@@ -47,6 +47,7 @@ describe("mapDealRow", () => {
   it("maps imported Rightmove source metadata and marks sparse listings for review", () => {
     const deal = mapDealRow(baseRow, {
       sourceUrl: "https://www.rightmove.co.uk/properties/123",
+      imageUrl: "https://media.rightmove.co.uk/property.jpg",
       importSourceName: "Rightmove Commercial Bournemouth",
       importSourceType: "apify_rightmove_commercial",
     });
@@ -55,6 +56,7 @@ describe("mapDealRow", () => {
       id: "imp-rightmove",
       importSourceName: "Rightmove Commercial Bournemouth",
       sourceUrl: "https://www.rightmove.co.uk/properties/123",
+      imageUrl: "https://media.rightmove.co.uk/property.jpg",
       needsReview: true,
       mainRiskFlag: "Needs review",
       rating: "red",

@@ -3,6 +3,7 @@
     "listingCardSelector": "ul.proplist-grid > li.auction",
     "titleSelector": ".proplist-sector",
     "urlSelector": { "selector": "a:first", "attribute": "href" },
+    "imageSelector": { "selector": "img:first", "attribute": "src" },
     "locationSelector": ".proplist-grid-address",
     "priceSelector": ".proplist-grid-status dd:nth-of-type(4)",
     "rentSelector": "",
