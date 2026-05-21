@@ -1,0 +1,17 @@
+{
+  "selectors": {
+    "listingCardSelector": ".listing-card",
+    "titleSelector": ".listing-title",
+    "urlSelector": { "selector": "a.listing-link", "attribute": "href" },
+    "locationSelector": ".listing-location",
+    "priceSelector": ".listing-price",
+    "rentSelector": ".listing-rent",
+    "sizeSelector": ".listing-size",
+    "propertyTypeSelector": ".listing-type",
+    "descriptionSelector": ".listing-description"
+  },
+  "defaults": {
+    "region": "All UK",
+    "source": "Private treaty"
+  }
+}

@@ -162,6 +162,64 @@ Fields that usually still need enrichment or analyst review:
 - void risk and exit sensitivity
 - comparable evidence and AI summaries
 
+## Custom HTML Scraper Template
+
+Custom scrapers are server-side only and reuse the same import pipeline as CSV and Rightmove imports. They fetch a listing page, parse listing cards with a selector config, normalize rows, validate, dedupe, write `raw_imports`, upsert `deals`, and create `deal_source_links`.
+
+Run a dry-run without writing to Supabase:
+
+```bash
+npm run scrape:site -- --url "https://example-agent-site.com/commercial" --source-name "Example Agent" --selector-config ./scrapers/example-agent.json --dry-run
+```
+
+Run a live import:
+
+```bash
+npm run scrape:site -- --url "https://example-agent-site.com/commercial" --source-name "Example Agent" --selector-config ./scrapers/example-agent.json
+```
+
+Live imports require:
+
+```bash
+VITE_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Create a new scraper by adding a selector config JSON file under `scrapers/`. The config supports:
+
+```json
+{
+  "selectors": {
+    "listingCardSelector": ".listing-card",
+    "titleSelector": ".listing-title",
+    "urlSelector": { "selector": "a.listing-link", "attribute": "href" },
+    "locationSelector": ".listing-location",
+    "priceSelector": ".listing-price",
+    "rentSelector": ".listing-rent",
+    "sizeSelector": ".listing-size",
+    "propertyTypeSelector": ".listing-type",
+    "descriptionSelector": ".listing-description"
+  },
+  "defaults": {
+    "region": "All UK",
+    "source": "Private treaty"
+  }
+}
+```
+
+Use browser dev tools to inspect each listing card on the source site and fill in selectors relative to that card. `urlSelector` can be a plain selector, but the object form is preferred so the scraper can read the `href` attribute. Relative listing URLs are resolved against the page URL.
+
+Selector output maps into the normalized import row fields:
+
+- title
+- source URL
+- location and extracted postcode
+- guide price
+- passing rent
+- sqft
+- asset type
+- description as raw context
+
 ## Migration Notes
 
 `20260507120000_phase1_foundation.sql` creates the MVP data model:
