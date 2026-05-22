@@ -9,6 +9,10 @@ const dealsState = vi.hoisted(() => ({
   deals: [],
 }));
 
+const savedSearchState = vi.hoisted(() => ({
+  saveSearch: vi.fn(),
+}));
+
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -67,7 +71,7 @@ vi.mock("@/hooks/useSavedSearches", () => ({
   useSavedSearches: () => ({
     savedSearches: [],
     isSaving: false,
-    saveSearch: vi.fn(),
+    saveSearch: savedSearchState.saveSearch,
   }),
 }));
 
@@ -78,6 +82,7 @@ vi.mock("@/lib/supabase/client", () => ({
 describe("Dashboard live location search", () => {
   beforeEach(() => {
     dealsState.deals = [];
+    savedSearchState.saveSearch.mockReset();
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -130,5 +135,118 @@ describe("Dashboard live location search", () => {
     });
     expect(await screen.findByText(/Scanned Rightmove Commercial and Acuitus. Added 6 new deals, refreshed 12 existing deals./)).toBeInTheDocument();
     expect(screen.getByText(/Skipped 5 rent-only listings./)).toBeInTheDocument();
+  });
+
+  it("hides seeded demo deals and fake dashboard controls in Supabase mode", () => {
+    dealsState.deals = [
+      {
+        id: "ds-demo",
+        title: "Demo Tesco",
+        location: "Sheffield, S10",
+        region: "Yorkshire",
+        assetType: "Retail",
+        source: "Private treaty",
+        guidePrice: 1000000,
+        passingRent: 80000,
+        sqft: 10000,
+        grossYield: 8,
+        netInitialYield: 7.4,
+        reversionaryYield: 8,
+        wault: 5,
+        leaseLength: 5,
+        tenant: "Tesco",
+        covenantStrength: "Good",
+        tenantHealthScore: 80,
+        rentSustainability: "Market rent",
+        rentReview: "None",
+        pricePerSqft: 100,
+        planningUpsideScore: 50,
+        voidRiskScore: 20,
+        exitYieldSensitivity: "Moderate",
+        cashflowAfterDebt: 0,
+        returnOnEquity: 0,
+        redFlags: [],
+        mainRiskFlag: "None",
+        score: 75,
+        rating: "amber",
+        scoreBreakdown: { incomeQuality: 70, tenantSecurity: 80, marketPricing: 70, upside: 50, riskExit: 80 },
+        insights: { mispricing: "", couldGoWrong: "", askAgent: "", negotiation: "" },
+        thumbnail: "",
+        postedAt: "2026-05-08T00:00:00Z",
+        isSeed: true,
+      },
+      {
+        id: "imp-live",
+        title: "Rightmove Bournemouth Office",
+        location: "Bournemouth, BH1",
+        region: "South West",
+        assetType: "Office",
+        source: "Private treaty",
+        guidePrice: 350000,
+        passingRent: 0,
+        sqft: 30203,
+        grossYield: 0,
+        netInitialYield: 0,
+        reversionaryYield: 0,
+        wault: 0,
+        leaseLength: 0,
+        tenant: "Unknown",
+        covenantStrength: "Moderate",
+        tenantHealthScore: 50,
+        rentSustainability: "Market rent",
+        rentReview: "None",
+        pricePerSqft: 12,
+        planningUpsideScore: 40,
+        voidRiskScore: 40,
+        exitYieldSensitivity: "Moderate",
+        cashflowAfterDebt: 0,
+        returnOnEquity: 0,
+        redFlags: [],
+        mainRiskFlag: "Needs review",
+        score: 42,
+        rating: "red",
+        scoreBreakdown: { incomeQuality: 10, tenantSecurity: 40, marketPricing: 45, upside: 40, riskExit: 40 },
+        insights: { mispricing: "", couldGoWrong: "", askAgent: "", negotiation: "" },
+        thumbnail: "",
+        postedAt: "2026-05-20T00:00:00Z",
+        isImported: true,
+        importSourceName: "Rightmove Commercial",
+        needsReview: true,
+      },
+    ];
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("Rightmove Bournemouth Office")).toBeInTheDocument();
+    expect(screen.queryByText("Demo Tesco")).not.toBeInTheDocument();
+    expect(screen.queryByText(/14,832/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Run AI sweep/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/AI sweep coming soon/i)).toBeDisabled();
+  });
+
+  it("saves the active location search filters", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    fireEvent.change(screen.getByLabelText("Location filter"), { target: { value: "Poole" } });
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(savedSearchState.saveSearch).toHaveBeenCalledWith(expect.objectContaining({
+        name: "Poole - All real deals",
+        filters: expect.objectContaining({ locationQuery: "Poole", source: "All real deals" }),
+      }));
+    });
   });
 });

@@ -61,7 +61,7 @@ export function sourceMatches(deal: Deal, source: string) {
   return sourceLabel(deal) === source;
 }
 
-function isSeedDeal(deal: Deal) {
+export function isSeedDeal(deal: Deal) {
   return Boolean(deal.isSeed || deal.id.startsWith("ds-"));
 }
 

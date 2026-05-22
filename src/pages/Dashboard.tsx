@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
-import { ALL_REAL_DEALS_FILTER, buildSourceOptions, filterAndSortDeals } from "@/lib/dashboardFilters";
+import { ALL_REAL_DEALS_FILTER, buildSourceOptions, DEMO_SOURCE_FILTER, filterAndSortDeals, isSeedDeal } from "@/lib/dashboardFilters";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 const EMPTY_DEALS = [];
@@ -33,7 +33,10 @@ export default function Dashboard() {
   const savedSearches = useSavedSearches();
   const locationImport = useLocationImport();
   const [searchParams] = useSearchParams();
-  const deals = dealsQuery.data ?? EMPTY_DEALS;
+  const fetchedDeals = dealsQuery.data ?? EMPTY_DEALS;
+  const deals = useMemo(() => (
+    isSupabaseConfigured ? fetchedDeals.filter((deal) => !isSeedDeal(deal)) : fetchedDeals
+  ), [fetchedDeals]);
   const search = searchParams.get("q") ?? "";
   const firstName = (profile.data?.full_name || auth.user?.user_metadata?.full_name || auth.user?.email || "there").split(/\s|@/)[0];
   const [strategyOpen, setStrategyOpen] = useState(false);
@@ -53,12 +56,16 @@ export default function Dashboard() {
     const yields = deals.filter(d => d.netInitialYield > 0).map(d => d.netInitialYield);
     const avg = yields.reduce((a, b) => a + b, 0) / yields.length;
     const top = [...deals].sort((a, b) => b.score - a.score)[0];
+    const withPrice = deals.filter((deal) => deal.guidePrice > 0).length;
+    const needsReviewCount = deals.filter((deal) => deal.needsReview).length;
     return {
-      scanned: 14_832,
+      total: deals.length,
+      withPrice,
       greens,
       avgYield: Number.isFinite(avg) ? avg : 0,
       top: top?.score ?? 0,
       watched: ids.length,
+      needsReviewCount,
     };
   }, [deals, ids.length]);
 
@@ -66,9 +73,12 @@ export default function Dashboard() {
     return filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
   }, [deals, region, asset, source, minYield, maxPrice, rating, confidence, search, locationQuery, sort, weights]);
 
-  const best = useMemo(() => [...deals].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [deals, weights]);
-  const sourceOptions = useMemo(() => buildSourceOptions(deals), [deals]);
-  const needsReview = useMemo(() => deals.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [deals]);
+  const best = useMemo(() => [...filtered].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [filtered, weights]);
+  const sourceOptions = useMemo(() => {
+    const options = buildSourceOptions(deals);
+    return isSupabaseConfigured ? options.filter((option) => option !== DEMO_SOURCE_FILTER && option !== "All") : options;
+  }, [deals]);
+  const needsReview = useMemo(() => filtered.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [filtered]);
   const importedCount = useMemo(() => deals.filter((deal) => deal.isImported || deal.importSourceName).length, [deals]);
   const showDebugCounts = import.meta.env.DEV || source !== "All" || search.length > 0 || locationQuery.length > 0;
   const hasLocationFilter = locationQuery.trim().length > 0;
@@ -82,7 +92,7 @@ export default function Dashboard() {
   const saveLocationSearch = async () => {
     if (!locationQuery.trim()) return;
     await savedSearches.saveSearch({
-      name: `${locationQuery.trim()}${source !== "All" ? ` · ${source}` : ""}`,
+      name: `${locationQuery.trim()}${source !== "All" ? ` - ${source}` : ""}`,
       filters: currentSavedFilters,
     });
   };
@@ -110,25 +120,27 @@ export default function Dashboard() {
         {/* Header */}
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
-            <div className="text-xs uppercase tracking-widest text-primary font-medium">Today · 30 April 2026</div>
+            <div className="text-xs uppercase tracking-widest text-primary font-medium">Dashboard</div>
             <h1 className="font-display text-4xl mt-1">Good morning, {firstName}.</h1>
-            <p className="text-muted-foreground text-sm mt-1">{kpis.greens} green-rated deals surfaced overnight across your search filters.</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              {dealsQuery.isLoading ? "Loading live opportunities." : `${filtered.length} matching ${filtered.length === 1 ? "deal" : "deals"} from real imported data.`}
+            </p>
           </div>
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
-            <Sparkles className="h-4 w-4" /> Run AI sweep
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2" disabled title="Coming soon">
+            <Sparkles className="h-4 w-4" /> AI sweep coming soon
           </Button>
         </div>
 
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <Kpi label="Deals scanned today" value={kpis.scanned.toLocaleString()} icon={Activity} accent="text-foreground" sub="across 87 sources" />
-          <Kpi label="Green deals found" value={kpis.greens.toString()} icon={Target} accent="text-signal-green" sub="+3 vs yesterday" />
+          <Kpi label="Live deals loaded" value={kpis.total.toLocaleString()} icon={Activity} accent="text-foreground" sub={`${kpis.withPrice} with guide price`} />
+          <Kpi label="Green deals" value={kpis.greens.toString()} icon={Target} accent="text-signal-green" sub="from current data" />
           <Kpi label="Average yield (NIY)" value={formatPct(kpis.avgYield, 2)} icon={TrendingUp} accent="text-foreground" sub="net initial" />
-          <Kpi label="Highest score today" value={kpis.top.toString()} icon={Sparkles} accent="text-primary" sub="DealSignal score" />
-          <Kpi label="Watchlisted deals" value={kpis.watched.toString()} icon={Bookmark} accent="text-foreground" sub="across portfolio" />
+          <Kpi label="Highest score" value={kpis.top.toString()} icon={Sparkles} accent="text-primary" sub="current data" />
+          <Kpi label="Watchlisted deals" value={kpis.watched.toString()} icon={Bookmark} accent="text-foreground" sub={`${kpis.needsReviewCount} need review`} />
         </div>
 
-        {/* Today's best */}
+        {/* Needs review */}
         {needsReview.length > 0 && (
           <section className="space-y-3">
             <div className="flex items-end justify-between">
@@ -146,21 +158,19 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Today's best */}
+        {best.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="font-display text-2xl">Today's best deals</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Top 3 by DealSignal Score across your filters.</p>
+              <h2 className="font-display text-2xl">Top matching deals</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Top 3 by your active filters and strategy.</p>
             </div>
-            <button className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-              View all <ArrowUpRight className="h-3 w-3" />
-            </button>
           </div>
           <div className="grid md:grid-cols-3 gap-4">
             {best.map((d) => <DealCard key={d.id} deal={d} variant="feature" />)}
           </div>
         </section>
+        )}
 
         {/* Filters + table */}
         <section className="space-y-3">
@@ -170,7 +180,7 @@ export default function Dashboard() {
           </div>
           {showDebugCounts && (
             <div className="text-[11px] text-muted-foreground font-mono tabular">
-              total fetched: {deals.length} · visible: {filtered.length} · imported: {importedCount}
+              total fetched: {fetchedDeals.length} · visible: {filtered.length} · imported: {importedCount}
             </div>
           )}
 
@@ -223,7 +233,7 @@ export default function Dashboard() {
             <Select value={source} onValueChange={setSource}>
               <SelectTrigger className="h-9 w-[210px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="All">All sources</SelectItem>
+                {!isSupabaseConfigured && <SelectItem value="All">All sources</SelectItem>}
                 {isSupabaseConfigured && <SelectItem value={ALL_REAL_DEALS_FILTER}>All real deals</SelectItem>}
                 {sourceOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
               </SelectContent>
