@@ -168,6 +168,38 @@ describe("dashboard deal filters", () => {
     expect(demoOnly.map((item) => item.id)).toEqual(["ds-demo"]);
   });
 
+  it("uses the all real deals filter as the national default without narrowing by location", () => {
+    const manchester = deal({
+      id: "imp-manchester",
+      title: "Manchester office",
+      location: "Manchester, M4",
+      importSourceName: RIGHTMOVE_COMMERCIAL_SOURCE,
+      isImported: true,
+    });
+    const southampton = deal({
+      id: "imp-southampton",
+      title: "Southampton retail",
+      location: "Southampton, SO14",
+      importSourceName: RIGHTMOVE_COMMERCIAL_SOURCE,
+      isImported: true,
+    });
+
+    const result = filterAndSortDeals([demo, manchester, southampton], {
+      region: "All UK",
+      asset: "All",
+      source: ALL_REAL_DEALS_FILTER,
+      rating: "all",
+      confidence: "all",
+      minYield: 0,
+      maxPrice: 0,
+      search: "",
+      locationQuery: "",
+      sort: "score",
+    }, weights);
+
+    expect(result.map((item) => item.id)).toEqual(["imp-manchester", "imp-southampton"]);
+  });
+
   it("filters imported Acuitus and needs-review deals", () => {
     const sourceResult = filterAndSortDeals([demo, imported, acuitus], {
       region: "All UK",
