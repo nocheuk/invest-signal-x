@@ -209,13 +209,13 @@ The custom scraper is intentionally separate from `npm run import:rightmove` and
 
 ### Dashboard Location Search Import
 
-The dashboard location filter first searches deals already in Supabase. When a signed-in user enters a location with no or very few local matches, DealSignal shows a live-search CTA that calls the server-side `/api/location-search` route. The route verifies the Supabase access token with `auth.getUser(jwt)`, generates a Rightmove Commercial search URL, then runs the custom Rightmove scraper/import pipeline with source name `Rightmove Commercial`.
+The dashboard location filter first searches deals already in Supabase. When a signed-in user enters a location with no or very few local matches, DealSignal shows a live-search CTA that calls the server-side `/api/location-search` route. The route verifies the Supabase access token with `auth.getUser(jwt)`, then runs fresh scans against Rightmove Commercial and Acuitus.
 
 Live location imports are available to authenticated users, with basic abuse protection:
 
 - max 5 live location searches per user per hour
 - max 20 live location searches per user per day
-- 30 minute cooldown before rerunning the same normalized location/source for the same user
+- repeated searches are allowed as manual refreshes while still counting against hourly/daily limits
 - minimum location query length of 3 characters
 
 The generated URL format is:
@@ -235,6 +235,16 @@ This supports locations that Rightmove accepts in that URL format. If the genera
 ```bash
 npm run scrape:rightmove -- --url "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html" --source-name "Rightmove Commercial" --dry-run
 ```
+
+For Acuitus, live location search scrapes the main listings page first:
+
+```text
+https://www.acuitus.co.uk/find-a-property/
+```
+
+Then it filters parsed Acuitus rows by the user's location query across title, location, postcode and region before passing matching rows to the import pipeline.
+
+Duplicate source URLs are treated as refreshed existing deals. The importer writes a new `raw_imports` payload, updates `deal_source_links.raw_import_id`, and counts the row as existing/refreshed instead of creating a duplicate deal.
 
 Vercel/server-side environment variables required for live dashboard imports:
 

@@ -4,9 +4,11 @@ import { execFileSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildRightmoveCommercialSearchUrl,
+  aggregateSourceResults,
   prepareLocationSearchRequest,
   readBearerToken,
   requireAuthenticatedUser,
+  runLiveLocationSourceSearches,
   slugifyLocation,
   validateLocationQuery,
 } from "../../../scripts/lib/rightmoveLocationSearch.mjs";
@@ -87,7 +89,7 @@ describe("Rightmove location search helpers", () => {
     });
   });
 
-  it("reuses a recent same-location search instead of rerunning immediately", async () => {
+  it("allows repeated location searches within hourly and daily rate limits", async () => {
     const supabase = fakeRateLimitSupabase({
       recent: {
         id: "request-1",
@@ -103,11 +105,59 @@ describe("Rightmove location search helpers", () => {
       normalizedLocation: "poole",
       now: new Date("2026-05-21T12:00:00Z"),
     })).resolves.toMatchObject({
-      ok: false,
-      status: 200,
-      code: "recent_search",
-      result: { imported: 2, existing: 1, failed: 0 },
+      ok: true,
+      requestId: "request-new",
     });
+  });
+
+  it("runs both Rightmove and Acuitus adapters and aggregates per-source results", async () => {
+    const calls: string[] = [];
+    const result = await runLiveLocationSourceSearches({
+      locationQuery: "Southampton",
+      dryRun: false,
+      adapters: [
+        {
+          key: "rightmove",
+          sourceName: "Rightmove Commercial",
+          run: async () => {
+            calls.push("rightmove");
+            return { source: "Rightmove Commercial", dryRun: false, total: 10, unique: 8, inserted: 2, existing: 3, failed: 1, skipped_duplicate: 3, processed: 2 };
+          },
+        },
+        {
+          key: "acuitus",
+          sourceName: "Acuitus",
+          run: async () => {
+            calls.push("acuitus");
+            return { source: "Acuitus", dryRun: false, total: 6, unique: 5, inserted: 4, existing: 1, failed: 0, skipped_duplicate: 1, processed: 4 };
+          },
+        },
+      ],
+    });
+
+    expect(calls).toEqual(["rightmove", "acuitus"]);
+    expect(result.sources.rightmove).toMatchObject({ inserted: 2, existing: 3, skippedDuplicate: 3 });
+    expect(result.sources.acuitus).toMatchObject({ inserted: 4, existing: 1, skippedDuplicate: 1 });
+    expect(result).toMatchObject({
+      totalInserted: 6,
+      totalExisting: 4,
+      totalFailed: 1,
+      totalSkippedDuplicate: 4,
+    });
+  });
+
+  it("aggregates failed source adapters without hiding successful sources", () => {
+    const result = aggregateSourceResults({
+      locationQuery: "Poole",
+      sources: {
+        rightmove: { source: "Rightmove Commercial", dryRun: false, total: 2, unique: 2, inserted: 1, existing: 1, failed: 0, skippedDuplicate: 1, processed: 1 },
+        acuitus: { source: "Acuitus", dryRun: false, total: 0, unique: 0, inserted: 0, existing: 0, failed: 1, skippedDuplicate: 0, processed: 0, error: "HTML fetch failed" },
+      },
+    });
+
+    expect(result.totalInserted).toBe(1);
+    expect(result.totalExisting).toBe(1);
+    expect(result.totalFailed).toBe(1);
   });
 });
 

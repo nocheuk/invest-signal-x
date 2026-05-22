@@ -28,6 +28,11 @@ describe("useLocationImport", () => {
         error: "Live search is currently unavailable. Run manual import or try again later.",
         detail: "Rightmove page could not be parsed. The custom scraper may need updating.",
         code: "scraper_unavailable",
+        diagnostics: {
+          generatedUrl: "https://www.rightmove.co.uk/commercial-property-for-sale/Southampton.html",
+          env: { VITE_SUPABASE_URL: true, VITE_SUPABASE_ANON_KEY: true, SUPABASE_SERVICE_ROLE_KEY: false },
+          vercelGitCommitSha: "abc123",
+        },
       }),
     })));
 
@@ -38,5 +43,6 @@ describe("useLocationImport", () => {
     expect(result.current.error).toBeInstanceOf(LocationImportError);
     expect(result.current.error?.message).toBe("Live search is currently unavailable. Run manual import or try again later.");
     expect((result.current.error as LocationImportError).detail).toContain("Rightmove page could not be parsed");
+    expect((result.current.error as LocationImportError).diagnostics?.env?.SUPABASE_SERVICE_ROLE_KEY).toBe(false);
   });
 });
