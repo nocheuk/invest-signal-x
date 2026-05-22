@@ -259,7 +259,7 @@ Manual import tools under `/admin/import` remain admin-only.
 
 ### Scheduled National England Scan
 
-DealSignal can run a conservative national scan every 2 hours via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a priority England location queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus is included once per scheduled run from its main listings page.
+DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a priority England location queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus is included once per scheduled run from its main listings page.
 
 Priority locations live in `scripts/lib/nationalScan.mjs`:
 
@@ -274,9 +274,11 @@ Vercel Cron is configured in `vercel.json`:
 ```json
 {
   "path": "/api/cron/national-scan",
-  "schedule": "0 */2 * * *"
+  "schedule": "0 5 * * *"
 }
 ```
+
+Vercel cron schedules use UTC. During UK summer time (BST), `0 5 * * *` runs at 6am UK time. During GMT/winter, use `0 6 * * *` if you want to keep the scan at exactly 6am UK time manually.
 
 Required Vercel/server-side environment variables:
 

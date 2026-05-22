@@ -10,7 +10,7 @@
   "crons": [
     {
       "path": "/api/cron/national-scan",
-      "schedule": "0 */2 * * *"
+      "schedule": "0 5 * * *"
     }
   ],
   "rewrites": [
