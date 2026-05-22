@@ -85,7 +85,7 @@ describe("Dashboard live location search", () => {
         sourceName: "Rightmove Commercial",
         dryRun: false,
         sources: {
-          rightmove: { source: "Rightmove Commercial", inserted: 2, existing: 1, failed: 1, skippedDuplicate: 1, processed: 2, total: 3, unique: 3 },
+          rightmove: { source: "Rightmove Commercial", inserted: 2, existing: 1, failed: 1, skippedDuplicate: 1, skippedRentOnly: 5, skippedPoa: 1, failedMissingPrice: 1, processed: 2, total: 9, unique: 3 },
           acuitus: { source: "Acuitus", inserted: 4, existing: 11, failed: 0, skippedDuplicate: 11, processed: 4, total: 15, unique: 15 },
         },
         total: 4,
@@ -95,6 +95,9 @@ describe("Dashboard live location search", () => {
         refreshed: 12,
         failed: 1,
         skippedDuplicate: 1,
+        skippedRentOnly: 5,
+        skippedPoa: 1,
+        failedMissingPrice: 1,
         processed: 2,
       }),
     })));
@@ -126,5 +129,6 @@ describe("Dashboard live location search", () => {
       expect(invalidateSpy).toHaveBeenCalled();
     });
     expect(await screen.findByText(/Scanned Rightmove Commercial and Acuitus. Added 6 new deals, refreshed 12 existing deals./)).toBeInTheDocument();
+    expect(screen.getByText(/Skipped 5 rent-only listings./)).toBeInTheDocument();
   });
 });

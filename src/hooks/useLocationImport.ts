@@ -14,6 +14,9 @@ export type LocationImportResult = {
     existing: number;
     failed: number;
     skippedDuplicate: number;
+    skippedRentOnly?: number;
+    skippedPoa?: number;
+    failedMissingPrice?: number;
     processed: number;
     total: number;
     unique: number;
@@ -26,6 +29,9 @@ export type LocationImportResult = {
   refreshed?: number;
   failed: number;
   skippedDuplicate: number;
+  skippedRentOnly?: number;
+  skippedPoa?: number;
+  failedMissingPrice?: number;
   processed: number;
 };
 

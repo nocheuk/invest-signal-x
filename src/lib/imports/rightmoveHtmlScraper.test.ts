@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { dedupeImportRows } from "@/lib/imports/dealImport";
 import {
+  filterRightmoveAcquisitionRows,
   parseRightmoveCommercialListings,
   RIGHTMOVE_PARSE_ERROR,
   scrapeRightmoveCommercialHtmlToImportRows,
@@ -83,7 +84,7 @@ describe("custom Rightmove Commercial HTML scraper", () => {
     expect(rows[0].validationErrors).not.toContain("guide_price must be greater than 0");
   });
 
-  it("treats POA as a missing guide price", () => {
+  it("skips POA sale listings as POA", () => {
     const rows = scrapeRightmoveCommercialHtmlToImportRows({
       html: pageWithCard(`
         <article data-testid="property-card">
@@ -99,7 +100,8 @@ describe("custom Rightmove Commercial HTML scraper", () => {
     });
 
     expect(rows[0].normalized.guidePrice).toBeUndefined();
-    expect(rows[0].validationErrors).toContain("guide_price must be greater than 0");
+    expect(rows[0].raw.skipReason).toBe("skipped_poa");
+    expect(filterRightmoveAcquisitionRows(rows).skipped.skipped_poa).toBe(1);
   });
 
   it("handles offers over and guide price labels", () => {
@@ -120,7 +122,7 @@ describe("custom Rightmove Commercial HTML scraper", () => {
     expect(rows[0].normalized.guidePrice).toBe(350000);
   });
 
-  it("does not use rent-only text as guide price", () => {
+  it("skips rent-only listings and does not use rent as guide price", () => {
     const rows = scrapeRightmoveCommercialHtmlToImportRows({
       html: pageWithCard(`
         <article data-testid="property-card">
@@ -137,7 +139,51 @@ describe("custom Rightmove Commercial HTML scraper", () => {
 
     expect(rows[0].normalized.guidePrice).toBeUndefined();
     expect(rows[0].normalized.passingRent).toBe(25000);
-    expect(rows[0].validationErrors).toContain("guide_price must be greater than 0");
+    expect(rows[0].raw.listingIntent).toBe("rent");
+    expect(rows[0].raw.skipReason).toBe("skipped_rent_only");
+    const filtered = filterRightmoveAcquisitionRows(rows);
+    expect(filtered.importRows).toHaveLength(0);
+    expect(filtered.skipped.skipped_rent_only).toBe(1);
+  });
+
+  it("imports sale listings", () => {
+    const rows = scrapeRightmoveCommercialHtmlToImportRows({
+      html: pageWithCard(`
+        <article data-testid="property-card">
+          <a href="/properties/148450007#/?channel=COM_BUY">
+            <h2>Freehold retail shop for sale</h2>
+            <address>Southampton, SO15</address>
+            <div data-testid="property-price">Guide Price \u00a3450,000</div>
+            <p>Freehold retail premises.</p>
+          </a>
+        </article>
+      `),
+      pageUrl,
+    });
+
+    expect(rows[0].raw.listingIntent).toBe("sale");
+    expect(filterRightmoveAcquisitionRows(rows).importRows).toHaveLength(1);
+  });
+
+  it("imports investment listings with passing rent", () => {
+    const rows = scrapeRightmoveCommercialHtmlToImportRows({
+      html: pageWithCard(`
+        <article data-testid="property-card">
+          <a href="/properties/148450008#/?channel=COM_BUY">
+            <h2>Retail investment for sale</h2>
+            <address>Poole, BH15</address>
+            <div data-testid="property-price">Guide Price \u00a3750,000</div>
+            <p>Investment let to tenant producing passing rent \u00a360,000 pa.</p>
+          </a>
+        </article>
+      `),
+      pageUrl,
+    });
+
+    expect(rows[0].raw.listingIntent).toBe("mixed");
+    expect(rows[0].normalized.guidePrice).toBe(750000);
+    expect(rows[0].normalized.passingRent).toBe(60000);
+    expect(filterRightmoveAcquisitionRows(rows).importRows).toHaveLength(1);
   });
 });
 

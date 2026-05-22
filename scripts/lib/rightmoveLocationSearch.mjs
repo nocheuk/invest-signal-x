@@ -118,6 +118,9 @@ export function aggregateSourceResults({ locationQuery, dryRun = false, sources 
     totalExisting: sum(values, "existing"),
     totalFailed: sum(values, "failed"),
     totalSkippedDuplicate: sum(values, "skippedDuplicate"),
+    totalSkippedRentOnly: sum(values, "skippedRentOnly"),
+    totalSkippedPoa: sum(values, "skippedPoa"),
+    totalFailedMissingPrice: sum(values, "failedMissingPrice"),
     totalProcessed: sum(values, "processed"),
     totalUnique: sum(values, "unique"),
     total: sum(values, "total"),
@@ -227,6 +230,9 @@ function normalizeSourceResult(result) {
     existing: result.existing ?? 0,
     failed: result.failed ?? 0,
     skippedDuplicate: result.skipped_duplicate ?? result.skippedDuplicate ?? 0,
+    skippedRentOnly: result.skipped_rent_only ?? result.skippedRentOnly ?? 0,
+    skippedPoa: result.skipped_poa ?? result.skippedPoa ?? 0,
+    failedMissingPrice: result.failed_missing_price ?? result.failedMissingPrice ?? 0,
     processed: result.processed ?? 0,
   };
 }
@@ -241,6 +247,9 @@ function failedSourceResult(source, dryRun, error) {
     existing: 0,
     failed: 1,
     skippedDuplicate: 0,
+    skippedRentOnly: 0,
+    skippedPoa: 0,
+    failedMissingPrice: 0,
     processed: 0,
     error: error instanceof Error ? error.message : String(error),
   };
