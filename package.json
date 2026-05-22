@@ -13,6 +13,7 @@
     "import:rightmove": "node --import tsx scripts/import-rightmove.mjs",
     "scrape:rightmove": "node --import tsx scripts/scrape-rightmove.mjs",
     "scrape:site": "node --import tsx scripts/scrape-site.mjs",
+    "scan:national": "node --import tsx scripts/scan-national.mjs",
     "seed:deals": "tsx scripts/seed-deals.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

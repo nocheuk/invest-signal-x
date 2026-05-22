@@ -252,9 +252,77 @@ Vercel/server-side environment variables required for live dashboard imports:
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
+CRON_SECRET=...
 ```
 
 Manual import tools under `/admin/import` remain admin-only.
+
+### Scheduled National England Scan
+
+DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a priority England location queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus is included once per scheduled run from its main listings page.
+
+Priority locations live in `scripts/lib/nationalScan.mjs`:
+
+```text
+London, Manchester, Birmingham, Leeds, Liverpool, Bristol, Southampton, Bournemouth, Poole, Sheffield, Nottingham, Leicester, Newcastle, Portsmouth, Brighton, Reading, Oxford, Cambridge, Milton Keynes, Dorset, Hampshire, Surrey, Kent, Essex, Sussex
+```
+
+The default batch size is 4 Rightmove locations per run. The scheduler stores the next queue index in `national_scan_runs.metadata.next_index`, so each run continues from the previous position and wraps around after Sussex. Duplicate source URLs refresh existing deals through the import pipeline instead of creating duplicate deals.
+
+Vercel Cron is configured in `vercel.json`:
+
+```json
+{
+  "path": "/api/cron/national-scan",
+  "schedule": "0 5 * * *"
+}
+```
+
+Vercel cron schedules use UTC. During UK summer time (BST), `0 5 * * *` runs at 6am UK time. During GMT/winter, use `0 6 * * *` if you want to keep the scan at exactly 6am UK time manually.
+
+Required Vercel/server-side environment variables:
+
+```bash
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+CRON_SECRET=...
+```
+
+`CRON_SECRET` protects `/api/cron/national-scan`. Call the endpoint with:
+
+```text
+Authorization: Bearer <CRON_SECRET>
+```
+
+Run a local dry-run batch without writing to Supabase:
+
+```bash
+npm run scan:national -- --dry-run
+```
+
+Run a local live batch:
+
+```bash
+npm run scan:national
+```
+
+Change the batch size locally:
+
+```bash
+npm run scan:national -- --batch-size 3 --dry-run
+```
+
+Scan run records are stored in `national_scan_runs` with:
+
+- scan type
+- location scanned
+- source scanned
+- inserted
+- existing/refreshed
+- failed/skipped counts
+- started/finished timestamps
+- raw result metadata
 
 ## Custom HTML Scraper Template
 
@@ -345,6 +413,12 @@ Selector output maps into the normalized import row fields:
 - `raw_imports.dedupe_key`
 - import status checks
 - source URL and row-number indexes for dedupe and traceability
+
+`20260522170000_national_scan_runs.sql` adds scheduled scan tracking:
+
+- `national_scan_runs`
+- per-location/source status and result counters
+- scan metadata used to rotate the England priority location queue
 
 All public tables have RLS enabled. User-owned tables are restricted to the authenticated owner. Deal/source/comparable reads are public where they support the product browsing experience; write access is intentionally not granted to `anon`.
 

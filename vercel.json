@@ -2,8 +2,17 @@
   "functions": {
     "api/location-search.mjs": {
       "maxDuration": 60
+    },
+    "api/cron/national-scan.mjs": {
+      "maxDuration": 60
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/national-scan",
+      "schedule": "0 5 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
