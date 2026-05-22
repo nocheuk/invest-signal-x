@@ -26,6 +26,40 @@ describe("deal import mapping", () => {
     ]);
   });
 
+  it("parses the first numeric price without combining nearby metadata", () => {
+    const row = normalizeImportRow({
+      title: "Mixed number retail lot",
+      location: "Bournemouth, BH1",
+      guide_price: "Guide Price £350,000 30,203 sq ft property ID 350000030203",
+    });
+
+    expect(row.normalized.guidePrice).toBe(350000);
+    expect(row.validationErrors).toEqual([]);
+  });
+
+  it("rejects unsafe guide prices before database mapping", () => {
+    const row = normalizeImportRow({
+      title: "Overflow price",
+      location: "Bournemouth, BH1",
+      guide_price: "350000030203",
+    });
+
+    expect(row.validationErrors).toContain("guide_price must be a safe integer between 1000 and 500000000");
+    expect(mapImportToDealInsert(row.normalized).guide_price).toBe(0);
+  });
+
+  it("does not map unsafe area values into deal writes", () => {
+    const row = normalizeImportRow({
+      title: "Bad area",
+      location: "Bournemouth, BH1",
+      guide_price: "350000",
+      sqft: "350000030203",
+    });
+
+    expect(row.normalized.sqft).toBe(350000030203);
+    expect(mapImportToDealInsert(row.normalized).sqft).toBe(0);
+  });
+
   it("maps a valid row to a deal insert shape", () => {
     const row = normalizeImportRow({
       external_id: "lot-1",

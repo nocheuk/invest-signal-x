@@ -2,7 +2,10 @@ import { createClient } from "@supabase/supabase-js";
 import {
   dedupeImportRows,
   findDuplicate,
+  isSafeGuidePrice,
   mapImportToDealInsert,
+  MAX_GUIDE_PRICE,
+  MIN_GUIDE_PRICE,
 } from "./dealImportCore.mjs";
 
 export async function runDealImport({
@@ -17,7 +20,8 @@ export async function runDealImport({
   }
 
   const sourceItemTotal = rows.length;
-  const { uniqueRows, duplicateRows } = dedupeImportRows(rows);
+  const safeRows = rows.map(applyFinalSafetyGuards);
+  const { uniqueRows, duplicateRows } = dedupeImportRows(safeRows);
 
   const url = process.env.VITE_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -67,6 +71,7 @@ export async function runDealImport({
       if (duplicate) {
         if (!dryRun) {
           await linkSource({ supabase, dryRun, source, dealId: duplicate.dealId, rawImportId: rawImport.id, row });
+          await refreshDuplicateDeal({ supabase, dealId: duplicate.dealId, row, sourceName });
           await updateRawImport({ supabase, rawImportId: rawImport.id, status: "skipped_duplicate", dealId: duplicate.dealId, errorMessage: `Duplicate by ${duplicate.rule}` });
         }
         stats.existing += 1;
@@ -102,6 +107,44 @@ export async function runDealImport({
     if (!dryRun) await finishImportRun({ supabase, runId: run.id, stats, status: "failed", errorMessage: error instanceof Error ? error.message : String(error) });
     throw error;
   }
+}
+
+function applyFinalSafetyGuards(row) {
+  const guidePrice = row.normalized?.guidePrice;
+  const normalized = { ...row.normalized };
+  let validationErrors = row.validationErrors ?? [];
+  let changed = false;
+
+  if (guidePrice !== undefined && guidePrice !== null && guidePrice !== "" && !isSafeGuidePrice(guidePrice)) {
+    const message = `guide_price must be a safe integer between ${MIN_GUIDE_PRICE} and ${MAX_GUIDE_PRICE}`;
+    validationErrors = [...new Set([...validationErrors, message])];
+    normalized.guidePrice = undefined;
+    changed = true;
+  }
+
+  for (const field of ["passingRent", "sqft", "pricePerSqft", "cashflowAfterDebt"]) {
+    const value = normalized[field];
+    if (value !== undefined && value !== null && value !== "" && !isSafeNonNegativeNumber(value)) {
+      normalized[field] = undefined;
+      changed = true;
+    }
+  }
+
+  if (!changed) return row;
+
+  return {
+    ...row,
+    normalized,
+    validationErrors,
+    dedupeKeys: {
+      ...row.dedupeKeys,
+      titlePriceLocation: undefined,
+    },
+  };
+}
+
+function isSafeNonNegativeNumber(value, max = MAX_GUIDE_PRICE) {
+  return Number.isSafeInteger(value) && value >= 0 && value <= max;
 }
 
 async function getOrCreateSource({ supabase, dryRun, sourceName, sourceType, sourceConfig }) {
@@ -205,6 +248,26 @@ async function linkSource({ supabase, dryRun, source, dealId, rawImportId, row }
       source_url: row.normalized.sourceUrl ?? null,
       confidence: 1,
     });
+  if (error) throw error;
+}
+
+async function refreshDuplicateDeal({ supabase, dealId, row, sourceName }) {
+  const deal = mapImportToDealInsert(row.normalized, sourceName);
+  const { error } = await supabase
+    .from("deals")
+    .update({
+      title: deal.title,
+      location: deal.location,
+      region: deal.region,
+      asset_type: deal.asset_type,
+      source: deal.source,
+      guide_price: deal.guide_price,
+      passing_rent: deal.passing_rent,
+      sqft: deal.sqft,
+      thumbnail: deal.thumbnail,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", dealId);
   if (error) throw error;
 }
 

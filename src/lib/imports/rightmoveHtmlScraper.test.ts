@@ -47,6 +47,44 @@ describe("custom Rightmove Commercial HTML scraper", () => {
     expect(rows[1].normalized.imageUrl).toBe("https://www.rightmove.co.uk/images/office.jpg");
   });
 
+  it("does not use carousel counters as listing titles", () => {
+    const rows = scrapeRightmoveCommercialHtmlToImportRows({
+      html: pageWithCard(`
+        <div data-testid="propertyCard-vrt-0" class="propertyCard-details">
+          <a data-testid="property-details-lozenge" href="/properties/148450009#/?channel=COM_BUY">
+            <img src="https://media.rightmove.co.uk/assets/hash/_next/static/media/camera-white.579a6efc.svg" alt="camera icon">
+            1/11
+          </a>
+          <a class="propertyCard-link" href="/properties/148450009#/?channel=COM_BUY">447-457 Wimborne Road, Bournemouth, BH9</a>
+          <div data-testid="property-price">\u00a32,650,000 Guide Price</div>
+          <p data-testid="property-description">Substantial freehold retail investment for sale by auction.</p>
+        </div>
+      `),
+      pageUrl,
+    });
+
+    expect(rows[0].normalized.title).toBe("447-457 Wimborne Road, Bournemouth, BH9");
+    expect(rows[0].normalized.title).not.toMatch(/^\d+\/\d+$/);
+  });
+
+  it("ignores placeholder/icon/logo images and extracts the first real property photo", () => {
+    const rows = scrapeRightmoveCommercialHtmlToImportRows({
+      html: pageWithCard(`
+        <div data-testid="propertyCard-vrt-1" class="propertyCard-details">
+          <a href="/properties/148450010#/?channel=COM_BUY">1/17</a>
+          <img src="https://media.rightmove.co.uk/assets/hash/_next/static/media/camera-white.579a6efc.svg" alt="camera icon">
+          <img src="https://media.rightmove.co.uk/partner-logo/agent-logo.jpeg" alt="Agent Logo">
+          <img data-testid="property-img-1" src="https://media.rightmove.co.uk:443/dir/crop/10:9-16:9/property-photo/abc/148450010/real_photo_max_476x317.jpeg" alt="Property Image 1">
+          <a class="propertyCard-link" href="/properties/148450010#/?channel=COM_BUY">Bournemouth Retail Investment, BH1</a>
+          <div data-testid="property-price">Guide Price \u00a3500,000</div>
+        </div>
+      `),
+      pageUrl,
+    });
+
+    expect(rows[0].normalized.imageUrl).toBe("https://media.rightmove.co.uk/dir/crop/10:9-16:9/property-photo/abc/148450010/real_photo_max_476x317.jpeg");
+  });
+
   it("normalizes listing URLs and removes duplicate property IDs", () => {
     const listings = parseRightmoveCommercialListings({ html: fixture, pageUrl });
     const rows = scrapeRightmoveCommercialHtmlToImportRows({ html: fixture, pageUrl });
@@ -82,6 +120,44 @@ describe("custom Rightmove Commercial HTML scraper", () => {
     expect(rows[0].normalized.guidePrice).toBe(350000);
     expect(rows[0].normalized.sqft).toBe(30203);
     expect(rows[0].validationErrors).not.toContain("guide_price must be greater than 0");
+  });
+
+  it("does not combine nearby source IDs into guide price", () => {
+    const rows = scrapeRightmoveCommercialHtmlToImportRows({
+      html: pageWithCard(`
+        <article data-testid="property-card">
+          <a href="/properties/350000030203#/?channel=COM_BUY">
+            <h2>Freehold Bournemouth shop</h2>
+            <address>Bournemouth, BH1</address>
+            <div data-testid="property-price">Guide Price £350,000</div>
+            <p>30,203 sq ft. Property reference 350000030203.</p>
+          </a>
+        </article>
+      `),
+      pageUrl,
+    });
+
+    expect(rows[0].normalized.guidePrice).toBe(350000);
+    expect(rows[0].normalized.guidePrice).toBeLessThan(500000000);
+  });
+
+  it("extracts sqft without combining the sale price", () => {
+    const rows = scrapeRightmoveCommercialHtmlToImportRows({
+      html: pageWithCard(`
+        <article data-testid="property-card">
+          <a href="/properties/174711599#/?channel=COM_BUY">
+            <h2>Telecom House</h2>
+            <address>Bournemouth, BH8 8EJ</address>
+            <div data-testid="property-price">£3,500,00030,203 sq. ft.</div>
+            <p>Prime commercial building.</p>
+          </a>
+        </article>
+      `),
+      pageUrl,
+    });
+
+    expect(rows[0].normalized.guidePrice).toBe(3500000);
+    expect(rows[0].normalized.sqft).toBe(30203);
   });
 
   it("skips POA sale listings as POA", () => {
