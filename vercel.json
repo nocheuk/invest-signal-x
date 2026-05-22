@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/location-search.mjs": {
+      "maxDuration": 60
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",

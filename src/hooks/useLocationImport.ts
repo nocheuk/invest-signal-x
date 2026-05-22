@@ -17,6 +17,18 @@ export type LocationImportResult = {
   processed: number;
 };
 
+export class LocationImportError extends Error {
+  code?: string;
+  detail?: string;
+
+  constructor(message: string, { code, detail }: { code?: string; detail?: string } = {}) {
+    super(message);
+    this.name = "LocationImportError";
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
 export function useLocationImport() {
   const auth = useAuth();
   const queryClient = useQueryClient();
@@ -33,7 +45,10 @@ export function useLocationImport() {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(body.error || "Couldn't search this location yet. Try a Rightmove search URL instead.");
+        throw new LocationImportError(
+          body.error || "Couldn't search this location yet. Try a Rightmove search URL instead.",
+          { code: body.code, detail: body.detail }
+        );
       }
       return body as LocationImportResult;
     },

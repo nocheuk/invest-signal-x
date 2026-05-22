@@ -10,7 +10,7 @@ import { useDeals } from "@/hooks/useDeals";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavedSearches, type SavedSearchFilters } from "@/hooks/useSavedSearches";
-import { useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
+import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save } from "lucide-react";
@@ -21,6 +21,7 @@ import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
 import { ALL_REAL_DEALS_FILTER, buildSourceOptions, filterAndSortDeals } from "@/lib/dashboardFilters";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { isAdminUser } from "@/lib/admin";
 
 const EMPTY_DEALS = [];
 
@@ -74,6 +75,8 @@ export default function Dashboard() {
   const hasLocationFilter = locationQuery.trim().length > 0;
   const showLocationSearchCta = isSupabaseConfigured && hasLocationFilter && filtered.length < 3;
   const canRunLiveLocationSearch = Boolean(auth.user && auth.session?.access_token);
+  const canShowLocationSearchDebug = import.meta.env.DEV || isAdminUser(auth.user);
+  const locationImportErrorDetail = locationImport.error instanceof LocationImportError ? locationImport.error.detail : undefined;
 
   const currentSavedFilters: SavedSearchFilters = { locationQuery, source, asset, minYield, maxPrice };
   const saveLocationSearch = async () => {
@@ -309,6 +312,9 @@ export default function Dashboard() {
               {locationImport.isError && (
                 <div className="basis-full rounded-md border border-signal-amber/40 bg-signal-amber/10 px-3 py-2 text-xs text-muted-foreground">
                   {locationImport.error.message || "Couldn't search this location yet. Try a Rightmove search URL instead."}
+                  {canShowLocationSearchDebug && locationImportErrorDetail && (
+                    <div className="mt-1 font-mono text-[11px]">{locationImportErrorDetail}</div>
+                  )}
                 </div>
               )}
               {locationImportResult && (

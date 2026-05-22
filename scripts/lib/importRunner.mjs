@@ -3,7 +3,7 @@ import {
   dedupeImportRows,
   findDuplicate,
   mapImportToDealInsert,
-} from "../../src/lib/imports/dealImport.ts";
+} from "./dealImportCore.mjs";
 
 export async function runDealImport({
   rows,
