@@ -99,6 +99,7 @@ export function parseRightmoveCommercialListings({ html, pageUrl, sourceName = "
     ]);
     const guidePrice = parseGuidePrice(price) ?? parseGuidePriceFromLabeledText(cardText);
     const rent = extractRent(cardText);
+    const intent = classifyListingIntent({ title, price, text: cardText, guidePrice, rent });
     const sqft = extractSqft(cardText);
     const propertyType = firstText($, $card, [
       '[data-testid*="property-type"]',
@@ -125,6 +126,8 @@ export function parseRightmoveCommercialListings({ html, pageUrl, sourceName = "
       price,
       guidePrice,
       rent,
+      listingIntent: intent.intent,
+      skipReason: intent.skipReason,
       sizeSqFt: sqft,
       description,
       imageUrl,
@@ -134,6 +137,39 @@ export function parseRightmoveCommercialListings({ html, pageUrl, sourceName = "
   });
 
   return items;
+}
+
+export function filterRightmoveAcquisitionRows(rows) {
+  const skipped = {
+    skipped_rent_only: 0,
+    skipped_poa: 0,
+    failed_missing_price: 0,
+  };
+  const importRows = [];
+
+  for (const row of rows) {
+    const intent = row.raw?.listingIntent;
+    const skipReason = row.raw?.skipReason;
+    if (skipReason === "skipped_rent_only" || intent === "rent") {
+      skipped.skipped_rent_only += 1;
+      continue;
+    }
+    if (skipReason === "skipped_poa") {
+      skipped.skipped_poa += 1;
+      continue;
+    }
+    if (!row.normalized.guidePrice || row.validationErrors.includes("guide_price must be greater than 0")) {
+      skipped.failed_missing_price += 1;
+      continue;
+    }
+    if (intent === "sale" || intent === "mixed" || intent === "investment") {
+      importRows.push(row);
+      continue;
+    }
+    skipped.failed_missing_price += 1;
+  }
+
+  return { importRows, skipped };
 }
 
 function normalizeRightmoveListing(item) {
@@ -238,7 +274,7 @@ function extractAddressFromText(text) {
 }
 
 function extractRent(text) {
-  return text.match(/(\u00a3[\d,]+(?:\.\d+)?\s*(?:pa|per annum|annum))/i)?.[1] ?? "";
+  return text.match(/(\u00a3[\d,]+(?:\.\d+)?\s*(?:pa|per annum|annum|pcm|per month|pw|per week))/i)?.[1] ?? "";
 }
 
 function extractSqft(text) {
@@ -292,7 +328,7 @@ function parseNumber(value) {
 function parseGuidePrice(value) {
   const text = clean(value);
   if (!text || /(?:price on application|\bpoa\b)/i.test(text)) return undefined;
-  const currencyMatches = [...text.matchAll(/\u00a3\s*\d[\d,]*(?:\.\d+)?\s*(?:m|k|million|thousand)?/gi)];
+  const currencyMatches = [...text.matchAll(/\u00a3\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*(?:m|k|million|thousand)?/gi)];
   for (const match of currencyMatches) {
     const snippet = text.slice(match.index ?? 0, (match.index ?? 0) + match[0].length + 25);
     if (/(?:pa|per annum|annum|pcm|per month|monthly)/i.test(snippet)) continue;
@@ -300,6 +336,34 @@ function parseGuidePrice(value) {
     if (isSensibleGuidePrice(parsed)) return parsed;
   }
   return undefined;
+}
+
+function classifyListingIntent({ title = "", price = "", text = "", guidePrice, rent = "" }) {
+  const combined = clean(`${title} ${price} ${text}`);
+  const lower = combined.toLowerCase();
+  const priceLower = String(price ?? "").toLowerCase();
+  const isPoa = /(?:price on application|\bpoa|poa\b)/i.test(combined);
+  if (isPoa && !guidePrice) return { intent: "sale", skipReason: "skipped_poa" };
+
+  const rentOnlyPrice = hasRentOnlyPrice(priceLower || lower);
+  const toLetSignal = /\b(to let|for rent|lease only|lease-only|available to let|rent only)\b/i.test(combined);
+  const investmentSignal = /\b(investment|income|yield|let to|let until|tenant|tenanted|passing rent|rental income)\b/i.test(combined);
+  const saleSignal = Boolean(guidePrice) || /\b(for sale|freehold|guide price|offers?\s+(?:over|in excess of)|asking price|auction|sale)\b/i.test(combined);
+
+  if ((rentOnlyPrice || toLetSignal) && !saleSignal && !investmentSignal) {
+    return { intent: "rent", skipReason: "skipped_rent_only" };
+  }
+  if ((rentOnlyPrice || rent || investmentSignal) && guidePrice) {
+    return { intent: "mixed" };
+  }
+  if (saleSignal && guidePrice) return { intent: "sale" };
+  if (investmentSignal) return { intent: "investment" };
+  if (rentOnlyPrice || toLetSignal) return { intent: "rent", skipReason: "skipped_rent_only" };
+  return { intent: "unknown" };
+}
+
+function hasRentOnlyPrice(text) {
+  return /\u00a3\s*\d[\d,]*(?:\.\d+)?\s*(?:pa|per annum|annum|pcm|per month|pw|per week|weekly|monthly)\b/i.test(text);
 }
 
 function parseGuidePriceFromLabeledText(text) {

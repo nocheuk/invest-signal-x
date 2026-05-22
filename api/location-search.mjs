@@ -98,6 +98,9 @@ export default async function handler(req, res) {
       existing: result.totalExisting,
       failed: result.totalFailed,
       skippedDuplicate: result.totalSkippedDuplicate,
+      skippedRentOnly: result.totalSkippedRentOnly,
+      skippedPoa: result.totalSkippedPoa,
+      failedMissingPrice: result.totalFailedMissingPrice,
     });
     const response = {
       locationQuery,
@@ -111,6 +114,9 @@ export default async function handler(req, res) {
       refreshed: result.totalExisting,
       failed: result.totalFailed,
       skippedDuplicate: result.totalSkippedDuplicate,
+      skippedRentOnly: result.totalSkippedRentOnly,
+      skippedPoa: result.totalSkippedPoa,
+      failedMissingPrice: result.totalFailedMissingPrice,
       processed: result.totalProcessed,
     };
     await finishLocationSearchRequest({ supabase, requestId, status: "completed", result: response });

@@ -325,6 +325,8 @@ export default function Dashboard() {
               {locationImportResult && (
                 <div className="basis-full rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-muted-foreground">
                   Scanned Rightmove Commercial and Acuitus. Added {locationImportResult.imported} new deals, refreshed {locationImportResult.refreshed ?? locationImportResult.existing} existing deals.
+                  {(locationImportResult.skippedRentOnly ?? 0) > 0 && ` Skipped ${locationImportResult.skippedRentOnly} rent-only listings.`}
+                  {(locationImportResult.skippedPoa ?? 0) > 0 && ` Skipped ${locationImportResult.skippedPoa} POA listings.`}
                   {locationImportResult.failed > 0 && ` ${locationImportResult.failed} rows failed validation or source parsing.`}
                 </div>
               )}
