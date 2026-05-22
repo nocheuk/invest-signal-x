@@ -20,6 +20,7 @@ export async function runRightmoveCommercialImport({
   const rows = scrapeRightmoveCommercialHtmlToImportRows({ html, pageUrl: searchUrl, sourceName });
   const { importRows, skipped } = filterRightmoveAcquisitionRows(rows);
   reportRightmoveSkips(skipped);
+  if (dryRun) reportRightmoveRowContext(rows);
 
   if (importRows.length === 0) {
     const result = {
@@ -66,6 +67,23 @@ function reportRightmoveSkips(skipped) {
   if (skipped.skipped_rent_only) console.log(`skipped_rent_only: ${skipped.skipped_rent_only}`);
   if (skipped.skipped_poa) console.log(`skipped_poa: ${skipped.skipped_poa}`);
   if (skipped.failed_missing_price) console.log(`failed_missing_price: ${skipped.failed_missing_price}`);
+}
+
+function reportRightmoveRowContext(rows) {
+  console.log("Rightmove parsed row context:");
+  for (const row of rows) {
+    console.log(JSON.stringify({
+      row: row.rowNumber,
+      source_url: row.normalized.sourceUrl,
+      title: row.normalized.title,
+      raw_price: row.raw?.price ?? null,
+      parsed_guide_price: row.normalized.guidePrice ?? null,
+      parsed_sqft: row.normalized.sqft ?? null,
+      listing_intent: row.raw?.listingIntent ?? null,
+      skip_reason: row.raw?.skipReason ?? null,
+      validation_errors: row.validationErrors,
+    }));
+  }
 }
 
 function isDirectRun() {

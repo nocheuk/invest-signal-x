@@ -77,20 +77,21 @@ export function parseRightmoveCommercialListings({ html, pageUrl, sourceName = "
 
     const $card = findListingCard($, $anchor);
     const cardText = clean($card.text() || $anchor.text());
-    const title = firstText($, $card, [
+    const explicitTitle = firstValidText($, $card, [
       '[data-testid*="title"]',
       '[data-test*="title"]',
       ".propertyCard-title",
       "h2",
       "h3",
-    ]) || clean($anchor.attr("aria-label")) || clean($anchor.text());
-    const location = firstText($, $card, [
+    ]);
+    const location = firstValidText($, $card, [
       "address",
       '[data-testid*="address"]',
       '[data-test*="address"]',
       ".propertyCard-address",
       ".propertyCard-location",
-    ]) || extractAddressFromText(cardText) || title;
+      ".propertyCard-link",
+    ]) || extractAddressFromText(cardText);
     const price = firstText($, $card, [
       '[data-testid*="price"]',
       '[data-test*="price"]',
@@ -99,14 +100,20 @@ export function parseRightmoveCommercialListings({ html, pageUrl, sourceName = "
     ]);
     const guidePrice = parseGuidePrice(price) ?? parseGuidePriceFromLabeledText(cardText);
     const rent = extractRent(cardText);
-    const intent = classifyListingIntent({ title, price, text: cardText, guidePrice, rent });
     const sqft = extractSqft(cardText);
-    const propertyType = firstText($, $card, [
+    const propertyType = firstValidText($, $card, [
       '[data-testid*="property-type"]',
       '[data-test*="property-type"]',
       ".propertyCard-branchSummary",
     ]) || inferPropertyType(cardText);
-    const description = firstText($, $card, [
+    const title = chooseListingTitle({
+      explicitTitle,
+      anchorText: clean($anchor.attr("aria-label")) || clean($anchor.text()),
+      location,
+      propertyType,
+    });
+    const intent = classifyListingIntent({ title, price, text: cardText, guidePrice, rent });
+    const description = firstValidText($, $card, [
       '[data-testid*="description"]',
       '[data-test*="description"]',
       ".propertyCard-description",
@@ -212,7 +219,10 @@ function assertParseableHtml(html) {
 }
 
 function findListingCard($, $anchor) {
-  const card = $anchor.closest('[data-testid*="property"], [data-test*="property"], article, li, div').filter((_, element) => {
+  const propertyCard = $anchor.closest('[data-testid^="propertyCard-vrt-"], [data-testid^="propertyCard-"], .propertyCard-details, [class*="propertyCardContainerWrapper"]').first();
+  if (propertyCard.length) return propertyCard;
+
+  const card = $anchor.closest('article, li, [data-testid*="property"], [data-test*="property"], div').filter((_, element) => {
     const text = $(element).text();
     return text.length > 20;
   }).first();
@@ -227,29 +237,102 @@ function firstText($, $root, selectors) {
   return "";
 }
 
+function firstValidText($, $root, selectors) {
+  for (const selector of selectors) {
+    const value = firstText($, $root, [selector]);
+    if (isValidTitleText(value)) return value;
+  }
+  return "";
+}
+
+function chooseListingTitle({ explicitTitle, anchorText, location, propertyType }) {
+  if (isValidTitleText(explicitTitle)) return explicitTitle;
+  if (isValidTitleText(location)) return location;
+  if (isValidTitleText(propertyType) && isValidTitleText(location)) return `${propertyType} - ${location}`;
+  if (isValidTitleText(anchorText)) return anchorText;
+  if (isValidTitleText(propertyType)) return propertyType;
+  return "Rightmove commercial listing";
+}
+
+function isValidTitleText(value) {
+  const text = clean(value);
+  if (!text) return false;
+  if (/^\|?\s*\d+\s*\/\s*\d+$/i.test(text)) return false;
+  if (/^(view property details|link to property details page|featured property)$/i.test(text)) return false;
+  if (/^(previous image|next image|camera icon|floorplan icon)$/i.test(text)) return false;
+  return true;
+}
+
 function extractImageUrl($, $card, pageUrl) {
   const attributes = ["src", "data-src", "data-lazy-src", "data-original"];
-  const image = $card.find("img").first();
-  for (const attribute of attributes) {
-    const value = image.attr(attribute);
-    const url = normalizeImageUrl(value, pageUrl);
-    if (url) return url;
+  const candidates = [];
+  $card.find("img, source").each((_, element) => {
+    const $element = $(element);
+    for (const attribute of attributes) {
+      const value = $element.attr(attribute);
+      const url = normalizeImageUrl(value, pageUrl);
+      if (url) candidates.push({ url, score: scoreImageUrl(url, $element) });
+    }
+    const srcset = $element.attr("srcset");
+    if (srcset) {
+      for (const part of srcset.split(",")) {
+        const candidate = part.trim().split(/\s+/)[0];
+        const url = normalizeImageUrl(candidate, pageUrl);
+        if (url) candidates.push({ url, score: scoreImageUrl(url, $element) });
+      }
+    }
+  });
+
+  const jsonUrls = extractImageUrlsFromText($card.html() || "", pageUrl);
+  for (const url of jsonUrls) candidates.push({ url, score: scoreImageUrl(url) + 5 });
+
+  return candidates
+    .filter((candidate) => isValidPropertyImageUrl(candidate.url))
+    .sort((a, b) => b.score - a.score)[0]?.url;
+}
+
+function extractImageUrlsFromText(text, pageUrl) {
+  const urls = new Set();
+  const matches = String(text ?? "").matchAll(/https?:\\?\/\\?\/[^"'<>\\\s]+?(?:jpe?g|png|webp)(?:\?[^"'<>\\\s]*)?/gi);
+  for (const match of matches) {
+    const raw = match[0].replace(/\\\//g, "/");
+    const url = normalizeImageUrl(raw, pageUrl);
+    if (url) urls.add(url);
   }
-  const srcset = image.attr("srcset") || $card.find("source").first().attr("srcset");
-  if (srcset) {
-    const first = srcset.split(",").map((part) => part.trim().split(/\s+/)[0]).find(Boolean);
-    const url = normalizeImageUrl(first, pageUrl);
-    if (url) return url;
-  }
-  return undefined;
+  return [...urls];
+}
+
+function scoreImageUrl(url, $element) {
+  let score = 0;
+  const lower = url.toLowerCase();
+  const testId = clean($element?.attr?.("data-testid"));
+  if (/property-img|property-image/i.test(testId)) score += 30;
+  if (lower.includes("property-photo")) score += 30;
+  if (lower.includes("/dir/crop/")) score += 20;
+  if (/\.(?:jpe?g|png|webp)(?:$|\?)/i.test(lower)) score += 10;
+  if (lower.includes("partner-logo")) score -= 100;
+  return score;
+}
+
+function isValidPropertyImageUrl(url) {
+  const lower = String(url ?? "").toLowerCase();
+  if (!lower) return false;
+  if (lower.startsWith("data:")) return false;
+  if (/\.(?:svg|gif)(?:$|\?)/i.test(lower)) return false;
+  if (/(?:icon|logo|sprite|tracking|pixel|transparent|placeholder|blank|camera-white|floorplan-white|chevron-line)/i.test(lower)) return false;
+  if (lower.includes("/_next/static/")) return false;
+  if (lower.includes("partner-logo")) return false;
+  if (!/\.(?:jpe?g|png|webp)(?:$|\?)/i.test(lower)) return false;
+  return true;
 }
 
 function normalizeImageUrl(value, pageUrl) {
   if (!value) return undefined;
-  const trimmed = clean(value);
+  const trimmed = clean(value).replace(/\\\//g, "/");
   if (!trimmed || trimmed.startsWith("data:")) return undefined;
   try {
-    return new URL(trimmed, pageUrl || RIGHTMOVE_BASE_URL).toString();
+    const url = new URL(trimmed, pageUrl || RIGHTMOVE_BASE_URL).toString();
+    return isValidPropertyImageUrl(url) ? url : undefined;
   } catch {
     return undefined;
   }
@@ -278,7 +361,11 @@ function extractRent(text) {
 }
 
 function extractSqft(text) {
-  return text.match(/([\d,]+(?:\.\d+)?\s*(?:sq\s*ft|sqft|sq\. ft\.?))/i)?.[1] ?? "";
+  const match = String(text ?? "").match(/([£\d,.\s–-]+)\s*(?:sq\s*ft|sqft|sq\. ft\.?)/i);
+  if (!match) return "";
+  const numberMatches = [...match[1].matchAll(/\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?/g)];
+  const value = numberMatches.at(-1)?.[0];
+  return value ? `${value} sq. ft.` : "";
 }
 
 function extractListedDate(text) {

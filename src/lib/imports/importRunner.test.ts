@@ -96,6 +96,12 @@ describe("deal import runner", () => {
 
     expect(result).toMatchObject({ inserted: 0, existing: 1, skipped_duplicate: 1 });
     expect(mock.calls.dealUpserts).toEqual([]);
+    expect(mock.calls.dealUpdates).toEqual([
+      expect.objectContaining({
+        title: "Office Investment",
+        thumbnail: "https://www.acuitus.co.uk/images/property-5760.jpg",
+      }),
+    ]);
     expect(mock.calls.rawInserts).toHaveLength(1);
     expect(mock.calls.rawInserts[0]).toMatchObject({
       source_url: "https://www.acuitus.co.uk/property/5760/",
@@ -119,6 +125,95 @@ describe("deal import runner", () => {
       }),
     ]);
   });
+
+  it("rejects unsafe guide prices before Supabase deal writes", async () => {
+    process.env.VITE_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    const mock = createImportSupabaseMock();
+    supabaseMocks.createClient.mockReturnValue(mock.client);
+    const unsafeRow = normalizeImportRow({
+      external_id: "rightmove-overflow",
+      source_url: "https://www.rightmove.co.uk/properties/350000030203#/?channel=COM_BUY",
+      title: "Bournemouth Retail Investment",
+      location: "Bournemouth, BH1",
+      guide_price: "350000030203",
+    }, 1);
+
+    const result = await runDealImport({
+      rows: [unsafeRow],
+      sourceName: "Rightmove Commercial",
+      sourceType: "custom_rightmove_commercial",
+      dryRun: false,
+    });
+
+    expect(result).toMatchObject({ inserted: 0, existing: 0, failed: 1 });
+    expect(mock.calls.dealUpserts).toEqual([]);
+    expect(mock.calls.dealUpdates).toEqual([]);
+    expect(mock.calls.rawInserts[0]).toMatchObject({
+      status: "failed",
+      normalized_payload: expect.not.objectContaining({ guidePrice: 350000030203 }),
+      validation_errors: expect.arrayContaining(["guide_price must be a safe integer between 1000 and 500000000"]),
+    });
+  });
+
+  it("does not refresh duplicate deals with unsafe guide prices", async () => {
+    process.env.VITE_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    const mock = createImportSupabaseMock();
+    supabaseMocks.createClient.mockReturnValue(mock.client);
+    const unsafeDuplicate = normalizeImportRow({
+      external_id: "acuitus-1",
+      source_url: "https://www.acuitus.co.uk/property/5760/",
+      image_url: "https://www.acuitus.co.uk/images/property-5760.jpg",
+      title: "Office Investment",
+      location: "London W1J 7EE",
+      guide_price: "350000030203",
+    }, 1);
+
+    const result = await runDealImport({
+      rows: [unsafeDuplicate],
+      sourceName: "Acuitus",
+      sourceType: "custom_html_scraper",
+      dryRun: false,
+    });
+
+    expect(result).toMatchObject({ inserted: 0, existing: 0, failed: 1, skipped_duplicate: 0 });
+    expect(mock.calls.dealUpserts).toEqual([]);
+    expect(mock.calls.dealUpdates).toEqual([]);
+    expect(mock.calls.linkUpdates).toEqual([]);
+    expect(mock.calls.rawInserts[0]).toMatchObject({
+      status: "failed",
+      validation_errors: expect.arrayContaining(["guide_price must be a safe integer between 1000 and 500000000"]),
+    });
+  });
+
+  it("sanitizes unsafe area values before Supabase writes", async () => {
+    process.env.VITE_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    const mock = createImportSupabaseMock();
+    supabaseMocks.createClient.mockReturnValue(mock.client);
+    const row = normalizeImportRow({
+      external_id: "rightmove-area-overflow",
+      source_url: "https://www.rightmove.co.uk/properties/174711599#/?channel=COM_BUY",
+      title: "Telecom House",
+      location: "Bournemouth, BH8 8EJ",
+      guide_price: "3500000",
+      sqft: "350000030203",
+    }, 1);
+
+    const result = await runDealImport({
+      rows: [row],
+      sourceName: "Rightmove Commercial",
+      sourceType: "custom_rightmove_commercial",
+      dryRun: false,
+    });
+
+    expect(result).toMatchObject({ inserted: 1, failed: 0 });
+    expect(mock.calls.dealUpserts[0]).toMatchObject({ guide_price: 3500000, sqft: 0 });
+    expect(mock.calls.rawInserts[0]).toMatchObject({
+      normalized_payload: expect.not.objectContaining({ sqft: 350000030203 }),
+    });
+  });
 });
 
 function createImportSupabaseMock() {
@@ -128,6 +223,7 @@ function createImportSupabaseMock() {
     rawUpdates: [] as unknown[],
     linkUpdates: [] as unknown[],
     linkInserts: [] as unknown[],
+    dealUpdates: [] as unknown[],
   };
 
   const client = {
@@ -171,6 +267,12 @@ function createImportSupabaseMock() {
           upsert: (payload: unknown) => {
             calls.dealUpserts.push(payload);
             return Promise.resolve({ error: null });
+          },
+          update: (payload: unknown) => {
+            calls.dealUpdates.push(payload);
+            return {
+              eq: async () => ({ error: null }),
+            };
           },
         };
       }

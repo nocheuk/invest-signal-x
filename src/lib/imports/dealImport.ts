@@ -95,6 +95,8 @@ const COVENANTS = ["Strong", "Good", "Moderate", "Weak", "Vacant"];
 const RENT_SUSTAINABILITY = ["Under-rented", "Market rent", "Over-rented"];
 const RENT_REVIEWS = ["Upward-only", "Fixed uplift", "CPI/RPI linked", "Open market", "None"];
 const EXIT_SENSITIVITY = ["Low", "Moderate", "High"];
+export const MIN_GUIDE_PRICE = 1_000;
+export const MAX_GUIDE_PRICE = 500_000_000;
 
 function canonicalHeader(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -110,9 +112,11 @@ function pick(raw: Record<string, string>, ...keys: string[]) {
 
 function parseNumber(value: string) {
   if (!value) return undefined;
-  const cleaned = value.replace(/,/g, "").replace(/gbp/gi, "").replace(/[£%]/g, "").trim();
+  const cleaned = String(value).replace(/,/g, "").replace(/gbp/gi, "").replace(/[£%]/g, " ").trim();
   if (!cleaned) return undefined;
-  const parsed = Number(cleaned);
+  const match = cleaned.match(/\d+(?:\.\d+)?/);
+  if (!match) return undefined;
+  const parsed = Number(match[0]);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
@@ -258,11 +262,20 @@ export function validateImportRow(row: DealImportInput) {
   if (!row.title) errors.push("title is required");
   if (!row.location) errors.push("location is required");
   if (!row.guidePrice || row.guidePrice <= 0) errors.push("guide_price must be greater than 0");
+  else if (!isSafeGuidePrice(row.guidePrice)) errors.push(`guide_price must be a safe integer between ${MIN_GUIDE_PRICE} and ${MAX_GUIDE_PRICE}`);
   if (row.assetType && !ASSET_TYPES.includes(row.assetType)) errors.push(`asset_type must be one of: ${ASSET_TYPES.join(", ")}`);
   if (row.source && !SOURCES.includes(row.source)) errors.push(`source must be one of: ${SOURCES.join(", ")}`);
   if (row.sourceUrl && !/^https?:\/\//i.test(row.sourceUrl)) errors.push("source_url must start with http:// or https://");
   if (row.imageUrl && !/^https?:\/\//i.test(row.imageUrl)) errors.push("image_url must start with http:// or https://");
   return errors;
+}
+
+export function isSafeGuidePrice(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= MIN_GUIDE_PRICE && Number(value) <= MAX_GUIDE_PRICE;
+}
+
+function isSafeNonNegativeNumber(value: unknown, max = MAX_GUIDE_PRICE): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= max;
 }
 
 export function findDuplicate(row: DealImportInput, existingDeals: ExistingDealForDedupe[]): DuplicateMatch | null {
@@ -288,9 +301,9 @@ export function findDuplicate(row: DealImportInput, existingDeals: ExistingDealF
 }
 
 export function mapImportToDealInsert(row: DealImportInput, sourceName = "Manual import") {
-  const passingRent = row.passingRent ?? 0;
-  const guidePrice = row.guidePrice ?? 0;
-  const sqft = row.sqft ?? 0;
+  const passingRent = isSafeNonNegativeNumber(row.passingRent) ? row.passingRent : 0;
+  const guidePrice = isSafeGuidePrice(row.guidePrice) ? row.guidePrice : 0;
+  const sqft = isSafeNonNegativeNumber(row.sqft) ? row.sqft : 0;
   const grossYield = row.grossYield ?? (guidePrice > 0 ? (passingRent / guidePrice) * 100 : 0);
   const netInitialYield = row.netInitialYield ?? Math.max(0, grossYield * 0.93);
   const reversionaryYield = row.reversionaryYield ?? netInitialYield;
