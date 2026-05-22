@@ -1,11 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import { runRightmoveCommercialImport } from "../scrape-rightmove.mjs";
+import { runCustomHtmlScraperImport } from "../scrape-site.mjs";
 
 export const RIGHTMOVE_COMMERCIAL_SOURCE_NAME = "Rightmove Commercial";
+export const ACUITUS_SOURCE_NAME = "Acuitus";
+export const ACUITUS_LISTINGS_URL = "https://www.acuitus.co.uk/find-a-property/";
 export const MIN_LOCATION_QUERY_LENGTH = 3;
 export const HOURLY_LOCATION_SEARCH_LIMIT = 5;
 export const DAILY_LOCATION_SEARCH_LIMIT = 20;
-export const LOCATION_SEARCH_COOLDOWN_MINUTES = 30;
 
 const RIGHTMOVE_LOCATION_BASE = "https://www.rightmove.co.uk/commercial-property-for-sale";
 const RATE_LIMITED_STATUSES = ["pending", "completed", "failed"];
@@ -66,6 +68,74 @@ export async function runRightmoveLocationSearch({
   return { ...result, searchUrl };
 }
 
+export async function runAcuitusLocationSearch({
+  locationQuery,
+  dryRun = false,
+  sourceName = ACUITUS_SOURCE_NAME,
+}) {
+  const normalizedLocation = normalizeLocationQuery(locationQuery);
+  const result = await runCustomHtmlScraperImport({
+    pageUrl: ACUITUS_LISTINGS_URL,
+    sourceName,
+    selectorConfigPath: "./scrapers/acuitus.json",
+    dryRun,
+    rowFilter: (row) => locationMatchesImportRow(row, normalizedLocation),
+    sourceConfig: {
+      generated_from_location: locationQuery,
+      location_filter: normalizedLocation,
+    },
+  });
+  return { ...result, searchUrl: ACUITUS_LISTINGS_URL };
+}
+
+export async function runLiveLocationSourceSearches({
+  locationQuery,
+  dryRun = false,
+  adapters = [
+    { key: "rightmove", sourceName: RIGHTMOVE_COMMERCIAL_SOURCE_NAME, run: runRightmoveLocationSearch },
+    { key: "acuitus", sourceName: ACUITUS_SOURCE_NAME, run: runAcuitusLocationSearch },
+  ],
+}) {
+  const sources = {};
+  for (const adapter of adapters) {
+    try {
+      const result = await adapter.run({ locationQuery, dryRun, sourceName: adapter.sourceName });
+      sources[adapter.key] = normalizeSourceResult(result);
+    } catch (error) {
+      sources[adapter.key] = failedSourceResult(adapter.sourceName, dryRun, error);
+    }
+  }
+  return aggregateSourceResults({ locationQuery, dryRun, sources });
+}
+
+export function aggregateSourceResults({ locationQuery, dryRun = false, sources }) {
+  const values = Object.values(sources);
+  return {
+    locationQuery,
+    dryRun,
+    sources,
+    totalInserted: sum(values, "inserted"),
+    totalExisting: sum(values, "existing"),
+    totalFailed: sum(values, "failed"),
+    totalSkippedDuplicate: sum(values, "skippedDuplicate"),
+    totalProcessed: sum(values, "processed"),
+    totalUnique: sum(values, "unique"),
+    total: sum(values, "total"),
+  };
+}
+
+export function locationMatchesImportRow(row, normalizedLocation) {
+  if (!normalizedLocation) return true;
+  const normalized = row.normalized ?? {};
+  const text = normalizeLocationQuery([
+    normalized.location,
+    normalized.postcode,
+    normalized.region,
+    normalized.title,
+  ].filter(Boolean).join(" "));
+  return text.includes(normalizedLocation);
+}
+
 export function readBearerToken(authorizationHeader = "") {
   const match = String(authorizationHeader).match(/^Bearer\s+(.+)$/i);
   return match?.[1] ?? "";
@@ -107,30 +177,6 @@ export async function prepareLocationSearchRequest({
   sourceName = RIGHTMOVE_COMMERCIAL_SOURCE_NAME,
   now = new Date(),
 }) {
-  const cooldownSince = new Date(now.getTime() - LOCATION_SEARCH_COOLDOWN_MINUTES * 60 * 1000).toISOString();
-  const { data: recent, error: recentError } = await supabase
-    .from("location_search_requests")
-    .select("id,result,created_at")
-    .eq("user_id", userId)
-    .eq("normalized_location", normalizedLocation)
-    .eq("source_name", sourceName)
-    .eq("status", "completed")
-    .gte("created_at", cooldownSince)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (recentError) throw recentError;
-  if (recent) {
-    return {
-      ok: false,
-      status: 200,
-      code: "recent_search",
-      error: `Rightmove Commercial was searched for ${locationQuery} recently. Showing the latest imported results instead.`,
-      result: recent.result,
-      recentRequestId: recent.id,
-    };
-  }
-
   const hourSince = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
   const daySince = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const [hourly, daily] = await Promise.all([
@@ -168,6 +214,40 @@ export async function prepareLocationSearchRequest({
     .single();
   if (insertError) throw insertError;
   return { ok: true, requestId: request.id };
+}
+
+function normalizeSourceResult(result) {
+  return {
+    source: result.source,
+    dryRun: result.dryRun,
+    searchUrl: result.searchUrl,
+    total: result.total ?? 0,
+    unique: result.unique ?? 0,
+    inserted: result.inserted ?? 0,
+    existing: result.existing ?? 0,
+    failed: result.failed ?? 0,
+    skippedDuplicate: result.skipped_duplicate ?? result.skippedDuplicate ?? 0,
+    processed: result.processed ?? 0,
+  };
+}
+
+function failedSourceResult(source, dryRun, error) {
+  return {
+    source,
+    dryRun,
+    total: 0,
+    unique: 0,
+    inserted: 0,
+    existing: 0,
+    failed: 1,
+    skippedDuplicate: 0,
+    processed: 0,
+    error: error instanceof Error ? error.message : String(error),
+  };
+}
+
+function sum(values, key) {
+  return values.reduce((total, value) => total + (Number(value?.[key]) || 0), 0);
 }
 
 export async function finishLocationSearchRequest({ supabase, requestId, status, result = {}, errorMessage = null }) {

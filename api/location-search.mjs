@@ -5,7 +5,7 @@ import {
   prepareLocationSearchRequest,
   requireAuthenticatedUser,
   RIGHTMOVE_COMMERCIAL_SOURCE_NAME,
-  runRightmoveLocationSearch,
+  runLiveLocationSourceSearches,
   validateLocationQuery,
 } from "../scripts/lib/rightmoveLocationSearch.mjs";
 
@@ -25,17 +25,32 @@ export default async function handler(req, res) {
 
   let requestId = null;
   let supabase = null;
+  let locationQuery = "";
+  let generatedUrl = null;
+  let validation = null;
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-    const locationQuery = String(body.locationQuery ?? "").trim();
+    locationQuery = String(body.locationQuery ?? "").trim();
     const dryRun = body.dryRun === true;
     logLocationSearch("location_query_received", { userId: auth.user.id, locationQuery, dryRun });
 
-    const validation = validateLocationQuery(locationQuery);
+    validation = validateLocationQuery(locationQuery);
     if (!validation.ok) {
       logLocationSearch("validation_failure", { userId: auth.user.id, locationQuery, reason: validation.error });
       return res.status(400).json({ error: validation.error });
     }
+
+    generatedUrl = buildRightmoveCommercialSearchUrl(locationQuery);
+    logLocationSearch("runtime_diagnostics", {
+      userId: auth.user.id,
+      locationQuery,
+      generatedUrl,
+      env: envDiagnostics(),
+      nodeVersion: process.version,
+      vercelRegion: process.env.VERCEL_REGION || null,
+      vercelEnv: process.env.VERCEL_ENV || null,
+      vercelGitCommitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+    });
 
     supabase = await createServiceClient();
     const prepared = await prepareLocationSearchRequest({
@@ -58,13 +73,11 @@ export default async function handler(req, res) {
       return res.status(prepared.status).json({
         error: prepared.error,
         code: prepared.code,
-        reusedRecentSearch: prepared.code === "recent_search",
         ...(prepared.result || {}),
       });
     }
 
     requestId = prepared.requestId;
-    const generatedUrl = buildRightmoveCommercialSearchUrl(locationQuery);
     logLocationSearch("rate_or_cooldown_result", {
       userId: auth.user.id,
       locationQuery,
@@ -73,29 +86,32 @@ export default async function handler(req, res) {
       requestId,
     });
     logLocationSearch("generated_rightmove_url", { userId: auth.user.id, locationQuery, generatedUrl });
-    const result = await runRightmoveLocationSearch({ locationQuery, dryRun });
+    const result = await runLiveLocationSourceSearches({ locationQuery, dryRun });
     logLocationSearch("scraper_import_result", {
       userId: auth.user.id,
       requestId,
       locationQuery,
+      sources: result.sources,
       total: result.total,
-      unique: result.unique,
-      inserted: result.inserted,
-      existing: result.existing,
-      failed: result.failed,
-      skippedDuplicate: result.skipped_duplicate,
+      unique: result.totalUnique,
+      inserted: result.totalInserted,
+      existing: result.totalExisting,
+      failed: result.totalFailed,
+      skippedDuplicate: result.totalSkippedDuplicate,
     });
     const response = {
       locationQuery,
-      sourceName: result.source,
+      sourceName: "Rightmove Commercial and Acuitus",
       dryRun: result.dryRun,
+      sources: result.sources,
       total: result.total,
-      unique: result.unique,
-      imported: result.inserted,
-      existing: result.existing,
-      failed: result.failed,
-      skippedDuplicate: result.skipped_duplicate,
-      processed: result.processed,
+      unique: result.totalUnique,
+      imported: result.totalInserted,
+      existing: result.totalExisting,
+      refreshed: result.totalExisting,
+      failed: result.totalFailed,
+      skippedDuplicate: result.totalSkippedDuplicate,
+      processed: result.totalProcessed,
     };
     await finishLocationSearchRequest({ supabase, requestId, status: "completed", result: response });
     logLocationSearch("request_completed", { userId: auth.user.id, requestId, durationMs: Date.now() - requestStartedAt });
@@ -119,6 +135,17 @@ export default async function handler(req, res) {
     return res.status(500).json({
       error: userFacingSearchError(detail),
       detail,
+      diagnostics: {
+        requestId,
+        locationQuery,
+        generatedUrl,
+        normalizedLocation: validation?.normalized,
+        env: envDiagnostics(),
+        nodeVersion: process.version,
+        vercelRegion: process.env.VERCEL_REGION || null,
+        vercelEnv: process.env.VERCEL_ENV || null,
+        vercelGitCommitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+      },
     });
   }
 }
@@ -137,4 +164,12 @@ function logLocationSearch(event, fields = {}) {
     at: new Date().toISOString(),
     ...fields,
   }));
+}
+
+function envDiagnostics() {
+  return {
+    VITE_SUPABASE_URL: Boolean(process.env.VITE_SUPABASE_URL),
+    VITE_SUPABASE_ANON_KEY: Boolean(process.env.VITE_SUPABASE_ANON_KEY),
+    SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  };
 }

@@ -84,10 +84,15 @@ describe("Dashboard live location search", () => {
         locationQuery: "Bournemouth",
         sourceName: "Rightmove Commercial",
         dryRun: false,
+        sources: {
+          rightmove: { source: "Rightmove Commercial", inserted: 2, existing: 1, failed: 1, skippedDuplicate: 1, processed: 2, total: 3, unique: 3 },
+          acuitus: { source: "Acuitus", inserted: 4, existing: 11, failed: 0, skippedDuplicate: 11, processed: 4, total: 15, unique: 15 },
+        },
         total: 4,
         unique: 4,
-        imported: 2,
-        existing: 1,
+        imported: 6,
+        existing: 12,
+        refreshed: 12,
         failed: 1,
         skippedDuplicate: 1,
         processed: 2,
@@ -111,7 +116,7 @@ describe("Dashboard live location search", () => {
 
     expect(screen.getByText("Search live sources for this location")).toBeInTheDocument();
     expect(screen.queryByText(/admin-only/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /search live sources/i }));
+    fireEvent.click(screen.getByRole("button", { name: /refresh live sources/i }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith("/api/location-search", expect.objectContaining({
@@ -120,6 +125,6 @@ describe("Dashboard live location search", () => {
       }));
       expect(invalidateSpy).toHaveBeenCalled();
     });
-    expect(await screen.findByText("Imported 2 new deals, 1 already existed, 1 failed.")).toBeInTheDocument();
+    expect(await screen.findByText(/Scanned Rightmove Commercial and Acuitus. Added 6 new deals, refreshed 12 existing deals./)).toBeInTheDocument();
   });
 });

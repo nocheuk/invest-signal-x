@@ -21,7 +21,6 @@ import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
 import { ALL_REAL_DEALS_FILTER, buildSourceOptions, filterAndSortDeals } from "@/lib/dashboardFilters";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { isAdminUser } from "@/lib/admin";
 
 const EMPTY_DEALS = [];
 
@@ -75,8 +74,9 @@ export default function Dashboard() {
   const hasLocationFilter = locationQuery.trim().length > 0;
   const showLocationSearchCta = isSupabaseConfigured && hasLocationFilter && filtered.length < 3;
   const canRunLiveLocationSearch = Boolean(auth.user && auth.session?.access_token);
-  const canShowLocationSearchDebug = import.meta.env.DEV || isAdminUser(auth.user);
+  const canShowLocationSearchDebug = true;
   const locationImportErrorDetail = locationImport.error instanceof LocationImportError ? locationImport.error.detail : undefined;
+  const locationImportDiagnostics = locationImport.error instanceof LocationImportError ? locationImport.error.diagnostics : undefined;
 
   const currentSavedFilters: SavedSearchFilters = { locationQuery, source, asset, minYield, maxPrice };
   const saveLocationSearch = async () => {
@@ -292,7 +292,7 @@ export default function Dashboard() {
                 <div className="text-sm font-medium">Search live sources for this location</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {locationImport.isPending
-                    ? `Searching Rightmove Commercial for ${locationQuery.trim()}...`
+                    ? `Scanning Rightmove Commercial and Acuitus for ${locationQuery.trim()}...`
                     : `Only ${filtered.length} local ${filtered.length === 1 ? "deal" : "deals"} found for ${locationQuery.trim()}.`}
                 </p>
               </div>
@@ -304,7 +304,7 @@ export default function Dashboard() {
                 onClick={() => void runLiveLocationSearch()}
                 className="h-9 gap-1.5 text-xs"
               >
-                <Search className="h-3.5 w-3.5" /> Search live sources
+                <Search className="h-3.5 w-3.5" /> Refresh live sources
               </Button>
               {!canRunLiveLocationSearch && (
                 <div className="basis-full text-[11px] text-muted-foreground">Sign in to search live sources.</div>
@@ -313,13 +313,19 @@ export default function Dashboard() {
                 <div className="basis-full rounded-md border border-signal-amber/40 bg-signal-amber/10 px-3 py-2 text-xs text-muted-foreground">
                   {locationImport.error.message || "Couldn't search this location yet. Try a Rightmove search URL instead."}
                   {canShowLocationSearchDebug && locationImportErrorDetail && (
-                    <div className="mt-1 font-mono text-[11px]">{locationImportErrorDetail}</div>
+                    <div className="mt-1 font-mono text-[11px]">Detail: {locationImportErrorDetail}</div>
+                  )}
+                  {canShowLocationSearchDebug && locationImportDiagnostics && (
+                    <div className="mt-1 font-mono text-[11px] break-all">
+                      URL: {locationImportDiagnostics.generatedUrl || "-"} · Env: {formatEnvDiagnostics(locationImportDiagnostics.env)} · Commit: {locationImportDiagnostics.vercelGitCommitSha || "-"}
+                    </div>
                   )}
                 </div>
               )}
               {locationImportResult && (
                 <div className="basis-full rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-muted-foreground">
-                  Imported {locationImportResult.imported} new deals, {locationImportResult.existing} already existed, {locationImportResult.failed} failed.
+                  Scanned Rightmove Commercial and Acuitus. Added {locationImportResult.imported} new deals, refreshed {locationImportResult.refreshed ?? locationImportResult.existing} existing deals.
+                  {locationImportResult.failed > 0 && ` ${locationImportResult.failed} rows failed validation or source parsing.`}
                 </div>
               )}
             </div>
@@ -354,6 +360,11 @@ export default function Dashboard() {
       <StrategyOptimiserModal open={strategyOpen} onOpenChange={setStrategyOpen} />
     </AppLayout>
   );
+}
+
+function formatEnvDiagnostics(env?: Record<string, boolean>) {
+  if (!env) return "-";
+  return Object.entries(env).map(([key, value]) => `${key}=${value ? "set" : "missing"}`).join(", ");
 }
 
 function Kpi({ label, value, sub, icon: Icon, accent }: { label: string; value: string; sub: string; icon: React.ComponentType<{ className?: string }>; accent: string }) {

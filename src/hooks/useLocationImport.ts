@@ -8,24 +8,50 @@ export type LocationImportResult = {
   dryRun: boolean;
   reusedRecentSearch?: boolean;
   code?: string;
+  sources?: Record<string, {
+    source: string;
+    inserted: number;
+    existing: number;
+    failed: number;
+    skippedDuplicate: number;
+    processed: number;
+    total: number;
+    unique: number;
+    error?: string;
+  }>;
   total: number;
   unique: number;
   imported: number;
   existing: number;
+  refreshed?: number;
   failed: number;
   skippedDuplicate: number;
   processed: number;
 };
 
+export type LocationImportDiagnostics = {
+  requestId?: string | null;
+  locationQuery?: string;
+  generatedUrl?: string | null;
+  normalizedLocation?: string;
+  env?: Record<string, boolean>;
+  nodeVersion?: string;
+  vercelRegion?: string | null;
+  vercelEnv?: string | null;
+  vercelGitCommitSha?: string | null;
+};
+
 export class LocationImportError extends Error {
   code?: string;
   detail?: string;
+  diagnostics?: LocationImportDiagnostics;
 
-  constructor(message: string, { code, detail }: { code?: string; detail?: string } = {}) {
+  constructor(message: string, { code, detail, diagnostics }: { code?: string; detail?: string; diagnostics?: LocationImportDiagnostics } = {}) {
     super(message);
     this.name = "LocationImportError";
     this.code = code;
     this.detail = detail;
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -47,7 +73,7 @@ export function useLocationImport() {
       if (!response.ok) {
         throw new LocationImportError(
           body.error || "Couldn't search this location yet. Try a Rightmove search URL instead.",
-          { code: body.code, detail: body.detail }
+          { code: body.code, detail: body.detail, diagnostics: body.diagnostics }
         );
       }
       return body as LocationImportResult;
