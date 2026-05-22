@@ -3,7 +3,7 @@ import {
   buildDedupeKeys,
   extractPostcode,
   validateImportRow,
-} from "../../src/lib/imports/dealImport.ts";
+} from "./dealImportCore.mjs";
 
 export const RIGHTMOVE_CUSTOM_SCRAPER_VERSION = "custom-rightmove-commercial-v1";
 export const RIGHTMOVE_PARSE_ERROR = "Rightmove page could not be parsed. The custom scraper may need updating.";

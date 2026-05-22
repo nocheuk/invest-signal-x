@@ -54,7 +54,7 @@ export async function runRightmoveLocationSearch({
   sourceName = RIGHTMOVE_COMMERCIAL_SOURCE_NAME,
 }) {
   const searchUrl = buildRightmoveCommercialSearchUrl(locationQuery);
-  return runRightmoveCommercialImport({
+  const result = await runRightmoveCommercialImport({
     searchUrl,
     sourceName,
     dryRun,
@@ -63,6 +63,7 @@ export async function runRightmoveLocationSearch({
       generated_search_url: searchUrl,
     },
   });
+  return { ...result, searchUrl };
 }
 
 export function readBearerToken(authorizationHeader = "") {

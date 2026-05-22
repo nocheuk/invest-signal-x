@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildRightmoveCommercialSearchUrl,
@@ -39,6 +40,15 @@ describe("Rightmove location search helpers", () => {
     expect(clientHook).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(clientHook).not.toContain("runRightmoveCommercialImport");
     expect(clientHook).not.toContain("rightmoveCommercialScraper");
+  });
+
+  it("imports the Vercel API route with plain Node without a TS loader", () => {
+    const output = execFileSync(process.execPath, [
+      "-e",
+      "import('./api/location-search.mjs').then(() => process.stdout.write('ok'))",
+    ], { cwd: path.resolve("."), encoding: "utf8" });
+
+    expect(output).toBe("ok");
   });
 
   it("blocks unauthenticated callers and allows any verified Supabase user", async () => {

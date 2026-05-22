@@ -1,5 +1,5 @@
 import { load } from "cheerio";
-import { buildDedupeKeys, extractPostcode, validateImportRow } from "../../src/lib/imports/dealImport.ts";
+import { buildDedupeKeys, extractPostcode, validateImportRow } from "./dealImportCore.mjs";
 
 export const SCRAPER_ADAPTER_VERSION = "custom-html-v1";
 

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { parseDealCsv } from "../src/lib/imports/dealImport.ts";
+import { parseDealCsv } from "./lib/dealImportCore.mjs";
 import { loadEnv, parseArgs, readBooleanFlag, readStringArg } from "./lib/env.mjs";
 import { runDealImport } from "./lib/importRunner.mjs";
 
