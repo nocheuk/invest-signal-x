@@ -97,4 +97,11 @@ describe("DealCard", () => {
     expect(badge.className).not.toContain("-bottom");
     expect(badge.className).not.toContain("-right");
   });
+
+  it("shows missing imported metrics honestly", () => {
+    renderCard(deal({ guidePrice: 0, netInitialYield: 0, wault: 0, tenant: "Unknown" }));
+
+    expect(screen.getAllByText("Not available").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText("Tenant not available")).toBeInTheDocument();
+  });
 });

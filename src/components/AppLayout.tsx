@@ -1,8 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Bookmark, CreditCard, Settings, Search, LogOut, Sparkles, UploadCloud } from "lucide-react";
+import { LayoutDashboard, Bookmark, Settings, Search, LogOut, UploadCloud } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWatchlist } from "@/lib/watchlist";
 import { useAuth } from "@/lib/auth";
@@ -13,7 +12,6 @@ import { ReactNode } from "react";
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/watchlist", label: "Watchlist", icon: Bookmark },
-  { to: "/pricing", label: "Pricing", icon: CreditCard },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -82,11 +80,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="p-3 border-t border-border/60">
           <div className="ds-card p-3 space-y-2">
             <div className="flex items-center gap-2 text-xs">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              <span className="font-medium">Investor plan</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              <span className="font-medium">Live imports</span>
             </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">AI summaries, comparables and priority alerts active.</p>
-            <Link to="/pricing" className="text-[11px] text-primary hover:underline">Manage plan →</Link>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">Rightmove Commercial and Acuitus refresh from dashboard location search.</p>
           </div>
           <button onClick={() => void handleSignOut()} className="mt-3 flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
             <LogOut className="h-3.5 w-3.5" /> Sign out
@@ -112,10 +109,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="hidden sm:inline-flex text-xs gap-1.5">
+            <div className="hidden sm:inline-flex items-center rounded-md px-2 py-1 text-xs gap-1.5 text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-signal-green animate-pulse" />
-              Live scanning
-            </Button>
+              Live sources ready
+            </div>
             <div className="hidden sm:block text-right leading-tight">
               <div className="text-xs font-medium truncate max-w-40">{displayName}</div>
               {displayEmail && <div className="text-[10px] text-muted-foreground truncate max-w-40">{displayEmail}</div>}

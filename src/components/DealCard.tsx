@@ -21,6 +21,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
   const missingWarnings = deal.scoreReasons?.missingDataWarnings ?? [];
   const cardReasons = positiveDrivers.length > 0 ? positiveDrivers.slice(0, 2) : reasons;
   const [imageAvailable, setImageAvailable] = useState(Boolean(deal.imageUrl));
+  const tenantLabel = deal.tenant && deal.tenant !== "Unknown" ? deal.tenant : "Tenant not available";
 
   useEffect(() => {
     setImageAvailable(Boolean(deal.imageUrl));
@@ -78,9 +79,9 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
         </div>
 
         <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
-          <Metric label="Guide" value={formatGBP(deal.guidePrice)} />
-          <Metric label="NIY" value={deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "—"} />
-          <Metric label="WAULT" value={deal.wault ? `${deal.wault.toFixed(1)}y` : "—"} />
+          <Metric label="Guide" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"} />
+          <Metric label="NIY" value={deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "Not available"} />
+          <Metric label="WAULT" value={deal.wault ? `${deal.wault.toFixed(1)}y` : "Not available"} />
         </div>
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
@@ -114,7 +115,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
 
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <TrendingUp className="h-3 w-3" /> {deal.tenant.length > 22 ? deal.tenant.slice(0, 20) + "…" : deal.tenant}
+            <TrendingUp className="h-3 w-3" /> {tenantLabel.length > 22 ? tenantLabel.slice(0, 20) + "..." : tenantLabel}
           </div>
           <div className="flex items-center gap-1 text-[11px] text-signal-amber">
             <AlertTriangle className="h-3 w-3" /> {deal.needsReview ? "Needs review" : deal.mainRiskFlag}

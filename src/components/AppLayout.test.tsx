@@ -30,5 +30,9 @@ describe("AppLayout", () => {
     expect(screen.getByText("Real User")).toBeInTheDocument();
     expect(screen.getByText("real@example.com")).toBeInTheDocument();
     expect(screen.queryByText("JS")).not.toBeInTheDocument();
+    expect(screen.queryByText("Investor plan")).not.toBeInTheDocument();
+    expect(screen.queryByText(/AI summaries/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /pricing/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Live sources ready")).toBeInTheDocument();
   });
 });

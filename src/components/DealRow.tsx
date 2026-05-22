@@ -48,9 +48,9 @@ export function DealRow({ deal }: { deal: Deal }) {
       </div>
 
       {/* Numbers — hidden on mobile */}
-      <div className="hidden sm:block col-span-2 font-mono tabular text-right">{formatGBP(deal.guidePrice)}</div>
-      <div className="hidden md:block col-span-1 font-mono tabular text-right">{deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "—"}</div>
-      <div className="hidden md:block col-span-1 font-mono tabular text-right">{deal.wault ? `${deal.wault.toFixed(1)}y` : "—"}</div>
+      <div className="hidden sm:block col-span-2 font-mono tabular text-right">{deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"}</div>
+      <div className="hidden md:block col-span-1 font-mono tabular text-right">{deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "Not available"}</div>
+      <div className="hidden md:block col-span-1 font-mono tabular text-right">{deal.wault ? `${deal.wault.toFixed(1)}y` : "Not available"}</div>
       <div className="hidden lg:block col-span-2 text-xs text-muted-foreground truncate">
         {deal.mainRiskFlag}
       </div>
