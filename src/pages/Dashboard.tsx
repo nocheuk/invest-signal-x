@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavedSearches, type SavedSearchFilters } from "@/hooks/useSavedSearches";
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
+import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save } from "lucide-react";
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const profile = useProfile();
   const savedSearches = useSavedSearches();
   const locationImport = useLocationImport();
+  const nationalScanStatus = useNationalScanStatus();
   const [searchParams] = useSearchParams();
   const fetchedDeals = dealsQuery.data ?? EMPTY_DEALS;
   const deals = useMemo(() => (
@@ -139,6 +141,27 @@ export default function Dashboard() {
           <Kpi label="Highest score" value={kpis.top.toString()} icon={Sparkles} accent="text-primary" sub="current data" />
           <Kpi label="Watchlisted deals" value={kpis.watched.toString()} icon={Bookmark} accent="text-foreground" sub={`${kpis.needsReviewCount} need review`} />
         </div>
+
+        {isSupabaseConfigured && (
+          <div className="ds-card p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">National scan status</div>
+              <div className="mt-1 text-sm font-medium">
+                {nationalScanStatus.isLoading
+                  ? "Loading national scan status..."
+                  : nationalScanStatus.isError
+                    ? "Could not load national scan status"
+                    : nationalScanStatus.data
+                      ? `Last national scan: ${formatNationalScanTime(nationalScanStatus.data.finishedAt ?? nationalScanStatus.data.startedAt)}`
+                      : "National scan has not run yet"}
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground sm:text-right">
+              <div>Next scheduled scan: daily at 6am UK time</div>
+              <div>Sources: Rightmove Commercial + Acuitus</div>
+            </div>
+          </div>
+        )}
 
         {/* Needs review */}
         {needsReview.length > 0 && (
