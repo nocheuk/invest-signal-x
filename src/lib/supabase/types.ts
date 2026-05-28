@@ -117,6 +117,29 @@ export type Database = {
         Insert: { id?: string; deal_id?: string | null; title: string; location?: string | null; asset_type?: string | null; price?: number | null; yield_percent?: number | null; transaction_date?: string | null; evidence_url?: string | null; metadata?: Json };
         Update: Partial<Database["public"]["Tables"]["comparable_transactions"]["Insert"]>;
       };
+      national_scan_runs: {
+        Row: {
+          id: string;
+          scan_type: string;
+          location_query: string;
+          normalized_location: string;
+          source_name: string;
+          status: string;
+          inserted: number;
+          existing: number;
+          failed: number;
+          skipped_duplicate: number;
+          skipped_rent_only: number;
+          skipped_poa: number;
+          result: Json;
+          metadata: Json;
+          error_message: string | null;
+          started_at: string;
+          finished_at: string | null;
+        };
+        Insert: { id?: string; scan_type?: string; location_query: string; normalized_location: string; source_name: string; status?: string; inserted?: number; existing?: number; failed?: number; skipped_duplicate?: number; skipped_rent_only?: number; skipped_poa?: number; result?: Json; metadata?: Json; error_message?: string | null; started_at?: string; finished_at?: string | null };
+        Update: Partial<Database["public"]["Tables"]["national_scan_runs"]["Insert"]>;
+      };
     };
   };
 };

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { COMPARABLES, formatGBP, formatPct } from "@/lib/deals";
@@ -11,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Bookmark, MapPin, Building2, Sparkles, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine, Map as MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { downloadDealMemoPdf } from "@/lib/memoPdf";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -26,6 +28,7 @@ export default function DealDetail() {
   const { deal, isLoading, isError } = useDeal(id);
   const sourceLinks = useDealSourceLinks(deal?.id);
   const { isWatched, toggle, notes, setNote } = useWatchlist();
+  const [memoStatus, setMemoStatus] = useState<"idle" | "loading" | "error">("idle");
 
   if (isLoading) {
     return (
@@ -48,6 +51,16 @@ export default function DealDetail() {
 
   const watched = isWatched(deal.id);
   const note = notes[deal.id] || "";
+  const handleDownloadMemo = async () => {
+    setMemoStatus("loading");
+    try {
+      await downloadDealMemoPdf(deal);
+      setMemoStatus("idle");
+    } catch (error) {
+      console.error("Could not generate memo PDF", error);
+      setMemoStatus("error");
+    }
+  };
 
   return (
     <AppLayout>
@@ -95,9 +108,14 @@ export default function DealDetail() {
                 <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
                 {watched ? "Watching" : "Add to watchlist"}
               </Button>
-              <Button variant="outline" className="gap-2"><FileText className="h-4 w-4" />Download memo (PDF)</Button>
-              <Button variant="outline" className="gap-2"><Sparkles className="h-4 w-4" />Re-run AI analysis</Button>
+              <Button onClick={() => void handleDownloadMemo()} disabled={memoStatus === "loading"} variant="outline" className="gap-2">
+                <FileText className="h-4 w-4" />{memoStatus === "loading" ? "Generating memo..." : "Download memo (PDF)"}
+              </Button>
+              <Button variant="outline" className="gap-2" disabled title="Coming soon"><Sparkles className="h-4 w-4" />AI analysis coming soon</Button>
             </div>
+            {memoStatus === "error" && (
+              <div className="mt-3 text-xs text-signal-red">Could not generate the memo PDF. Please try again.</div>
+            )}
           </div>
         </div>
 

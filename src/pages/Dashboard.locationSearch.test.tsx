@@ -13,6 +13,18 @@ const savedSearchState = vi.hoisted(() => ({
   saveSearch: vi.fn(),
 }));
 
+const nationalScanState = vi.hoisted(() => ({
+  data: {
+    id: "scan-1",
+    sourceName: "Rightmove Commercial",
+    locationQuery: "Bournemouth",
+    startedAt: "2026-05-28T04:59:00Z",
+    finishedAt: "2026-05-28T05:03:00Z",
+  },
+  isLoading: false,
+  isError: false,
+}));
+
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -75,6 +87,14 @@ vi.mock("@/hooks/useSavedSearches", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useNationalScanStatus", async () => {
+  const actual = await vi.importActual<typeof import("@/hooks/useNationalScanStatus")>("@/hooks/useNationalScanStatus");
+  return {
+    ...actual,
+    useNationalScanStatus: () => nationalScanState,
+  };
+});
+
 vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: true,
 }));
@@ -83,6 +103,15 @@ describe("Dashboard live location search", () => {
   beforeEach(() => {
     dealsState.deals = [];
     savedSearchState.saveSearch.mockReset();
+    nationalScanState.data = {
+      id: "scan-1",
+      sourceName: "Rightmove Commercial",
+      locationQuery: "Bournemouth",
+      startedAt: "2026-05-28T04:59:00Z",
+      finishedAt: "2026-05-28T05:03:00Z",
+    };
+    nationalScanState.isLoading = false;
+    nationalScanState.isError = false;
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -248,5 +277,34 @@ describe("Dashboard live location search", () => {
         filters: expect.objectContaining({ locationQuery: "Poole", source: "All real deals" }),
       }));
     });
+  });
+
+  it("shows the latest real national scan status", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("National scan status")).toBeInTheDocument();
+    expect(screen.getByText(/Last national scan:/)).toBeInTheDocument();
+    expect(screen.getByText("Next scheduled scan: daily at 6am UK time")).toBeInTheDocument();
+    expect(screen.getByText("Sources: Rightmove Commercial + Acuitus")).toBeInTheDocument();
+  });
+
+  it("shows a no-run state when no completed national scan exists", () => {
+    nationalScanState.data = null;
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("National scan has not run yet")).toBeInTheDocument();
   });
 });
