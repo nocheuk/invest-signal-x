@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
-import { COMPARABLES, formatGBP, formatPct } from "@/lib/deals";
+import { formatGBP, formatPct } from "@/lib/deals";
 import { useDeal } from "@/hooks/useDeals";
 import { useDealSourceLinks } from "@/hooks/useDealSourceLinks";
 import { ScorePill, RatingBadge } from "@/components/RatingBadge";
@@ -11,7 +11,7 @@ import { PIPELINE_STATUSES, type PipelineStatus, useWatchlist } from "@/lib/watc
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bookmark, MapPin, Building2, Sparkles, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine, Map as MapIcon } from "lucide-react";
+import { ArrowLeft, Bookmark, MapPin, Building2, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
@@ -102,7 +102,7 @@ export default function DealDetail() {
 
             <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <HeroStat label="Guide price" value={formatGBP(deal.guidePrice)} />
-              <HeroStat label="Passing rent" value={deal.passingRent ? `${formatGBP(deal.passingRent)} pa` : "Vacant"} />
+              <HeroStat label="Passing rent" value={deal.passingRent ? `${formatGBP(deal.passingRent)} pa` : "Not available"} />
               <HeroStat label={<Hint term="NIY">NIY</Hint>} value={deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "—"} />
               <HeroStat label={<Hint term="WAULT">WAULT</Hint>} value={deal.wault ? `${deal.wault.toFixed(1)} yrs` : "—"} />
             </div>
@@ -121,7 +121,6 @@ export default function DealDetail() {
               <Button onClick={() => void handleDownloadMemo()} disabled={memoStatus === "loading"} variant="outline" className="gap-2">
                 <FileText className="h-4 w-4" />{memoStatus === "loading" ? "Generating memo..." : "Download memo (PDF)"}
               </Button>
-              <Button variant="outline" className="gap-2" disabled title="Coming soon"><Sparkles className="h-4 w-4" />AI analysis coming soon</Button>
             </div>
             {memoStatus === "error" && (
               <div className="mt-3 text-xs text-signal-red">Could not generate the memo PDF. Please try again.</div>
@@ -248,20 +247,6 @@ export default function DealDetail() {
           </div>
         </section>
 
-        {/* Smart investor insights */}
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="font-display text-2xl">What smart investors would notice</h2>
-          </div>
-          <div className="grid md:grid-cols-2 gap-3">
-            <InsightCard label="Why this may be mispriced" tone="primary" body={deal.insights.mispricing} />
-            <InsightCard label="What could go wrong" tone="amber" body={deal.insights.couldGoWrong} />
-            <InsightCard label="What to ask the agent" tone="default" body={deal.insights.askAgent} />
-            <InsightCard label="Negotiation angle" tone="primary" body={deal.insights.negotiation} />
-          </div>
-        </section>
-
         {sourceLinks.data && sourceLinks.data.length > 0 && (
           <section className="ds-card p-6 space-y-3">
             <h2 className="font-display text-2xl">Source attribution</h2>
@@ -282,50 +267,12 @@ export default function DealDetail() {
           </section>
         )}
 
-        {/* Comparables + map */}
-        <div className="grid lg:grid-cols-3 gap-5">
-          <div className="ds-card p-6 lg:col-span-2 space-y-4">
-            <div>
-              <h2 className="font-display text-2xl">Comparable transactions</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Recent sales within sector and lot-size range.</p>
-            </div>
-            <div className="overflow-hidden">
-              <div className="grid grid-cols-12 gap-3 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/60">
-                <div className="col-span-5">Asset</div>
-                <div className="col-span-3">Location</div>
-                <div className="col-span-2 text-right">Price</div>
-                <div className="col-span-2 text-right">Yield</div>
-              </div>
-              {COMPARABLES.default.map((c, i) => (
-                <div key={i} className="grid grid-cols-12 gap-3 px-3 py-3 text-sm border-b border-border/30 last:border-0">
-                  <div className="col-span-5">{c.title}<div className="text-[11px] text-muted-foreground">{c.date}</div></div>
-                  <div className="col-span-3 text-muted-foreground text-xs self-center">{c.location}</div>
-                  <div className="col-span-2 text-right font-mono tabular self-center">{formatGBP(c.price)}</div>
-                  <div className="col-span-2 text-right font-mono tabular self-center">{c.yield.toFixed(2)}%</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="ds-card overflow-hidden">
-            <div className="relative h-48 bg-surface-2 ds-grid-bg">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
-              <div className="absolute inset-0 grid place-items-center">
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
-                  <div className="relative h-8 w-8 rounded-full bg-primary border-4 border-background grid place-items-center">
-                    <MapPin className="h-3.5 w-3.5 text-primary-foreground" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 space-y-1">
-              <div className="flex items-center gap-1.5 text-sm font-medium"><MapIcon className="h-3.5 w-3.5 text-primary" />{deal.location}</div>
-              <div className="text-xs text-muted-foreground">{deal.region} · 12 comparable assets within 5 miles</div>
-            </div>
-          </div>
-        </div>
-
+        <section className="ds-card p-6 space-y-3">
+          <h2 className="font-display text-2xl">Verify before action</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            DealSignal is not financial advice and is not a valuation. Treat the score as a triage signal only. Verify the source listing, price, lease terms, tenancy, title, planning, condition and comparable evidence before making an offer.
+          </p>
+        </section>
         {/* Pipeline */}
         <div className="ds-card p-6 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -396,16 +343,6 @@ function UWCard({ icon: Icon, title, rows }: { icon: React.ComponentType<{ class
   );
 }
 
-function InsightCard({ label, body, tone }: { label: string; body: string; tone: "primary" | "amber" | "default" }) {
-  const accent = tone === "primary" ? "border-primary/30 bg-primary/5" : tone === "amber" ? "border-signal-amber/30 bg-signal-amber/5" : "border-border bg-surface-2/40";
-  return (
-    <div className={cn("rounded-xl border p-5", accent)}>
-      <div className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{label}</div>
-      <p className="text-sm leading-relaxed mt-2">{body}</p>
-    </div>
-  );
-}
-
 function ReasonList({ title, items, fallback, tone }: { title: string; items: string[]; fallback: string; tone: "primary" | "amber" | "red" | "default" }) {
   const dot = tone === "primary" ? "bg-primary" : tone === "amber" ? "bg-signal-amber" : tone === "red" ? "bg-signal-red" : "bg-muted-foreground";
   const shown = items.length > 0 ? items : [fallback];
@@ -424,3 +361,4 @@ function ReasonList({ title, items, fallback, tone }: { title: string; items: st
     </div>
   );
 }
+
