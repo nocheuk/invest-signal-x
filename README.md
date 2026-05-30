@@ -267,7 +267,7 @@ The queue lives in `scripts/lib/englandLocationQueue.mjs` and includes:
 - major commercial towns such as Bournemouth, Poole, Reading, Warrington, Watford and Stockport
 - selected regional/county search areas such as Dorset, Hampshire, Surrey, Kent, Essex and Sussex
 
-The default batch size is 4 Rightmove locations per run. The scheduler stores the next queue index in `national_scan_runs.metadata.next_index`, so each run continues from the previous position and wraps around after the final queued location. Duplicate source URLs refresh existing deals through the import pipeline instead of creating duplicate deals.
+The default batch size is 16 Rightmove locations per run. The scheduler stores the next queue index in `national_scan_runs.metadata.next_index`, so each run continues from the previous position and wraps around after the final queued location. Duplicate source URLs refresh existing deals through the import pipeline instead of creating duplicate deals.
 
 Each scan run stores coverage diagnostics in `national_scan_runs.metadata`:
 
@@ -277,7 +277,7 @@ Each scan run stores coverage diagnostics in `national_scan_runs.metadata`:
 - estimated full-cycle duration
 - scan cycle progress
 
-On Vercel Hobby the cron is daily, so it can take multiple days to rotate through every city/town in the queue. With the current 160-location queue and a 4-location batch, one full cycle takes about 40 days. A future Pro plan can scan more often and/or use a larger safe batch size.
+On Vercel Hobby the cron is daily, so it can take multiple days to rotate through every city/town in the queue. With the current 160-location queue and a 16-location batch, one full cycle takes about 10 days. A future Pro plan can scan more often and/or use a larger safe batch size.
 
 Rightmove pagination is supported conservatively when the first search page exposes pagination links. The scraper follows a small number of discovered search-result pages, keeps requests serial, and deduplicates repeated source URLs before writing through the import pipeline.
 
@@ -321,6 +321,14 @@ npm run validate:rightmove-locations
 ```
 
 The validator logs each generated Rightmove URL, HTTP status, final redirected URL, whether property cards were detected, parser status and listings found. It finishes with totals for valid, redirected, empty, parser-failure and unsupported locations.
+
+Benchmark national scan throughput without writing to Supabase:
+
+```bash
+npm run benchmark:national-scan
+```
+
+The benchmark tests batch sizes 4, 8, 12 and 16 by default and reports runtime, memory, reachable rows, dry-run imported deals and estimated full-cycle duration. The recommendation uses the current Vercel cron `maxDuration` of 60 seconds with a 60% safety budget.
 
 Run a local live batch:
 

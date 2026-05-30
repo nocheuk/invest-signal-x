@@ -33,6 +33,10 @@ const nationalScanState = vi.hoisted(() => ({
     nextIndex: 4,
     estimatedFullCycleDays: 40,
     scanCycleProgress: 3,
+    totalDeals: 42,
+    totalRightmoveDeals: 30,
+    totalAcuitusDeals: 12,
+    locationsCompletedInCurrentCycle: 4,
   },
   isLoading: false,
   isError: false,
@@ -202,6 +206,10 @@ describe("Dashboard live location search", () => {
       nextIndex: 4,
       estimatedFullCycleDays: 40,
       scanCycleProgress: 3,
+      totalDeals: 42,
+      totalRightmoveDeals: 30,
+      totalAcuitusDeals: 12,
+      locationsCompletedInCurrentCycle: 4,
     };
     nationalScanState.isLoading = false;
     nationalScanState.isError = false;
@@ -550,6 +558,8 @@ describe("Dashboard live location search", () => {
     expect(screen.getByText("Last run locations: London, Manchester, Birmingham, Leeds")).toBeInTheDocument();
     expect(screen.getByText(/Queue: 160 locations/)).toBeInTheDocument();
     expect(screen.getByText(/Cycle progress: 3%/)).toBeInTheDocument();
+    expect(screen.getByText("Locations completed this cycle: 4/160")).toBeInTheDocument();
+    expect(screen.getByText("Database: 42 deals · Rightmove 30 · Acuitus 12")).toBeInTheDocument();
   });
 
   it("shows a no-run state when no completed national scan exists", () => {

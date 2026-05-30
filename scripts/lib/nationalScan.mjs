@@ -10,7 +10,7 @@ import {
 import { ENGLAND_NATIONAL_SCAN_LOCATIONS } from "./englandLocationQueue.mjs";
 
 export const NATIONAL_SCAN_TYPE = "england_national_scan";
-export const NATIONAL_SCAN_BATCH_SIZE = 4;
+export const NATIONAL_SCAN_BATCH_SIZE = 16;
 export const ENGLAND_PRIORITY_LOCATIONS = ENGLAND_NATIONAL_SCAN_LOCATIONS;
 
 export function verifyCronSecret({ authorizationHeader = "", querySecret = "", env = process.env } = {}) {

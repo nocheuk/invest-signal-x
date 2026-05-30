@@ -5,11 +5,13 @@ import {
   aggregateNationalResults,
   buildNationalScanDiagnostics,
   ENGLAND_PRIORITY_LOCATIONS,
+  NATIONAL_SCAN_BATCH_SIZE,
   runNationalScan,
   selectNationalScanBatch,
   verifyCronSecret,
 } from "../../../scripts/lib/nationalScan.mjs";
 import { OFFICIAL_ENGLISH_CITIES } from "../../../scripts/lib/englandLocationQueue.mjs";
+import { recommendBatchSize } from "../../../scripts/benchmark-national-scan.mjs";
 
 describe("national scan scheduler", () => {
   it("authenticates cron requests using CRON_SECRET", () => {
@@ -82,6 +84,20 @@ describe("national scan scheduler", () => {
     expect(diagnostics.locationsScannedCount).toBe(4);
     expect(diagnostics.nextIndex).toBe(8);
     expect(diagnostics.estimatedFullCycleDays).toBe(Math.ceil(ENGLAND_PRIORITY_LOCATIONS.length / 4));
+  });
+
+  it("uses the measured safe Hobby batch size by default", () => {
+    expect(NATIONAL_SCAN_BATCH_SIZE).toBe(16);
+    expect(Math.ceil(ENGLAND_PRIORITY_LOCATIONS.length / NATIONAL_SCAN_BATCH_SIZE)).toBe(10);
+  });
+
+  it("recommends the largest batch inside the configured cron safety budget", () => {
+    expect(recommendBatchSize([
+      { batchSize: 4, durationSeconds: 5.63 },
+      { batchSize: 8, durationSeconds: 8.9 },
+      { batchSize: 12, durationSeconds: 11.59 },
+      { batchSize: 16, durationSeconds: 14.39 },
+    ], { maxDurationSeconds: 60 })).toMatchObject({ batchSize: 16 });
   });
 
   it("aggregates per-location and per-source scan results", async () => {
