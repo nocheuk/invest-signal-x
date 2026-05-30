@@ -12,12 +12,13 @@ import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { cn } from "@/lib/utils";
 
 export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: "default" | "feature" }) {
-  const { isWatched, toggle } = useWatchlist();
+  const { isWatched, toggle, getPipelineStatus, saveToPipeline } = useWatchlist();
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
   const reasons = matchReasons(deal, weights);
   const analysis = getDealAnalysis(deal);
   const watched = isWatched(deal.id);
+  const pipelineStatus = getPipelineStatus(deal.id);
   const sourceLabel = getSourceLabel(deal);
   const cardReasons = analysis.opportunitySignals.length > 0 ? analysis.opportunitySignals.slice(0, 2) : reasons;
   const riskSignals = analysis.riskSignals.slice(0, 2);
@@ -122,6 +123,18 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
             <AlertTriangle className="h-3 w-3" /> {deal.needsReview ? "Needs review" : deal.mainRiskFlag}
           </div>
         </div>
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); void saveToPipeline(deal.id); }}
+          className={cn(
+            "w-full rounded-md border px-3 py-2 text-xs transition-colors",
+            pipelineStatus
+              ? "border-primary/30 bg-primary/10 text-primary"
+              : "border-border/60 bg-surface-2 text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {pipelineStatus ? `Pipeline: ${pipelineStatus}` : "Save to Pipeline"}
+        </button>
       </div>
     </Link>
   );

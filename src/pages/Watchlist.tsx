@@ -1,15 +1,16 @@
 import { Link } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
-import { useWatchlist } from "@/lib/watchlist";
+import { PIPELINE_STATUSES, type PipelineStatus, useWatchlist } from "@/lib/watchlist";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { useDeals } from "@/hooks/useDeals";
 import { RatingBadge, ScorePill } from "@/components/RatingBadge";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bookmark, MapPin, Trash2, AlertTriangle, ArrowRight } from "lucide-react";
 
 export default function Watchlist() {
-  const { ids, notes, setNote, remove, error } = useWatchlist();
+  const { ids, notes, setNote, remove, error, getPipelineStatus, setStatus } = useWatchlist();
   const dealsQuery = useDeals();
   const watched = (dealsQuery.data ?? []).filter((d) => ids.includes(d.id));
 
@@ -68,6 +69,15 @@ export default function Watchlist() {
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{d.mainRiskFlag}</span>
                 </div>
+
+                <Select value={getPipelineStatus(d.id) ?? "Saved"} onValueChange={(value) => void setStatus(d.id, value as PipelineStatus)}>
+                  <SelectTrigger className="h-9 bg-surface-2 border-border/60 text-xs" aria-label={`Pipeline status for ${d.title}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PIPELINE_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                  </SelectContent>
+                </Select>
 
                 <Textarea
                   placeholder="Notes — viewing booked, target price, contact…"

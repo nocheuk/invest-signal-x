@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { ASSET_TYPES, REGIONS, formatPct, type Rating } from "@/lib/deals";
 import { DealCard } from "@/components/DealCard";
 import { DealRow } from "@/components/DealRow";
-import { useWatchlist } from "@/lib/watchlist";
+import { PIPELINE_STATUSES, type PipelineStatus, useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore } from "@/lib/strategy";
 import { useDeals } from "@/hooks/useDeals";
 import { useAuth } from "@/lib/auth";
@@ -28,7 +28,7 @@ import { defaultAlertName } from "@/lib/alerts";
 const EMPTY_DEALS = [];
 
 export default function Dashboard() {
-  const { ids } = useWatchlist();
+  const { ids, pipelineItems, pipelineCounts } = useWatchlist();
   const { weights } = useStrategy();
   const dealsQuery = useDeals();
   const auth = useAuth();
@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [locationQuery, setLocationQuery] = useState("");
   const [rating, setRating] = useState<"all" | Rating>("all");
   const [confidence, setConfidence] = useState<"all" | "high" | "medium" | "low">("all");
+  const [pipelineStatus, setPipelineStatus] = useState<"all" | PipelineStatus>("all");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
   const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence">("score");
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
@@ -81,8 +82,10 @@ export default function Dashboard() {
   }, [currentFilterScope, ids.length]);
 
   const filtered = useMemo(() => {
-    return filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
-  }, [deals, region, asset, source, minYield, maxPrice, rating, confidence, search, locationQuery, sort, weights]);
+    const base = filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
+    if (pipelineStatus === "all") return base;
+    return base.filter((deal) => pipelineItems[deal.id]?.status === pipelineStatus);
+  }, [deals, region, asset, source, minYield, maxPrice, rating, confidence, search, locationQuery, sort, weights, pipelineStatus, pipelineItems]);
 
   const best = useMemo(() => [...filtered].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [filtered, weights]);
   const sourceOptions = useMemo(() => {
@@ -91,6 +94,12 @@ export default function Dashboard() {
   }, [deals]);
   const needsReview = useMemo(() => filtered.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [filtered]);
   const importedCount = useMemo(() => deals.filter((deal) => deal.isImported || deal.importSourceName).length, [deals]);
+  const pipelineAnalytics = useMemo(() => ({
+    totalSaved: ids.length,
+    activeOpportunities: pipelineCounts.Reviewing + pipelineCounts["Viewing Booked"] + pipelineCounts["Offer Submitted"],
+    offersSubmitted: pipelineCounts["Offer Submitted"],
+    purchased: pipelineCounts.Purchased,
+  }), [ids.length, pipelineCounts]);
   const showDebugCounts = import.meta.env.DEV || source !== "All" || search.length > 0 || locationQuery.length > 0;
   const hasLocationFilter = locationQuery.trim().length > 0;
   const showLocationSearchCta = isSupabaseConfigured && hasLocationFilter && filtered.length < 3;
@@ -221,6 +230,39 @@ export default function Dashboard() {
           </div>
         )}
 
+        <section className="ds-card p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-medium">My Pipeline</h2>
+              <p className="text-xs text-muted-foreground">Track saved acquisition opportunities by stage.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <PipelineMetric label="Total saved" value={pipelineAnalytics.totalSaved} />
+              <PipelineMetric label="Active opportunities" value={pipelineAnalytics.activeOpportunities} />
+              <PipelineMetric label="Offers submitted" value={pipelineAnalytics.offersSubmitted} />
+              <PipelineMetric label="Purchased" value={pipelineAnalytics.purchased} />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PIPELINE_STATUSES.filter((status) => status !== "Passed").map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setPipelineStatus(pipelineStatus === status ? "all" : status)}
+                aria-pressed={pipelineStatus === status}
+                className={cn(
+                  "rounded-md border px-2.5 py-1 text-xs transition-colors",
+                  pipelineStatus === status
+                    ? "border-primary/40 bg-primary/10 text-primary"
+                    : "border-border/60 bg-surface-2 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {status}: {pipelineCounts[status]}
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* Needs review */}
         {needsReview.length > 0 && (
           <section className="space-y-3">
@@ -337,6 +379,13 @@ export default function Dashboard() {
                 <SelectItem value="low">Low confidence</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={pipelineStatus} onValueChange={(v) => setPipelineStatus(v as typeof pipelineStatus)}>
+              <SelectTrigger className="h-9 w-[170px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any pipeline stage</SelectItem>
+                {PIPELINE_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <div className="ml-auto flex items-center gap-2">
               <Button
                 type="button"
@@ -380,6 +429,19 @@ export default function Dashboard() {
                 className="rounded-md border border-border/60 bg-surface-2 px-2.5 py-1 text-muted-foreground hover:text-foreground"
               >
                 Clear green filter
+              </button>
+            </div>
+          )}
+
+          {pipelineStatus !== "all" && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-primary">Pipeline: {pipelineStatus}</span>
+              <button
+                type="button"
+                onClick={() => setPipelineStatus("all")}
+                className="rounded-md border border-border/60 bg-surface-2 px-2.5 py-1 text-muted-foreground hover:text-foreground"
+              >
+                Clear pipeline filter
               </button>
             </div>
           )}
@@ -562,6 +624,15 @@ function alertToInput(alert: SavedAlert): SaveAlertInput {
     minScore: alert.minScore,
     enabled: alert.enabled,
   };
+}
+
+function PipelineMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-border/60 bg-surface-2/60 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="font-mono text-sm font-semibold tabular">{value}</div>
+    </div>
+  );
 }
 
 function Kpi({

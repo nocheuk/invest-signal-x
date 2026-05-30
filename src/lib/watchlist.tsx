@@ -3,17 +3,39 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
 
+export const PIPELINE_STATUSES = ["Saved", "Reviewing", "Viewing Booked", "Offer Submitted", "Passed", "Purchased"] as const;
+export type PipelineStatus = typeof PIPELINE_STATUSES[number];
+
+export type PipelineItem = {
+  dealId: string;
+  status: PipelineStatus;
+  notes: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type WatchlistState = {
   watchlistId?: string;
   ids: string[];
   notes: Record<string, string>;
+  pipelineItems: Record<string, PipelineItem>;
+};
+
+type PipelinePatch = {
+  status?: PipelineStatus;
+  notes?: string;
 };
 
 type WatchlistContextType = WatchlistState & {
   isSaving: boolean;
   error: string | null;
+  pipelineCounts: Record<PipelineStatus, number>;
   toggle: (id: string) => Promise<void>;
   isWatched: (id: string) => boolean;
+  getPipelineStatus: (id: string) => PipelineStatus | undefined;
+  saveToPipeline: (id: string, status?: PipelineStatus) => Promise<void>;
+  setStatus: (id: string, status: PipelineStatus) => Promise<void>;
+  setPipelineItem: (id: string, patch: PipelinePatch) => Promise<void>;
   setNote: (id: string, note: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
 };
@@ -22,24 +44,59 @@ const WatchlistContext = createContext<WatchlistContextType | null>(null);
 
 const KEY = "dealsignal:watchlist";
 const NOTES_KEY = "dealsignal:notes";
+const PIPELINE_KEY = "dealsignal:pipeline";
 const SEEDED_KEY = "dealsignal:seeded";
 const DEFAULT_IDS = ["ds-001", "ds-002", "ds-010"];
+
+function isPipelineStatus(value: unknown): value is PipelineStatus {
+  return typeof value === "string" && PIPELINE_STATUSES.includes(value as PipelineStatus);
+}
+
+function normalizePipelineItem(item: Partial<PipelineItem> & { dealId: string }): PipelineItem {
+  return {
+    dealId: item.dealId,
+    status: isPipelineStatus(item.status) ? item.status : "Saved",
+    notes: item.notes ?? "",
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  };
+}
+
+function buildState(watchlistId: string | undefined, items: PipelineItem[]): WatchlistState {
+  const pipelineItems = Object.fromEntries(items.map((item) => [item.dealId, normalizePipelineItem(item)]));
+  return {
+    watchlistId,
+    ids: Object.keys(pipelineItems),
+    notes: Object.fromEntries(Object.values(pipelineItems).filter((item) => item.notes).map((item) => [item.dealId, item.notes])),
+    pipelineItems,
+  };
+}
 
 function readLocalState(): WatchlistState {
   let ids: string[] = [];
   let notes: Record<string, string> = {};
+  let storedItems: Record<string, PipelineItem> = {};
   try {
     ids = JSON.parse(localStorage.getItem(KEY) || "[]");
     notes = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}");
+    storedItems = JSON.parse(localStorage.getItem(PIPELINE_KEY) || "{}");
   } catch {
     ids = [];
     notes = {};
+    storedItems = {};
   }
-  if (ids.length === 0 && !localStorage.getItem(SEEDED_KEY)) {
+  if (ids.length === 0 && Object.keys(storedItems).length === 0 && !localStorage.getItem(SEEDED_KEY)) {
     ids = DEFAULT_IDS;
     localStorage.setItem(SEEDED_KEY, "1");
   }
-  return { ids, notes };
+  const mergedIds = Array.from(new Set([...ids, ...Object.keys(storedItems), ...Object.keys(notes)]));
+  return buildState(undefined, mergedIds.map((dealId) => normalizePipelineItem({
+    dealId,
+    status: storedItems[dealId]?.status,
+    notes: storedItems[dealId]?.notes ?? notes[dealId] ?? "",
+    createdAt: storedItems[dealId]?.createdAt,
+    updatedAt: storedItems[dealId]?.updatedAt,
+  })));
 }
 
 async function ensureWatchlist(userId: string) {
@@ -56,27 +113,33 @@ async function ensureWatchlist(userId: string) {
 
   const { data, error } = await db
     .from("watchlists")
-    .insert({ user_id: userId, name: "My Watchlist" })
+    .insert({ user_id: userId, name: "My Pipeline" })
     .select("*")
     .single();
   if (error) throw error;
   return data;
 }
 
-async function ensureWatchlistItem(watchlistId: string, dealId: string) {
-  const { error } = await requireSupabase()
-    .from("watchlist_items")
-    .upsert(
-      { watchlist_id: watchlistId, deal_id: dealId },
-      { onConflict: "watchlist_id,deal_id" }
-    );
-  if (error) throw error;
+function nextStateFromPatch(state: WatchlistState, dealId: string, patch: PipelinePatch): WatchlistState {
+  const existing = state.pipelineItems[dealId];
+  const item = normalizePipelineItem({
+    dealId,
+    status: patch.status ?? existing?.status ?? "Saved",
+    notes: patch.notes ?? existing?.notes ?? "",
+    createdAt: existing?.createdAt,
+    updatedAt: new Date().toISOString(),
+  });
+  return buildState(state.watchlistId, [...Object.values(state.pipelineItems).filter((current) => current.dealId !== dealId), item]);
+}
+
+function nextStateAfterRemove(state: WatchlistState, dealId: string): WatchlistState {
+  return buildState(state.watchlistId, Object.values(state.pipelineItems).filter((item) => item.dealId !== dealId));
 }
 
 export function WatchlistProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const queryClient = useQueryClient();
-  const [state, setState] = useState<WatchlistState>(() => isSupabaseConfigured ? { ids: [], notes: {} } : readLocalState());
+  const [state, setState] = useState<WatchlistState>(() => isSupabaseConfigured ? { ids: [], notes: {}, pipelineItems: {} } : readLocalState());
   const [error, setError] = useState<string | null>(null);
   const queryKey = ["watchlist", auth.user?.id];
 
@@ -85,18 +148,19 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     enabled: isSupabaseConfigured && Boolean(auth.user?.id),
     queryFn: async (): Promise<WatchlistState> => {
       const watchlist = await ensureWatchlist(auth.user!.id);
-      const db = requireSupabase();
-      const [{ data: items, error: itemsError }, { data: notes, error: notesError }] = await Promise.all([
-        db.from("watchlist_items").select("deal_id").eq("watchlist_id", watchlist.id),
-        db.from("watchlist_notes").select("deal_id,note").eq("watchlist_id", watchlist.id),
-      ]);
+      const { data: items, error: itemsError } = await requireSupabase()
+        .from("watchlist_items")
+        .select("deal_id,status,notes,created_at,updated_at")
+        .eq("user_id", auth.user!.id)
+        .order("updated_at", { ascending: false });
       if (itemsError) throw itemsError;
-      if (notesError) throw notesError;
-      return {
-        watchlistId: watchlist.id,
-        ids: (items ?? []).map((item) => item.deal_id),
-        notes: Object.fromEntries((notes ?? []).map((note) => [note.deal_id, note.note])),
-      };
+      return buildState(watchlist.id, (items ?? []).map((item) => normalizePipelineItem({
+        dealId: item.deal_id,
+        status: item.status,
+        notes: item.notes ?? "",
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      })));
     },
   });
 
@@ -108,107 +172,104 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     if (!isSupabaseConfigured) {
       localStorage.setItem(KEY, JSON.stringify(state.ids));
       localStorage.setItem(NOTES_KEY, JSON.stringify(state.notes));
+      localStorage.setItem(PIPELINE_KEY, JSON.stringify(state.pipelineItems));
     }
   }, [state]);
 
-  const itemMutation = useMutation({
-    mutationFn: async ({ dealId, nextIds }: { dealId: string; nextIds: string[] }) => {
+  const upsertMutation = useMutation({
+    mutationFn: async ({ dealId, patch }: { dealId: string; patch: PipelinePatch }) => {
       if (!isSupabaseConfigured) return;
-      if (!auth.user) throw new Error("Cannot update watchlist without an authenticated Supabase user.");
+      if (!auth.user) throw new Error("Cannot update pipeline without an authenticated Supabase user.");
       const watchlist = state.watchlistId ? { id: state.watchlistId } : await ensureWatchlist(auth.user.id);
-      const db = requireSupabase();
-      if (nextIds.includes(dealId)) {
-        const { error: insertError } = await db
-          .from("watchlist_items")
-          .upsert(
-            { watchlist_id: watchlist.id, deal_id: dealId },
-            { onConflict: "watchlist_id,deal_id" }
-          );
-        if (insertError) throw insertError;
-      } else {
-        const { error: deleteError } = await db
-          .from("watchlist_items")
-          .delete()
-          .eq("watchlist_id", watchlist.id)
-          .eq("deal_id", dealId);
-        if (deleteError) throw deleteError;
-      }
+      const existing = state.pipelineItems[dealId];
+      const payload = {
+        watchlist_id: watchlist.id,
+        user_id: auth.user.id,
+        deal_id: dealId,
+        status: patch.status ?? existing?.status ?? "Saved",
+        notes: patch.notes ?? existing?.notes ?? "",
+      };
+      const { error: upsertError } = await requireSupabase()
+        .from("watchlist_items")
+        .upsert(payload, { onConflict: "user_id,deal_id" });
+      if (upsertError) throw upsertError;
     },
-    onMutate: async ({ nextIds }) => {
+    onMutate: async ({ dealId, patch }) => {
       setError(null);
       await queryClient.cancelQueries({ queryKey });
       const previous = state;
-      const next = { ...state, ids: nextIds };
+      const next = nextStateFromPatch(state, dealId, patch);
       setState(next);
       queryClient.setQueryData(queryKey, next);
       return { previous };
     },
     onError: (mutationError, _vars, context) => {
       if (context?.previous) setState(context.previous);
-      setError(mutationError instanceof Error ? mutationError.message : "Could not update watchlist.");
+      setError(mutationError instanceof Error ? mutationError.message : "Could not update pipeline.");
     },
   });
 
-  const noteMutation = useMutation({
-    mutationFn: async ({ dealId, note }: { dealId: string; note: string }) => {
+  const removeMutation = useMutation({
+    mutationFn: async ({ dealId }: { dealId: string }) => {
       if (!isSupabaseConfigured) return;
-      if (!auth.user) throw new Error("Cannot save note without an authenticated Supabase user.");
-      const watchlist = state.watchlistId ? { id: state.watchlistId } : await ensureWatchlist(auth.user.id);
-      const db = requireSupabase();
-      if (note.trim()) {
-        await ensureWatchlistItem(watchlist.id, dealId);
-        const { error: upsertError } = await db
-          .from("watchlist_notes")
-          .upsert(
-            { watchlist_id: watchlist.id, deal_id: dealId, note },
-            { onConflict: "watchlist_id,deal_id" }
-          );
-        if (upsertError) throw upsertError;
-      } else {
-        const { error: deleteError } = await db
-          .from("watchlist_notes")
-          .delete()
-          .eq("watchlist_id", watchlist.id)
-          .eq("deal_id", dealId);
-        if (deleteError) throw deleteError;
-      }
+      if (!auth.user) throw new Error("Cannot update pipeline without an authenticated Supabase user.");
+      const { error: deleteError } = await requireSupabase()
+        .from("watchlist_items")
+        .delete()
+        .eq("user_id", auth.user.id)
+        .eq("deal_id", dealId);
+      if (deleteError) throw deleteError;
     },
-    onMutate: async ({ dealId, note }) => {
+    onMutate: async ({ dealId }) => {
       setError(null);
       await queryClient.cancelQueries({ queryKey });
       const previous = state;
-      const next = {
-        ...state,
-        ids: note.trim() && !state.ids.includes(dealId) ? [...state.ids, dealId] : state.ids,
-        notes: { ...state.notes, [dealId]: note },
-      };
-      if (!note.trim()) delete next.notes[dealId];
+      const next = nextStateAfterRemove(state, dealId);
       setState(next);
       queryClient.setQueryData(queryKey, next);
       return { previous };
     },
     onError: (mutationError, _vars, context) => {
       if (context?.previous) setState(context.previous);
-      setError(mutationError instanceof Error ? mutationError.message : "Could not save note.");
+      setError(mutationError instanceof Error ? mutationError.message : "Could not remove deal from pipeline.");
     },
   });
+
+  const pipelineCounts = useMemo(() => {
+    const counts = Object.fromEntries(PIPELINE_STATUSES.map((status) => [status, 0])) as Record<PipelineStatus, number>;
+    Object.values(state.pipelineItems).forEach((item) => {
+      counts[item.status] += 1;
+    });
+    return counts;
+  }, [state.pipelineItems]);
 
   const value = useMemo<WatchlistContextType>(() => ({
     ...state,
-    isSaving: itemMutation.isPending || noteMutation.isPending,
+    pipelineCounts,
+    isSaving: upsertMutation.isPending || removeMutation.isPending,
     error,
     toggle: async (id) => {
-      const nextIds = state.ids.includes(id) ? state.ids.filter((item) => item !== id) : [...state.ids, id];
-      await itemMutation.mutateAsync({ dealId: id, nextIds });
+      if (state.ids.includes(id)) await removeMutation.mutateAsync({ dealId: id });
+      else await upsertMutation.mutateAsync({ dealId: id, patch: { status: "Saved" } });
     },
     isWatched: (id) => state.ids.includes(id),
+    getPipelineStatus: (id) => state.pipelineItems[id]?.status,
+    saveToPipeline: async (id, status = "Saved") => {
+      await upsertMutation.mutateAsync({ dealId: id, patch: { status } });
+    },
+    setStatus: async (id, status) => {
+      await upsertMutation.mutateAsync({ dealId: id, patch: { status } });
+    },
+    setPipelineItem: async (id, patch) => {
+      await upsertMutation.mutateAsync({ dealId: id, patch });
+    },
     setNote: async (id, note) => {
-      await noteMutation.mutateAsync({ dealId: id, note });
+      await upsertMutation.mutateAsync({ dealId: id, patch: { notes: note } });
     },
     remove: async (id) => {
-      await itemMutation.mutateAsync({ dealId: id, nextIds: state.ids.filter((item) => item !== id) });
+      await removeMutation.mutateAsync({ dealId: id });
     },
-  }), [error, itemMutation, noteMutation, state]);
+  }), [error, pipelineCounts, removeMutation, state, upsertMutation]);
 
   return <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>;
 }
