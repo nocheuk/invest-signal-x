@@ -1,10 +1,27 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rows = vi.hoisted(() => ({
-  value: [{
+  scanRuns: [] as Array<{
+    id: string;
+    source_name: string;
+    location_query: string;
+    started_at: string;
+    finished_at: string;
+    metadata: Record<string, unknown>;
+  }>,
+  sourceLinks: [
+    { deal_id: "imp-rightmove-1", import_sources: { name: "Rightmove Commercial" } },
+    { deal_id: "imp-rightmove-2", import_sources: { name: "Rightmove Commercial" } },
+    { deal_id: "imp-acuitus-1", import_sources: { name: "Acuitus" } },
+  ],
+  dealCount: 42,
+}));
+
+function resetRows() {
+  rows.scanRuns = [{
     id: "scan-1",
     source_name: "Rightmove Commercial",
     location_query: "Bournemouth",
@@ -17,11 +34,12 @@ const rows = vi.hoisted(() => ({
       estimated_full_cycle_days: 40,
       scan_cycle_progress: 3,
     },
-  }],
-}));
+  }];
+  rows.dealCount = 42;
+}
 
 const calls = vi.hoisted(() => ({
-  table: "",
+  tables: [] as string[],
   status: "",
   orderColumn: "",
 }));
@@ -30,7 +48,17 @@ vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: true,
   requireSupabase: () => ({
     from: (table: string) => {
-      calls.table = table;
+      calls.tables.push(table);
+      if (table === "deals") {
+        return {
+          select: async () => ({ count: rows.dealCount, error: null }),
+        };
+      }
+      if (table === "deal_source_links") {
+        return {
+          select: async () => ({ data: rows.sourceLinks, error: null }),
+        };
+      }
       return {
         select: () => ({
           eq: (_column: string, value: string) => {
@@ -39,7 +67,7 @@ vi.mock("@/lib/supabase/client", () => ({
               order: (column: string) => {
                 calls.orderColumn = column;
                 return {
-                  limit: async () => ({ data: rows.value, error: null }),
+                  limit: async () => ({ data: rows.scanRuns, error: null }),
                 };
               },
             };
@@ -58,15 +86,22 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe("useNationalScanStatus", () => {
+  beforeEach(() => {
+    resetRows();
+    calls.tables = [];
+    calls.status = "";
+    calls.orderColumn = "";
+  });
+
   it("loads the latest completed national scan run", async () => {
     const { result } = renderHook(() => useNationalScanStatus(), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(calls).toMatchObject({
-      table: "national_scan_runs",
       status: "completed",
       orderColumn: "finished_at",
     });
+    expect(calls.tables).toEqual(["national_scan_runs", "deal_source_links", "deals"]);
     expect(result.current.data).toMatchObject({
       id: "scan-1",
       sourceName: "Rightmove Commercial",
@@ -77,11 +112,15 @@ describe("useNationalScanStatus", () => {
       nextIndex: 4,
       estimatedFullCycleDays: 40,
       scanCycleProgress: 3,
+      totalDeals: 42,
+      totalRightmoveDeals: 2,
+      totalAcuitusDeals: 1,
+      locationsCompletedInCurrentCycle: 4,
     });
   });
 
   it("returns null when no completed scan has run", async () => {
-    rows.value = [];
+    rows.scanRuns = [];
     const { result } = renderHook(() => useNationalScanStatus(), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

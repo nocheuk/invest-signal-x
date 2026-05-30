@@ -14,6 +14,7 @@
     "scrape:rightmove": "node --import tsx scripts/scrape-rightmove.mjs",
     "scrape:site": "node --import tsx scripts/scrape-site.mjs",
     "scan:national": "node --import tsx scripts/scan-national.mjs",
+    "benchmark:national-scan": "node --import tsx scripts/benchmark-national-scan.mjs",
     "validate:rightmove-locations": "node --import tsx scripts/validate-rightmove-locations.mjs",
     "seed:deals": "tsx scripts/seed-deals.mjs",
     "test": "vitest run",

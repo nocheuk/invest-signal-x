@@ -236,6 +236,12 @@ export default function Dashboard() {
                     Cycle progress: {nationalScanStatus.data.scanCycleProgress}%
                     {nationalScanStatus.data.estimatedFullCycleDays ? ` · ${nationalScanStatus.data.estimatedFullCycleDays} day cycle` : ""}
                   </div>
+                  <div>
+                    Locations completed this cycle: {nationalScanStatus.data.locationsCompletedInCurrentCycle}/{nationalScanStatus.data.totalConfiguredLocations || "unknown"}
+                  </div>
+                  <div>
+                    Database: {nationalScanStatus.data.totalDeals.toLocaleString()} deals · Rightmove {nationalScanStatus.data.totalRightmoveDeals.toLocaleString()} · Acuitus {nationalScanStatus.data.totalAcuitusDeals.toLocaleString()}
+                  </div>
                 </>
               )}
             </div>
