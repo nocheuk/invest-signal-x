@@ -10,6 +10,13 @@ const rows = vi.hoisted(() => ({
     location_query: "Bournemouth",
     started_at: "2026-05-28T04:59:00Z",
     finished_at: "2026-05-28T05:03:00Z",
+    metadata: {
+      locations_scanned: ["London", "Manchester", "Birmingham", "Leeds"],
+      total_configured_locations: 160,
+      next_index: 4,
+      estimated_full_cycle_days: 40,
+      scan_cycle_progress: 3,
+    },
   }],
 }));
 
@@ -65,6 +72,11 @@ describe("useNationalScanStatus", () => {
       sourceName: "Rightmove Commercial",
       locationQuery: "Bournemouth",
       finishedAt: "2026-05-28T05:03:00Z",
+      locationsScanned: ["London", "Manchester", "Birmingham", "Leeds"],
+      totalConfiguredLocations: 160,
+      nextIndex: 4,
+      estimatedFullCycleDays: 40,
+      scanCycleProgress: 3,
     });
   });
 

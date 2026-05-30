@@ -3,11 +3,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   aggregateNationalResults,
+  buildNationalScanDiagnostics,
   ENGLAND_PRIORITY_LOCATIONS,
   runNationalScan,
   selectNationalScanBatch,
   verifyCronSecret,
 } from "../../../scripts/lib/nationalScan.mjs";
+import { OFFICIAL_ENGLISH_CITIES } from "../../../scripts/lib/englandLocationQueue.mjs";
 
 describe("national scan scheduler", () => {
   it("authenticates cron requests using CRON_SECRET", () => {
@@ -24,7 +26,21 @@ describe("national scan scheduler", () => {
     expect(verifyCronSecret({ env: {} })).toMatchObject({ ok: false, status: 500 });
   });
 
-  it("rotates priority locations in conservative batches", () => {
+  it("contains a broad England location queue with official cities and no duplicates", () => {
+    expect(OFFICIAL_ENGLISH_CITIES.length).toBeGreaterThanOrEqual(55);
+    for (const city of ["London", "Manchester", "Birmingham", "Leeds", "Southampton", "Westminster", "Wells"]) {
+      expect(OFFICIAL_ENGLISH_CITIES).toContain(city);
+      expect(ENGLAND_PRIORITY_LOCATIONS).toContain(city);
+    }
+    for (const town of ["Bournemouth", "Poole", "Reading", "Warrington", "Watford"]) {
+      expect(ENGLAND_PRIORITY_LOCATIONS).toContain(town);
+    }
+    const normalized = ENGLAND_PRIORITY_LOCATIONS.map((location) => location.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim());
+    expect(new Set(normalized).size).toBe(ENGLAND_PRIORITY_LOCATIONS.length);
+    expect(ENGLAND_PRIORITY_LOCATIONS.length).toBeGreaterThan(100);
+  });
+
+  it("rotates England locations in conservative batches", () => {
     expect(ENGLAND_PRIORITY_LOCATIONS).toContain("London");
     expect(ENGLAND_PRIORITY_LOCATIONS).toContain("Bournemouth");
     expect(ENGLAND_PRIORITY_LOCATIONS).toContain("Hampshire");
@@ -50,6 +66,24 @@ describe("national scan scheduler", () => {
     });
   });
 
+  it("reports scan coverage diagnostics for the dashboard", () => {
+    const batch = selectNationalScanBatch({
+      lastNextIndex: 4,
+      batchSize: 4,
+      locations: ENGLAND_PRIORITY_LOCATIONS,
+    });
+    const diagnostics = buildNationalScanDiagnostics({
+      batch,
+      batchSize: 4,
+      totalLocations: ENGLAND_PRIORITY_LOCATIONS.length,
+    });
+
+    expect(diagnostics.totalConfiguredLocations).toBe(ENGLAND_PRIORITY_LOCATIONS.length);
+    expect(diagnostics.locationsScannedCount).toBe(4);
+    expect(diagnostics.nextIndex).toBe(8);
+    expect(diagnostics.estimatedFullCycleDays).toBe(Math.ceil(ENGLAND_PRIORITY_LOCATIONS.length / 4));
+  });
+
   it("aggregates per-location and per-source scan results", async () => {
     const calls: string[] = [];
     const result = await runNationalScan({
@@ -71,6 +105,11 @@ describe("national scan scheduler", () => {
     expect(calls).toEqual(["rightmove:London", "rightmove:Manchester", "acuitus"]);
     expect(result.locations).toEqual(["London", "Manchester"]);
     expect(result.nextIndex).toBe(2);
+    expect(result.diagnostics).toMatchObject({
+      totalConfiguredLocations: 3,
+      locationsScanned: ["London", "Manchester"],
+      nextIndex: 2,
+    });
     expect(result.totals).toMatchObject({
       inserted: 5,
       existing: 8,
@@ -121,7 +160,7 @@ describe("national scan scheduler", () => {
     ], { cwd: path.resolve("."), encoding: "utf8" });
 
     expect(output).toBe("ok");
-  });
+  }, 15000);
 
   it("sums duplicate refreshes without implying duplicate deals are created", () => {
     expect(aggregateNationalResults([

@@ -225,6 +225,19 @@ export default function Dashboard() {
             <div className="text-xs text-muted-foreground sm:text-right">
               <div>Next scheduled scan: daily at 6am UK time</div>
               <div>Sources: Rightmove Commercial + Acuitus</div>
+              {nationalScanStatus.data && (
+                <>
+                  <div>Last run locations: {nationalScanStatus.data.locationsScanned.length ? nationalScanStatus.data.locationsScanned.join(", ") : "Not available"}</div>
+                  <div>
+                    Queue: {nationalScanStatus.data.totalConfiguredLocations || "unknown"} locations
+                    {nationalScanStatus.data.totalConfiguredLocations ? ` · next index ${nationalScanStatus.data.nextIndex}` : ""}
+                  </div>
+                  <div>
+                    Cycle progress: {nationalScanStatus.data.scanCycleProgress}%
+                    {nationalScanStatus.data.estimatedFullCycleDays ? ` · ${nationalScanStatus.data.estimatedFullCycleDays} day cycle` : ""}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

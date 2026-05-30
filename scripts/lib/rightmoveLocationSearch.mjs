@@ -11,6 +11,9 @@ export const DAILY_LOCATION_SEARCH_LIMIT = 20;
 
 const RIGHTMOVE_LOCATION_BASE = "https://www.rightmove.co.uk/commercial-property-for-sale";
 const RATE_LIMITED_STATUSES = ["pending", "completed", "failed"];
+const RIGHTMOVE_LOCATION_SLUG_OVERRIDES = {
+  "burton upon trent": "Burton-On-Trent",
+};
 
 export function buildRightmoveCommercialSearchUrl(locationQuery) {
   const slug = slugifyLocation(locationQuery);
@@ -19,6 +22,8 @@ export function buildRightmoveCommercialSearchUrl(locationQuery) {
 }
 
 export function slugifyLocation(locationQuery) {
+  const normalized = normalizeLocationQuery(locationQuery);
+  if (RIGHTMOVE_LOCATION_SLUG_OVERRIDES[normalized]) return RIGHTMOVE_LOCATION_SLUG_OVERRIDES[normalized];
   return String(locationQuery ?? "")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")

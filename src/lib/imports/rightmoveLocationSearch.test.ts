@@ -30,8 +30,10 @@ describe("Rightmove location search helpers", () => {
   it("generates a Rightmove commercial search URL from a location query", () => {
     expect(slugifyLocation("Bournemouth")).toBe("Bournemouth");
     expect(slugifyLocation("  South  West London  ")).toBe("South-West-London");
+    expect(slugifyLocation("Burton upon Trent")).toBe("Burton-On-Trent");
     expect(buildRightmoveCommercialSearchUrl("Poole")).toBe("https://www.rightmove.co.uk/commercial-property-for-sale/Poole.html");
     expect(buildRightmoveCommercialSearchUrl("Hampshire")).toBe("https://www.rightmove.co.uk/commercial-property-for-sale/Hampshire.html");
+    expect(buildRightmoveCommercialSearchUrl("Burton upon Trent")).toBe("https://www.rightmove.co.uk/commercial-property-for-sale/Burton-On-Trent.html");
   });
 
   it("reads bearer tokens without requiring frontend secrets", () => {
