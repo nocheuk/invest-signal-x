@@ -111,6 +111,7 @@ describe("custom Rightmove Commercial HTML scraper", () => {
         </article>
         <nav>
           <a href="/commercial-property-for-sale/Bournemouth.html">1</a>
+          <a href="/commercial-property-for-sale/map.html?viewType=MAP&index=0&locationIdentifier=REGION%5E368">Map</a>
           <a href="/commercial-property-for-sale/Bournemouth.html?index=24" aria-label="Page 2">2</a>
           <a href="/commercial-property-for-sale/Bournemouth.html?index=48" aria-label="Next page">Next</a>
           <a href="/properties/148450011#/?channel=COM_BUY">Property link</a>

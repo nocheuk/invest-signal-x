@@ -314,6 +314,14 @@ Run a local dry-run batch without writing to Supabase:
 npm run scan:national -- --dry-run
 ```
 
+Audit Rightmove URL coverage for every configured England location without writing to Supabase:
+
+```bash
+npm run validate:rightmove-locations
+```
+
+The validator logs each generated Rightmove URL, HTTP status, final redirected URL, whether property cards were detected, parser status and listings found. It finishes with totals for valid, redirected, empty, parser-failure and unsupported locations.
+
 Run a local live batch:
 
 ```bash

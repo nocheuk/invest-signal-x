@@ -371,7 +371,12 @@ function normalizeRightmoveUrl(url, pageUrl) {
 function isRightmoveSearchPageUrl(url) {
   try {
     const parsed = new URL(url);
-    return parsed.hostname.endsWith("rightmove.co.uk") && parsed.pathname.includes("/commercial-property-for-sale/");
+    return (
+      parsed.hostname.endsWith("rightmove.co.uk") &&
+      parsed.pathname.includes("/commercial-property-for-sale/") &&
+      !parsed.pathname.endsWith("/map.html") &&
+      parsed.searchParams.get("viewType")?.toUpperCase() !== "MAP"
+    );
   } catch {
     return false;
   }
@@ -379,6 +384,12 @@ function isRightmoveSearchPageUrl(url) {
 
 function looksLikePaginationLink({ href = "", text = "", label = "", url = "" }) {
   const haystack = `${href} ${text} ${label} ${url}`.toLowerCase();
+  try {
+    const parsed = new URL(url);
+    if (parsed.searchParams.get("index") === "0") return false;
+  } catch {
+    // Fall through to string matching below.
+  }
   return (
     /(?:\?|&)index=\d+/.test(haystack) ||
     /(?:\?|&)page=\d+/.test(haystack) ||

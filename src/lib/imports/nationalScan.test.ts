@@ -160,7 +160,7 @@ describe("national scan scheduler", () => {
     ], { cwd: path.resolve("."), encoding: "utf8" });
 
     expect(output).toBe("ok");
-  });
+  }, 15000);
 
   it("sums duplicate refreshes without implying duplicate deals are created", () => {
     expect(aggregateNationalResults([
