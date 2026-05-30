@@ -349,7 +349,7 @@ describe("Dashboard live location search", () => {
     expect(screen.queryByText("Demo Tesco")).not.toBeInTheDocument();
     expect(screen.queryByText(/14,832/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Run AI sweep/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/AI sweep coming soon/i)).toBeDisabled();
+    expect(screen.queryByText(/AI sweep coming soon/i)).not.toBeInTheDocument();
   });
 
   it("saves the active location search filters", async () => {

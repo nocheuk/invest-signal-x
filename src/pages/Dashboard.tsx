@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { ALL_REAL_DEALS_FILTER, buildSourceOptions, DEMO_SOURCE_FILTER, filterAndSortDeals, isSeedDeal } from "@/lib/dashboardFilters";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { defaultAlertName } from "@/lib/alerts";
+import { isAdminUser } from "@/lib/admin";
 
 const EMPTY_DEALS = [];
 
@@ -100,11 +101,12 @@ export default function Dashboard() {
     offersSubmitted: pipelineCounts["Offer Submitted"],
     purchased: pipelineCounts.Purchased,
   }), [ids.length, pipelineCounts]);
-  const showDebugCounts = import.meta.env.DEV || source !== "All" || search.length > 0 || locationQuery.length > 0;
+  const canShowDiagnostics = import.meta.env.DEV || isAdminUser(auth.user);
+  const showDebugCounts = canShowDiagnostics;
   const hasLocationFilter = locationQuery.trim().length > 0;
   const showLocationSearchCta = isSupabaseConfigured && hasLocationFilter && filtered.length < 3;
   const canRunLiveLocationSearch = Boolean(auth.user && auth.session?.access_token);
-  const canShowLocationSearchDebug = true;
+  const canShowLocationSearchDebug = canShowDiagnostics;
   const locationImportErrorDetail = locationImport.error instanceof LocationImportError ? locationImport.error.detail : undefined;
   const locationImportDiagnostics = locationImport.error instanceof LocationImportError ? locationImport.error.diagnostics : undefined;
 
@@ -186,9 +188,6 @@ export default function Dashboard() {
               {dealsQuery.isLoading ? "Loading live opportunities." : `${filtered.length} matching ${filtered.length === 1 ? "deal" : "deals"} from real imported data.`}
             </p>
           </div>
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2" disabled title="Coming soon">
-            <Sparkles className="h-4 w-4" /> AI sweep coming soon
-          </Button>
         </div>
 
         {/* KPI cards */}

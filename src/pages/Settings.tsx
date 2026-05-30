@@ -1,108 +1,63 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { ASSET_TYPES, REGIONS } from "@/lib/deals";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
 
 export default function Settings() {
   const auth = useAuth();
   const profile = useProfile();
-  const [regions, setRegions] = useState<string[]>(["South East", "North West", "Yorkshire"]);
-  const [assets, setAssets] = useState<string[]>(["Industrial", "Convenience", "Healthcare"]);
-  const [risk, setRisk] = useState("Balanced");
-  const [freq, setFreq] = useState("Daily digest");
-  const [minYield, setMinYield] = useState(6);
-
-  const toggle = (arr: string[], setter: (v: string[]) => void, val: string) =>
-    setter(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
-
-  const save = () => toast.success("Settings saved", { description: "Your preferences will apply to the next deal scan." });
 
   return (
     <AppLayout>
       <div className="container max-w-4xl py-8 space-y-6">
         <div>
           <div className="text-xs uppercase tracking-widest text-primary font-medium">Settings</div>
-          <h1 className="font-display text-4xl mt-1">Workspace preferences</h1>
-          <p className="text-muted-foreground text-sm mt-1">Tune your deal flow, alerts, and underwriting profile.</p>
+          <h1 className="font-display text-4xl mt-1">Account settings</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Review the profile attached to your DealSignal account and manage live workflows from the dashboard.
+          </p>
         </div>
 
-        <Section title="Profile" desc="Your name and identity inside the workspace.">
+        <Section title="Profile" desc="Loaded from your authenticated Supabase account.">
           <div className="grid sm:grid-cols-2 gap-4">
-            <Field label="Full name"><Input value={profile.data?.full_name || auth.user?.user_metadata?.full_name || ""} readOnly className="bg-surface-2 border-border/60" /></Field>
-            <Field label="Work email"><Input value={auth.user?.email || ""} readOnly className="bg-surface-2 border-border/60" /></Field>
-            <Field label="Firm"><Input value={profile.data?.company || ""} readOnly placeholder="Not set" className="bg-surface-2 border-border/60" /></Field>
-            <Field label="Role">
-              <div className="grid grid-cols-4 gap-1.5">
-                {["Investor", "Developer", "Sourcer", "Agent"].map(r => (
-                  <button key={r} className={cn("px-2 py-2 rounded-md border text-xs", r === "Investor" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>{r}</button>
-                ))}
-              </div>
+            <Field label="Full name">
+              <Input value={profile.data?.full_name || auth.user?.user_metadata?.full_name || "Not available"} readOnly className="bg-surface-2 border-border/60" />
+            </Field>
+            <Field label="Work email">
+              <Input value={auth.user?.email || "Not available"} readOnly className="bg-surface-2 border-border/60" />
+            </Field>
+            <Field label="Firm">
+              <Input value={profile.data?.company || "Not available"} readOnly className="bg-surface-2 border-border/60" />
+            </Field>
+            <Field label="Access">
+              <Input value={auth.user?.app_metadata?.role ? String(auth.user.app_metadata.role) : "Beta user"} readOnly className="bg-surface-2 border-border/60" />
             </Field>
           </div>
         </Section>
 
-        <Section title="Deal preferences" desc="What kind of deals should we surface?">
-          <div className="space-y-5">
-            <div>
-              <Label className="text-xs">Preferred regions</Label>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {REGIONS.slice(1).map(r => (
-                  <button key={r} onClick={() => toggle(regions, setRegions, r)} className={cn("px-3 py-1.5 rounded-full border text-xs", regions.includes(r) ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>{r}</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs">Asset types</Label>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {ASSET_TYPES.map(a => (
-                  <button key={a} onClick={() => toggle(assets, setAssets, a)} className={cn("px-3 py-1.5 rounded-full border text-xs", assets.includes(a) ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>{a}</button>
-                ))}
-              </div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-5">
-              <div>
-                <Label className="text-xs">Minimum target yield: <span className="font-mono text-primary">{minYield.toFixed(1)}%</span></Label>
-                <input type="range" min={4} max={12} step={0.5} value={minYield} onChange={(e) => setMinYield(+e.target.value)} className="w-full mt-2 accent-primary" />
-              </div>
-              <div>
-                <Label className="text-xs">Risk appetite</Label>
-                <div className="grid grid-cols-3 gap-1.5 mt-2">
-                  {["Conservative", "Balanced", "Opportunistic"].map(r => (
-                    <button key={r} onClick={() => setRisk(r)} className={cn("px-2 py-2 rounded-md border text-xs", risk === r ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>{r}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
+        <Section title="Live workflows" desc="These controls use real saved alerts and pipeline records.">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <WorkflowLink
+              title="Saved alerts"
+              desc="Create, edit, pause and delete matching alerts from the dashboard filters."
+              to="/dashboard"
+            />
+            <WorkflowLink
+              title="Pipeline"
+              desc="Save deals, update review status and keep private notes from deal cards or deal detail."
+              to="/dashboard"
+            />
           </div>
         </Section>
 
-        <Section title="Alerts" desc="How and when we contact you.">
-          <div className="space-y-4">
-            <div>
-              <Label className="text-xs">Alert frequency</Label>
-              <div className="grid sm:grid-cols-3 gap-2 mt-2">
-                {["Real-time", "Daily digest", "Weekly digest"].map(f => (
-                  <button key={f} onClick={() => setFreq(f)} className={cn("px-3 py-2.5 rounded-lg border text-sm", freq === f ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>{f}</button>
-                ))}
-              </div>
-            </div>
-            <Toggle label="Only alert on green-rated deals" desc="Skip amber and red ratings in alerts." defaultChecked />
-            <Toggle label="Auction lot alerts" desc="Get notified about auction listings 48 hours before close." defaultChecked />
-            <Toggle label="Off-market deals (Pro)" desc="Surface vetted off-market opportunities first." />
-          </div>
+        <Section title="Data and advice disclaimer" desc="Important before relying on deal output.">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            DealSignal is not financial advice and is not a valuation. Imported data can be incomplete or stale, and users must verify source listings, tenancy, lease terms, title, planning, condition and comparable evidence before making offers.
+          </p>
         </Section>
-
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="outline">Cancel</Button>
-          <Button onClick={save} className="bg-primary text-primary-foreground hover:bg-primary/90">Save changes</Button>
-        </div>
       </div>
     </AppLayout>
   );
@@ -121,17 +76,24 @@ function Section({ title, desc, children }: { title: string; desc: string; child
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><Label className="text-xs">{label}</Label>{children}</div>;
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      {children}
+    </div>
+  );
 }
 
-function Toggle({ label, desc, defaultChecked }: { label: string; desc: string; defaultChecked?: boolean }) {
+function WorkflowLink({ title, desc, to }: { title: string; desc: string; to: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-2 border-t border-border/40 first:border-0 first:pt-0">
+    <div className="rounded-lg border border-border/60 bg-surface-2 p-4 space-y-3">
       <div>
-        <div className="text-sm font-medium">{label}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{desc}</div>
+        <div className="text-sm font-semibold">{title}</div>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
       </div>
-      <Switch defaultChecked={defaultChecked} />
+      <Button asChild size="sm" variant="outline">
+        <Link to={to}>Open dashboard</Link>
+      </Button>
     </div>
   );
 }
