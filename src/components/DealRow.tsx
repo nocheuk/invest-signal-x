@@ -10,7 +10,7 @@ import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { cn } from "@/lib/utils";
 
 export function DealRow({ deal }: { deal: Deal }) {
-  const { isWatched, toggle, getPipelineStatus } = useWatchlist();
+  const { isWatched, getPipelineStatus, saveToPipeline } = useWatchlist();
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
   const watched = isWatched(deal.id);
@@ -58,12 +58,16 @@ export function DealRow({ deal }: { deal: Deal }) {
 
       <div className="col-span-12 sm:col-span-1 flex justify-end">
         <button
-          onClick={(e) => { e.preventDefault(); toggle(deal.id); }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!watched) void saveToPipeline(deal.id);
+          }}
           className={cn(
             "h-8 w-8 grid place-items-center rounded-md transition-colors",
             watched ? "text-primary" : "text-muted-foreground hover:text-foreground"
           )}
-          aria-label="Toggle watchlist"
+          aria-label={watched ? `Saved to pipeline as ${pipelineStatus ?? "Saved"}` : "Save to Pipeline"}
         >
           <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
         </button>

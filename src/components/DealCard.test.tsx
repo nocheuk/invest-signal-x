@@ -1,15 +1,20 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DealCard } from "@/components/DealCard";
 import type { Deal } from "@/lib/deals";
 
+const watchlistMock = vi.hoisted(() => ({
+  saveToPipeline: vi.fn(),
+  saved: false,
+}));
+
 vi.mock("@/lib/watchlist", () => ({
   useWatchlist: () => ({
-    isWatched: () => false,
+    isWatched: () => watchlistMock.saved,
     toggle: vi.fn(),
-    getPipelineStatus: () => undefined,
-    saveToPipeline: vi.fn(),
+    getPipelineStatus: () => watchlistMock.saved ? "Saved" : undefined,
+    saveToPipeline: watchlistMock.saveToPipeline,
   }),
 }));
 
@@ -74,6 +79,11 @@ function renderCard(input: Deal) {
 }
 
 describe("DealCard", () => {
+  beforeEach(() => {
+    watchlistMock.saveToPipeline.mockReset();
+    watchlistMock.saved = false;
+  });
+
   it("renders the imported deal image when an image URL is available", () => {
     renderCard(deal({ imageUrl: "https://cdn.example.com/property.jpg" }));
 
@@ -106,6 +116,23 @@ describe("DealCard", () => {
     expect(screen.getAllByText("Not available").length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText("Tenant not available")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save to Pipeline" })).toBeInTheDocument();
+  });
+
+  it("saves to pipeline without toggling saved deals back off", () => {
+    const { rerender } = renderCard(deal());
+
+    fireEvent.click(screen.getByRole("button", { name: "Save to Pipeline" }));
+    expect(watchlistMock.saveToPipeline).toHaveBeenCalledWith("imp-card");
+
+    watchlistMock.saved = true;
+    rerender(
+      <MemoryRouter>
+        <DealCard deal={deal()} />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Pipeline: Saved" }));
+    expect(watchlistMock.saveToPipeline).toHaveBeenCalledTimes(1);
   });
 
   it("shows opportunity and risk signals from Deal Analysis V2", () => {

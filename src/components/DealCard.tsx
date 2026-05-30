@@ -12,7 +12,7 @@ import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { cn } from "@/lib/utils";
 
 export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: "default" | "feature" }) {
-  const { isWatched, toggle, getPipelineStatus, saveToPipeline } = useWatchlist();
+  const { isWatched, getPipelineStatus, saveToPipeline } = useWatchlist();
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
   const reasons = matchReasons(deal, weights);
@@ -53,12 +53,16 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
           <RatingBadge rating={deal.rating} />
         </div>
         <button
-          onClick={(e) => { e.preventDefault(); toggle(deal.id); }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!watched) void saveToPipeline(deal.id);
+          }}
           className={cn(
             "absolute top-3 right-3 h-8 w-8 grid place-items-center rounded-full border transition-colors",
             watched ? "bg-primary/20 border-primary/40 text-primary" : "bg-surface/80 border-border text-muted-foreground hover:text-foreground"
           )}
-          aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
+          aria-label={watched ? `Saved to pipeline as ${pipelineStatus ?? "Saved"}` : "Save to Pipeline bookmark"}
         >
           <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
         </button>
@@ -125,7 +129,11 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
         </div>
         <button
           type="button"
-          onClick={(e) => { e.preventDefault(); void saveToPipeline(deal.id); }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!pipelineStatus) void saveToPipeline(deal.id);
+          }}
           className={cn(
             "w-full rounded-md border px-3 py-2 text-xs transition-colors",
             pipelineStatus

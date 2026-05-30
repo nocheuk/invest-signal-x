@@ -29,7 +29,7 @@ export default function DealDetail() {
   const navigate = useNavigate();
   const { deal, isLoading, isError } = useDeal(id);
   const sourceLinks = useDealSourceLinks(deal?.id);
-  const { isWatched, toggle, notes, setNote, getPipelineStatus, setStatus, saveToPipeline } = useWatchlist();
+  const { isWatched, notes, setNote, getPipelineStatus, setStatus, saveToPipeline } = useWatchlist();
   const [memoStatus, setMemoStatus] = useState<"idle" | "loading" | "error">("idle");
 
   if (isLoading) {
@@ -108,7 +108,13 @@ export default function DealDetail() {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <Button onClick={() => void toggle(deal.id)} variant={watched ? "default" : "outline"} className={cn("gap-2", watched && "bg-primary text-primary-foreground hover:bg-primary/90")}>
+              <Button
+                onClick={() => {
+                  if (!watched) void saveToPipeline(deal.id);
+                }}
+                variant={watched ? "default" : "outline"}
+                className={cn("gap-2", watched && "bg-primary text-primary-foreground hover:bg-primary/90")}
+              >
                 <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
                 {watched ? "In pipeline" : "Save to Pipeline"}
               </Button>

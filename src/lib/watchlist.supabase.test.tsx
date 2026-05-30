@@ -11,6 +11,7 @@ const watchlistDb = vi.hoisted(() => ({
   items: [] as Array<{ watchlist_id: string; user_id: string; deal_id: string; status: string; notes: string; created_at?: string; updated_at?: string }>,
   insertedWatchlist: null as unknown,
   itemUpserts: [] as unknown[],
+  itemDeletes: [] as unknown[],
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -77,6 +78,7 @@ vi.mock("@/lib/supabase/client", () => ({
           delete: () => ({
             eq: (_column: string, userId: string) => ({
               eq: async (_dealColumn: string, dealId: string) => {
+                watchlistDb.itemDeletes.push({ userId, dealId });
                 watchlistDb.items = watchlistDb.items.filter((item) => !(item.user_id === userId && item.deal_id === dealId));
                 return { data: null, error: null };
               },
@@ -101,6 +103,7 @@ function Probe() {
       <button onClick={() => void watchlist.setStatus("ds-001", "Viewing Booked")}>Change status</button>
       <button onClick={() => void watchlist.setNote("ds-001", "First note")}>Create note</button>
       <button onClick={() => void watchlist.setNote("ds-001", "Updated note")}>Update note</button>
+      <button onClick={() => void watchlist.remove("ds-001")}>Remove pipeline</button>
     </div>
   );
 }
@@ -115,6 +118,7 @@ describe("WatchlistProvider Supabase pipeline persistence", () => {
     watchlistDb.items = [];
     watchlistDb.insertedWatchlist = null;
     watchlistDb.itemUpserts = [];
+    watchlistDb.itemDeletes = [];
   });
 
   it("creates one pipeline item for the real authenticated user id", async () => {
@@ -136,6 +140,7 @@ describe("WatchlistProvider Supabase pipeline persistence", () => {
     await waitFor(() => expect(watchlistDb.itemUpserts.length).toBe(2));
     expect(watchlistDb.items).toHaveLength(1);
     expect(watchlistDb.items[0]).toMatchObject({ user_id: "real-user-id", deal_id: "ds-001" });
+    expect(watchlistDb.itemDeletes).toEqual([]);
   });
 
   it("changes status at any time", async () => {
@@ -144,6 +149,7 @@ describe("WatchlistProvider Supabase pipeline persistence", () => {
 
     await waitFor(() => expect(screen.getByText("Status: Viewing Booked")).toBeInTheDocument());
     expect(watchlistDb.items[0]).toMatchObject({ status: "Viewing Booked" });
+    expect(watchlistDb.itemDeletes).toEqual([]);
   });
 
   it("saves and updates private notes on the user's pipeline item", async () => {
@@ -156,6 +162,22 @@ describe("WatchlistProvider Supabase pipeline persistence", () => {
     expect(watchlistDb.items).toEqual([
       expect.objectContaining({ user_id: "real-user-id", deal_id: "ds-001", notes: "Updated note" }),
     ]);
+    expect(watchlistDb.itemDeletes).toEqual([]);
+  });
+
+  it("only removes a saved item when remove is explicitly called", async () => {
+    render(<Probe />, { wrapper });
+    screen.getByText("Save pipeline").click();
+    await waitFor(() => expect(screen.getByText("Items: ds-001")).toBeInTheDocument());
+
+    expect(watchlistDb.items).toHaveLength(1);
+    expect(watchlistDb.itemDeletes).toEqual([]);
+
+    screen.getByText("Remove pipeline").click();
+
+    await waitFor(() => expect(screen.getByText("Items:")).toBeInTheDocument());
+    expect(watchlistDb.items).toHaveLength(0);
+    expect(watchlistDb.itemDeletes).toEqual([{ userId: "real-user-id", dealId: "ds-001" }]);
   });
 
   it("pipeline item persists after refresh from Supabase state", async () => {

@@ -165,10 +165,6 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    if (watchlistQuery.data) setState(watchlistQuery.data);
-  }, [watchlistQuery.data]);
-
-  useEffect(() => {
     if (!isSupabaseConfigured) {
       localStorage.setItem(KEY, JSON.stringify(state.ids));
       localStorage.setItem(NOTES_KEY, JSON.stringify(state.notes));
@@ -207,6 +203,9 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       if (context?.previous) setState(context.previous);
       setError(mutationError instanceof Error ? mutationError.message : "Could not update pipeline.");
     },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey });
+    },
   });
 
   const removeMutation = useMutation({
@@ -233,7 +232,16 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       if (context?.previous) setState(context.previous);
       setError(mutationError instanceof Error ? mutationError.message : "Could not remove deal from pipeline.");
     },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey });
+    },
   });
+
+  useEffect(() => {
+    if (watchlistQuery.data && !upsertMutation.isPending && !removeMutation.isPending) {
+      setState(watchlistQuery.data);
+    }
+  }, [removeMutation.isPending, upsertMutation.isPending, watchlistQuery.data]);
 
   const pipelineCounts = useMemo(() => {
     const counts = Object.fromEntries(PIPELINE_STATUSES.map((status) => [status, 0])) as Record<PipelineStatus, number>;
