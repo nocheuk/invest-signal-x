@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
@@ -141,6 +141,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<WatchlistState>(() => isSupabaseConfigured ? { ids: [], notes: {}, pipelineItems: {} } : readLocalState());
   const [error, setError] = useState<string | null>(null);
+  const locallyChangedItems = useRef<Record<string, PipelineItem>>({});
   const queryKey = ["watchlist", auth.user?.id];
 
   const watchlistQuery = useQuery({
@@ -185,16 +186,29 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
         status: patch.status ?? existing?.status ?? "Saved",
         notes: patch.notes ?? existing?.notes ?? "",
       };
-      const { error: upsertError } = await requireSupabase()
+      const { data, error: upsertError } = await requireSupabase()
         .from("watchlist_items")
-        .upsert(payload, { onConflict: "user_id,deal_id" });
+        .upsert(payload, { onConflict: "user_id,deal_id" })
+        .select("deal_id,status,notes,created_at,updated_at")
+        .single();
       if (upsertError) throw upsertError;
+      return {
+        watchlistId: watchlist.id,
+        item: normalizePipelineItem({
+          dealId: data.deal_id,
+          status: data.status,
+          notes: data.notes ?? "",
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        }),
+      };
     },
     onMutate: async ({ dealId, patch }) => {
       setError(null);
       await queryClient.cancelQueries({ queryKey });
       const previous = state;
       const next = nextStateFromPatch(state, dealId, patch);
+      locallyChangedItems.current[dealId] = next.pipelineItems[dealId];
       setState(next);
       queryClient.setQueryData(queryKey, next);
       return { previous };
@@ -203,7 +217,14 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       if (context?.previous) setState(context.previous);
       setError(mutationError instanceof Error ? mutationError.message : "Could not update pipeline.");
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      if (saved?.item) {
+        locallyChangedItems.current[saved.item.dealId] = saved.item;
+        setState((current) => buildState(saved.watchlistId ?? current.watchlistId, [
+          ...Object.values(current.pipelineItems).filter((item) => item.dealId !== saved.item.dealId),
+          saved.item,
+        ]));
+      }
       void queryClient.invalidateQueries({ queryKey });
     },
   });
@@ -224,6 +245,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       await queryClient.cancelQueries({ queryKey });
       const previous = state;
       const next = nextStateAfterRemove(state, dealId);
+      delete locallyChangedItems.current[dealId];
       setState(next);
       queryClient.setQueryData(queryKey, next);
       return { previous };
@@ -239,7 +261,14 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (watchlistQuery.data && !upsertMutation.isPending && !removeMutation.isPending) {
-      setState(watchlistQuery.data);
+      const localItems = Object.values(locallyChangedItems.current);
+      const serverDealIds = new Set(watchlistQuery.data.ids);
+      const stillMissingLocallyChangedItems = localItems.filter((item) => !serverDealIds.has(item.dealId));
+      locallyChangedItems.current = Object.fromEntries(stillMissingLocallyChangedItems.map((item) => [item.dealId, item]));
+      setState(buildState(watchlistQuery.data.watchlistId, [
+        ...Object.values(watchlistQuery.data.pipelineItems),
+        ...stillMissingLocallyChangedItems,
+      ]));
     }
   }, [removeMutation.isPending, upsertMutation.isPending, watchlistQuery.data]);
 
