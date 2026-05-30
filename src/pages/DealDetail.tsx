@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Bookmark, MapPin, Building2, Sparkles, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine, Map as MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
+import { getDealAnalysis } from "@/lib/dealAnalysis";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -51,6 +52,7 @@ export default function DealDetail() {
 
   const watched = isWatched(deal.id);
   const note = notes[deal.id] || "";
+  const dealAnalysis = getDealAnalysis(deal);
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
     try {
@@ -177,17 +179,19 @@ export default function DealDetail() {
           </div>
         </div>
 
-        {deal.scoreReasons && (
+        {dealAnalysis && (
           <section className="ds-card p-6 space-y-4">
             <div>
-              <h2 className="font-display text-2xl">Scoring notes</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">What DealSignal can verify from imported source data today.</p>
+              <h2 className="font-display text-2xl">Deal analysis</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Deterministic signals generated only from imported source data and underwriting fields.</p>
             </div>
-            <div className="grid md:grid-cols-4 gap-3">
-              <ReasonList title="Why this scored well" items={deal.scoreReasons.positiveDrivers} fallback="No strong positive drivers found yet." tone="primary" />
-              <ReasonList title="Negative drivers" items={deal.scoreReasons.negativeDrivers} fallback="No extra negative drivers found yet." tone="red" />
-              <ReasonList title="What is missing" items={deal.scoreReasons.missingDataWarnings} fallback="No major missing fields flagged." tone="amber" />
-              <ReasonList title="Verify before trusting" items={deal.scoreReasons.verifyBeforeTrusting} fallback="Standard title, lease and comparable checks still apply." tone="default" />
+            <p className="rounded-lg border border-border/60 bg-surface-2/40 p-4 text-sm leading-relaxed text-muted-foreground">
+              {dealAnalysis.investmentSummary}
+            </p>
+            <div className="grid md:grid-cols-3 gap-3">
+              <ReasonList title="Opportunity signals" items={dealAnalysis.opportunitySignals} fallback="No strong opportunity signal found yet." tone="primary" />
+              <ReasonList title="Risk signals" items={dealAnalysis.riskSignals} fallback="No specific risk signal recorded yet." tone="amber" />
+              <ReasonList title="Verify before trusting" items={deal.scoreReasons?.verifyBeforeTrusting ?? []} fallback="Standard title, lease and comparable checks still apply." tone="default" />
             </div>
           </section>
         )}

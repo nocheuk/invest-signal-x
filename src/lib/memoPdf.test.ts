@@ -66,8 +66,11 @@ describe("memo PDF data", () => {
     expect(sections.summary).toContainEqual(["Price per sqft", "£116 / sq ft"]);
     expect(sections.summary).toContainEqual(["Data Confidence", "38/100 (low)"]);
     expect(sections.summary).toContainEqual(["Source", "Rightmove Commercial"]);
-    expect(sections.positiveDrivers).toEqual(["Guide price and floor area available"]);
-    expect(sections.risks).toEqual(expect.arrayContaining(["Needs review", "Tenant covenant unknown", "Passing rent missing"]));
+    expect(sections.investmentSummary).toContain("Telecom House, 35 Holdenhurst Road is a office opportunity in Bournemouth, BH8 8EJ");
+    expect(sections.opportunitySignals).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
+    expect(sections.riskSignals).toEqual(expect.arrayContaining(["Passing rent missing", "Tenant covenant unknown"]));
+    expect(sections.positiveDrivers).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
+    expect(sections.risks).toEqual(expect.arrayContaining(["Tenant covenant unknown", "Passing rent missing"]));
     expect(sections.missingData).toEqual(["Tenant covenant unknown", "Lease length/WAULT missing"]);
     expect(sections.sourceUrl).toBe("https://www.rightmove.co.uk/properties/174711599");
   });

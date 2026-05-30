@@ -3,10 +3,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Deal } from "@/lib/deals";
 import Dashboard from "@/pages/Dashboard";
 
 const dealsState = vi.hoisted(() => ({
-  deals: [],
+  deals: [] as Deal[],
 }));
 
 const savedSearchState = vi.hoisted(() => ({
@@ -98,6 +99,48 @@ vi.mock("@/hooks/useNationalScanStatus", async () => {
 vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: true,
 }));
+
+function dashboardDeal(overrides: Partial<Deal> = {}): Deal {
+  return {
+    id: "imp-live",
+    title: "Rightmove Bournemouth Office",
+    location: "Bournemouth, BH1",
+    region: "South West",
+    assetType: "Office",
+    source: "Private treaty",
+    guidePrice: 350000,
+    passingRent: 42000,
+    sqft: 30203,
+    grossYield: 12,
+    netInitialYield: 8,
+    reversionaryYield: 0,
+    wault: 0,
+    leaseLength: 0,
+    tenant: "Unknown",
+    covenantStrength: "Moderate",
+    tenantHealthScore: 50,
+    rentSustainability: "Market rent",
+    rentReview: "None",
+    pricePerSqft: 12,
+    planningUpsideScore: 40,
+    voidRiskScore: 40,
+    exitYieldSensitivity: "Moderate",
+    cashflowAfterDebt: 0,
+    returnOnEquity: 0,
+    redFlags: [],
+    mainRiskFlag: "Needs review",
+    score: 82,
+    rating: "green",
+    scoreBreakdown: { incomeQuality: 80, tenantSecurity: 80, marketPricing: 80, upside: 80, riskExit: 80 },
+    insights: { mispricing: "", couldGoWrong: "", askAgent: "", negotiation: "" },
+    thumbnail: "",
+    postedAt: "2026-05-20T00:00:00Z",
+    isImported: true,
+    importSourceName: "Rightmove Commercial",
+    needsReview: false,
+    ...overrides,
+  };
+}
 
 describe("Dashboard live location search", () => {
   beforeEach(() => {
@@ -277,6 +320,55 @@ describe("Dashboard live location search", () => {
         filters: expect.objectContaining({ locationQuery: "Poole", source: "All real deals" }),
       }));
     });
+  });
+
+  it("counts real green deals, filters when clicked, and clears the filter", () => {
+    dealsState.deals = [
+      dashboardDeal({
+        id: "ds-green-demo",
+        title: "Seed Green Demo",
+        isSeed: true,
+      }),
+      dashboardDeal({
+        id: "imp-green",
+        title: "Green Imported Deal",
+        location: "Bournemouth, BH1",
+        rating: "green",
+        score: 86,
+      }),
+      dashboardDeal({
+        id: "imp-red",
+        title: "Red Imported Deal",
+        location: "Bournemouth, BH1",
+        rating: "red",
+        score: 42,
+        netInitialYield: 0,
+      }),
+    ];
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByRole("button", { name: "Show 1 green deals from current filters" })).toBeInTheDocument();
+    expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
+    expect(screen.getByText("Red Imported Deal")).toBeInTheDocument();
+    expect(screen.queryByText("Seed Green Demo")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 green deals from current filters" }));
+
+    expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
+    expect(screen.queryByText("Red Imported Deal")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Green deals")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear green filter" }));
+
+    expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
+    expect(screen.getByText("Red Imported Deal")).toBeInTheDocument();
   });
 
   it("shows the latest real national scan status", () => {

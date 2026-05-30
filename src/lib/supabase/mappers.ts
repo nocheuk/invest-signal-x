@@ -1,4 +1,5 @@
 import type { Deal } from "@/lib/deals";
+import { buildDealAnalysis } from "@/lib/dealAnalysis";
 import { confidenceLevelForScore, scoreImportedDeal } from "@/lib/scoring";
 import type { Database } from "@/lib/supabase/types";
 
@@ -79,7 +80,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
   const finalRating = importedScore?.rating ?? ((row.rating || ratingFromScore(score)) as Deal["rating"]);
   const finalNeedsReview = importedScore?.needsReview ?? baseNeedsReview;
 
-  return {
+  const mapped: Deal = {
     id: row.id,
     title: row.title,
     location: row.location,
@@ -125,6 +126,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     thumbnail: thumbnailImageUrl ? "from-zinc-500/30 to-slate-700/20" : row.thumbnail || "from-zinc-500/30 to-slate-700/20",
     postedAt: row.posted_at,
   };
+  return { ...mapped, analysis: buildDealAnalysis(mapped) };
 }
 
 export function mapDealToInsert(deal: Deal) {
