@@ -12,6 +12,7 @@ const watchlistDb = vi.hoisted(() => ({
   insertedWatchlist: null as unknown,
   itemUpserts: [] as unknown[],
   itemDeletes: [] as unknown[],
+  returnEmptyItems: false,
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -52,7 +53,7 @@ vi.mock("@/lib/supabase/client", () => ({
           select: () => ({
             eq: (_column: string, userId: string) => ({
               order: () => ({
-                data: watchlistDb.items
+                data: (watchlistDb.returnEmptyItems ? [] : watchlistDb.items)
                   .filter((item) => item.user_id === userId)
                   .map((item) => ({
                     deal_id: item.deal_id,
@@ -65,7 +66,7 @@ vi.mock("@/lib/supabase/client", () => ({
               }),
             }),
           }),
-          upsert: async (
+          upsert: (
             payload: { watchlist_id: string; user_id: string; deal_id: string; status: string; notes: string },
             options: unknown
           ) => {
@@ -73,7 +74,20 @@ vi.mock("@/lib/supabase/client", () => ({
             const existing = watchlistDb.items.find((item) => item.user_id === payload.user_id && item.deal_id === payload.deal_id);
             if (existing) Object.assign(existing, payload);
             else watchlistDb.items.push(payload);
-            return { data: null, error: null };
+            return {
+              select: () => ({
+                single: async () => ({
+                  data: {
+                    deal_id: payload.deal_id,
+                    status: payload.status,
+                    notes: payload.notes,
+                    created_at: "2026-05-30T10:00:00Z",
+                    updated_at: "2026-05-30T10:01:00Z",
+                  },
+                  error: null,
+                }),
+              }),
+            };
           },
           delete: () => ({
             eq: (_column: string, userId: string) => ({
@@ -119,6 +133,7 @@ describe("WatchlistProvider Supabase pipeline persistence", () => {
     watchlistDb.insertedWatchlist = null;
     watchlistDb.itemUpserts = [];
     watchlistDb.itemDeletes = [];
+    watchlistDb.returnEmptyItems = false;
   });
 
   it("creates one pipeline item for the real authenticated user id", async () => {
@@ -178,6 +193,16 @@ describe("WatchlistProvider Supabase pipeline persistence", () => {
     await waitFor(() => expect(screen.getByText("Items:")).toBeInTheDocument());
     expect(watchlistDb.items).toHaveLength(0);
     expect(watchlistDb.itemDeletes).toEqual([{ userId: "real-user-id", dealId: "ds-001" }]);
+  });
+
+  it("keeps a just-saved item visible if a stale refetch briefly omits it", async () => {
+    watchlistDb.returnEmptyItems = true;
+    render(<Probe />, { wrapper });
+    screen.getByText("Save pipeline").click();
+
+    await waitFor(() => expect(screen.getByText("Items: ds-001")).toBeInTheDocument());
+    expect(screen.getByText("Status: Saved")).toBeInTheDocument();
+    expect(watchlistDb.itemDeletes).toEqual([]);
   });
 
   it("pipeline item persists after refresh from Supabase state", async () => {
