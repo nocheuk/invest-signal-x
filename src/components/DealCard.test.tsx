@@ -8,6 +8,8 @@ vi.mock("@/lib/watchlist", () => ({
   useWatchlist: () => ({
     isWatched: () => false,
     toggle: vi.fn(),
+    getPipelineStatus: () => undefined,
+    saveToPipeline: vi.fn(),
   }),
 }));
 
@@ -103,6 +105,7 @@ describe("DealCard", () => {
 
     expect(screen.getAllByText("Not available").length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText("Tenant not available")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save to Pipeline" })).toBeInTheDocument();
   });
 
   it("shows opportunity and risk signals from Deal Analysis V2", () => {

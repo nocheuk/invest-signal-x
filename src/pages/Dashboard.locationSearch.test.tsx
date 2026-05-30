@@ -33,6 +33,19 @@ const nationalScanState = vi.hoisted(() => ({
   isError: false,
 }));
 
+const watchlistState = vi.hoisted(() => ({
+  ids: [] as string[],
+  pipelineItems: {} as Record<string, { dealId: string; status: string; notes: string }>,
+  pipelineCounts: {
+    Saved: 0,
+    Reviewing: 0,
+    "Viewing Booked": 0,
+    "Offer Submitted": 0,
+    Passed: 0,
+    Purchased: 0,
+  },
+}));
+
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -62,7 +75,12 @@ vi.mock("@/hooks/useDeals", async () => {
 });
 
 vi.mock("@/lib/watchlist", () => ({
-  useWatchlist: () => ({ ids: [] }),
+  PIPELINE_STATUSES: ["Saved", "Reviewing", "Viewing Booked", "Offer Submitted", "Passed", "Purchased"],
+  useWatchlist: () => ({
+    ids: watchlistState.ids,
+    pipelineItems: watchlistState.pipelineItems,
+    pipelineCounts: watchlistState.pipelineCounts,
+  }),
 }));
 
 vi.mock("@/lib/strategy", async () => {
@@ -177,6 +195,16 @@ describe("Dashboard live location search", () => {
     };
     nationalScanState.isLoading = false;
     nationalScanState.isError = false;
+    watchlistState.ids = [];
+    watchlistState.pipelineItems = {};
+    watchlistState.pipelineCounts = {
+      Saved: 0,
+      Reviewing: 0,
+      "Viewing Booked": 0,
+      "Offer Submitted": 0,
+      Passed: 0,
+      Purchased: 0,
+    };
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => ({
@@ -334,7 +362,7 @@ describe("Dashboard live location search", () => {
     );
 
     fireEvent.change(screen.getByLabelText("Location filter"), { target: { value: "Poole" } });
-    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
       expect(savedSearchState.saveSearch).toHaveBeenCalledWith(expect.objectContaining({
@@ -450,6 +478,50 @@ describe("Dashboard live location search", () => {
 
     expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
     expect(screen.getByText("Red Imported Deal")).toBeInTheDocument();
+  });
+
+  it("shows pipeline counts and filters dashboard deals by pipeline status", () => {
+    dealsState.deals = [
+      dashboardDeal({ id: "imp-reviewing", title: "Reviewing Pipeline Deal", rating: "amber", score: 70 }),
+      dashboardDeal({ id: "imp-offer", title: "Offer Pipeline Deal", rating: "green", score: 88 }),
+      dashboardDeal({ id: "imp-unsaved", title: "Unsaved Deal", rating: "red", score: 41 }),
+    ];
+    watchlistState.ids = ["imp-reviewing", "imp-offer"];
+    watchlistState.pipelineItems = {
+      "imp-reviewing": { dealId: "imp-reviewing", status: "Reviewing", notes: "" },
+      "imp-offer": { dealId: "imp-offer", status: "Offer Submitted", notes: "" },
+    };
+    watchlistState.pipelineCounts = {
+      Saved: 0,
+      Reviewing: 1,
+      "Viewing Booked": 0,
+      "Offer Submitted": 1,
+      Passed: 0,
+      Purchased: 0,
+    };
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("My Pipeline")).toBeInTheDocument();
+    expect(screen.getByText("Reviewing: 1")).toBeInTheDocument();
+    expect(screen.getByText("Offer Submitted: 1")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reviewing: 1" }));
+
+    expect(screen.getByText("Reviewing Pipeline Deal")).toBeInTheDocument();
+    expect(screen.queryByText("Offer Pipeline Deal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unsaved Deal")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear pipeline filter" }));
+
+    expect(screen.getByText("Offer Pipeline Deal")).toBeInTheDocument();
+    expect(screen.getByText("Unsaved Deal")).toBeInTheDocument();
   });
 
   it("shows the latest real national scan status", () => {

@@ -78,8 +78,8 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["watchlists"]["Insert"]>;
       };
       watchlist_items: {
-        Row: { id: string; watchlist_id: string; deal_id: string; created_at: string };
-        Insert: { id?: string; watchlist_id: string; deal_id: string };
+        Row: { id: string; watchlist_id: string; user_id: string; deal_id: string; status: string; notes: string; created_at: string; updated_at: string };
+        Insert: { id?: string; watchlist_id: string; user_id: string; deal_id: string; status?: string; notes?: string };
         Update: Partial<Database["public"]["Tables"]["watchlist_items"]["Insert"]>;
       };
       watchlist_notes: {

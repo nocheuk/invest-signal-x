@@ -7,9 +7,10 @@ import { useDealSourceLinks } from "@/hooks/useDealSourceLinks";
 import { ScorePill, RatingBadge } from "@/components/RatingBadge";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { Hint } from "@/components/Hint";
-import { useWatchlist } from "@/lib/watchlist";
+import { PIPELINE_STATUSES, type PipelineStatus, useWatchlist } from "@/lib/watchlist";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Bookmark, MapPin, Building2, Sparkles, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine, Map as MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
@@ -28,7 +29,7 @@ export default function DealDetail() {
   const navigate = useNavigate();
   const { deal, isLoading, isError } = useDeal(id);
   const sourceLinks = useDealSourceLinks(deal?.id);
-  const { isWatched, toggle, notes, setNote } = useWatchlist();
+  const { isWatched, toggle, notes, setNote, getPipelineStatus, setStatus, saveToPipeline } = useWatchlist();
   const [memoStatus, setMemoStatus] = useState<"idle" | "loading" | "error">("idle");
 
   if (isLoading) {
@@ -52,6 +53,7 @@ export default function DealDetail() {
 
   const watched = isWatched(deal.id);
   const note = notes[deal.id] || "";
+  const pipelineStatus = getPipelineStatus(deal.id) ?? "Saved";
   const dealAnalysis = getDealAnalysis(deal);
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
@@ -108,7 +110,7 @@ export default function DealDetail() {
             <div className="mt-6 flex flex-wrap gap-2">
               <Button onClick={() => void toggle(deal.id)} variant={watched ? "default" : "outline"} className={cn("gap-2", watched && "bg-primary text-primary-foreground hover:bg-primary/90")}>
                 <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
-                {watched ? "Watching" : "Add to watchlist"}
+                {watched ? "In pipeline" : "Save to Pipeline"}
               </Button>
               <Button onClick={() => void handleDownloadMemo()} disabled={memoStatus === "loading"} variant="outline" className="gap-2">
                 <FileText className="h-4 w-4" />{memoStatus === "loading" ? "Generating memo..." : "Download memo (PDF)"}
@@ -318,16 +320,35 @@ export default function DealDetail() {
           </div>
         </div>
 
-        {/* Notes */}
+        {/* Pipeline */}
         <div className="ds-card p-6 space-y-3">
-          <h2 className="font-display text-2xl">Your notes</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-2xl">Pipeline</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Track this opportunity privately from first save through offer or purchase.</p>
+            </div>
+            <Select
+              value={pipelineStatus}
+              onValueChange={(value) => {
+                const nextStatus = value as PipelineStatus;
+                void (watched ? setStatus(deal.id, nextStatus) : saveToPipeline(deal.id, nextStatus));
+              }}
+            >
+              <SelectTrigger className="h-9 w-[190px] bg-surface-2 border-border/60 text-xs" aria-label="Pipeline status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PIPELINE_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <Textarea
             value={note}
             onChange={(e) => void setNote(deal.id, e.target.value)}
             placeholder="Add a note — pricing target, viewing date, follow-up actions…"
             className="bg-surface-2 border-border/60 min-h-32 resize-none"
           />
-          <div className="text-[11px] text-muted-foreground">Notes auto-save to your watchlist.</div>
+          <div className="text-[11px] text-muted-foreground">Notes auto-save to your private pipeline item.</div>
         </div>
       </div>
     </AppLayout>

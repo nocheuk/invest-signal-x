@@ -457,7 +457,20 @@ Selector output maps into the normalized import row fields:
 - per-location/source status and result counters
 - scan metadata used to rotate the England priority location queue
 
+`20260530130000_watchlist_pipeline_v1.sql` upgrades saved deals into a user-private pipeline:
+
+- adds `user_id`, `status`, `notes`, and `updated_at` to `watchlist_items`
+- backfills item owners from `watchlists` and notes from `watchlist_notes`
+- enforces one pipeline item per user/deal with `watchlist_items_user_deal_unique`
+- restricts item reads/writes with an owner-only RLS policy
+
 All public tables have RLS enabled. User-owned tables are restricted to the authenticated owner. Deal/source/comparable reads are public where they support the product browsing experience; write access is intentionally not granted to `anon`.
+
+## Watchlist Pipeline
+
+Deal cards and detail pages now save deals into "My Pipeline". Each authenticated user gets one private `watchlist_items` row per deal, with a stage of `Saved`, `Reviewing`, `Viewing Booked`, `Offer Submitted`, `Passed`, or `Purchased`. Pipeline notes are stored on the same row and are visible only to that user.
+
+The dashboard shows pipeline counts, active-opportunity analytics, and a pipeline-stage filter that combines with source, confidence, rating, location, and strategy sorting.
 
 ## Auth UX
 

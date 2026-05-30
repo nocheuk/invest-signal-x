@@ -10,10 +10,11 @@ import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { cn } from "@/lib/utils";
 
 export function DealRow({ deal }: { deal: Deal }) {
-  const { isWatched, toggle } = useWatchlist();
+  const { isWatched, toggle, getPipelineStatus } = useWatchlist();
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
   const watched = isWatched(deal.id);
+  const pipelineStatus = getPipelineStatus(deal.id);
   const sourceLabel = getSourceLabel(deal);
 
   return (
@@ -52,7 +53,7 @@ export function DealRow({ deal }: { deal: Deal }) {
       <div className="hidden md:block col-span-1 font-mono tabular text-right">{deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "Not available"}</div>
       <div className="hidden md:block col-span-1 font-mono tabular text-right">{deal.wault ? `${deal.wault.toFixed(1)}y` : "Not available"}</div>
       <div className="hidden lg:block col-span-2 text-xs text-muted-foreground truncate">
-        {deal.mainRiskFlag}
+        {pipelineStatus ? `Pipeline: ${pipelineStatus}` : deal.mainRiskFlag}
       </div>
 
       <div className="col-span-12 sm:col-span-1 flex justify-end">
