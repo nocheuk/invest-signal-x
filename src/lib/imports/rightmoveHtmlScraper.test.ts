@@ -3,11 +3,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { dedupeImportRows } from "@/lib/imports/dealImport";
 import {
+  extractRightmovePaginationUrls,
   filterRightmoveAcquisitionRows,
   parseRightmoveCommercialListings,
   RIGHTMOVE_PARSE_ERROR,
   scrapeRightmoveCommercialHtmlToImportRows,
 } from "../../../scripts/lib/rightmoveCommercialScraper.mjs";
+import { dedupeRightmoveRows } from "../../../scripts/scrape-rightmove.mjs";
 
 const fixture = fs.readFileSync(path.resolve("test/fixtures/rightmove-commercial-search.html"), "utf8");
 const pageUrl = "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html";
@@ -93,6 +95,62 @@ describe("custom Rightmove Commercial HTML scraper", () => {
     expect(listings.map((listing) => listing.propertyId)).toEqual(["148450001", "148450002", "148450003"]);
     expect(deduped.uniqueRows).toHaveLength(3);
     expect(deduped.duplicateRows).toHaveLength(0);
+  });
+
+  it("detects Rightmove pagination URLs without duplicating the current page", () => {
+    const urls = extractRightmovePaginationUrls({
+      pageUrl,
+      maxPages: 3,
+      html: pageWithCard(`
+        <article data-testid="property-card">
+          <a href="/properties/148450011#/?channel=COM_BUY">
+            <h2>Retail lot</h2>
+            <address>Bournemouth, BH1</address>
+            <div data-testid="property-price">Guide Price \u00a3350,000</div>
+          </a>
+        </article>
+        <nav>
+          <a href="/commercial-property-for-sale/Bournemouth.html">1</a>
+          <a href="/commercial-property-for-sale/Bournemouth.html?index=24" aria-label="Page 2">2</a>
+          <a href="/commercial-property-for-sale/Bournemouth.html?index=48" aria-label="Next page">Next</a>
+          <a href="/properties/148450011#/?channel=COM_BUY">Property link</a>
+        </nav>
+      `),
+    });
+
+    expect(urls).toEqual([
+      "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html?index=24",
+      "https://www.rightmove.co.uk/commercial-property-for-sale/Bournemouth.html?index=48",
+    ]);
+  });
+
+  it("dedupes listings repeated across paginated Rightmove pages before import", () => {
+    const firstPage = scrapeRightmoveCommercialHtmlToImportRows({
+      pageUrl,
+      html: pageWithCard(`
+        <article data-testid="property-card">
+          <a href="/properties/148450012#/?channel=COM_BUY">
+            <h2>Bournemouth shop</h2>
+            <address>Bournemouth, BH1</address>
+            <div data-testid="property-price">Guide Price \u00a3350,000</div>
+          </a>
+        </article>
+      `),
+    });
+    const secondPage = scrapeRightmoveCommercialHtmlToImportRows({
+      pageUrl: `${pageUrl}?index=24`,
+      html: pageWithCard(`
+        <article data-testid="property-card">
+          <a href="/properties/148450012#/?channel=COM_BUY">
+            <h2>Bournemouth shop duplicate</h2>
+            <address>Bournemouth, BH1</address>
+            <div data-testid="property-price">Guide Price \u00a3350,000</div>
+          </a>
+        </article>
+      `),
+    });
+
+    expect(dedupeRightmoveRows([...firstPage, ...secondPage])).toHaveLength(1);
   });
 
   it("fails gracefully for blocked or unsupported HTML", () => {

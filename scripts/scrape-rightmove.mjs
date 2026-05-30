@@ -3,31 +3,44 @@ import { runDealImport } from "./lib/importRunner.mjs";
 import {
   fetchRightmoveCommercialHtml,
   filterRightmoveAcquisitionRows,
+  extractRightmovePaginationUrls,
   RIGHTMOVE_CUSTOM_SCRAPER_VERSION,
   scrapeRightmoveCommercialHtmlToImportRows,
 } from "./lib/rightmoveCommercialScraper.mjs";
+
+const DEFAULT_MAX_PAGES = 2;
 
 export async function runRightmoveCommercialImport({
   searchUrl,
   sourceName = "Rightmove Commercial",
   dryRun = false,
   sourceConfig = {},
+  maxPages = DEFAULT_MAX_PAGES,
 }) {
   if (!searchUrl) throw new Error("Rightmove search URL is required.");
 
   console.log(`mode: ${dryRun ? "dry-run" : "live"}`);
-  const html = await fetchRightmoveCommercialHtml(searchUrl);
-  const rows = scrapeRightmoveCommercialHtmlToImportRows({ html, pageUrl: searchUrl, sourceName });
-  const { importRows, skipped } = filterRightmoveAcquisitionRows(rows);
+  const firstHtml = await fetchRightmoveCommercialHtml(searchUrl);
+  const pageUrls = [
+    searchUrl,
+    ...extractRightmovePaginationUrls({ html: firstHtml, pageUrl: searchUrl, maxPages }),
+  ];
+  const rows = [];
+  for (const [index, pageUrl] of pageUrls.entries()) {
+    const html = index === 0 ? firstHtml : await fetchRightmoveCommercialHtml(pageUrl);
+    rows.push(...scrapeRightmoveCommercialHtmlToImportRows({ html, pageUrl, sourceName }));
+  }
+  const uniqueRows = dedupeRightmoveRows(rows);
+  const { importRows, skipped } = filterRightmoveAcquisitionRows(uniqueRows);
   reportRightmoveSkips(skipped);
-  if (dryRun) reportRightmoveRowContext(rows);
+  if (dryRun) reportRightmoveRowContext(uniqueRows);
 
   if (importRows.length === 0) {
     const result = {
       source: sourceName,
       dryRun,
       total: rows.length,
-      unique: 0,
+      unique: uniqueRows.length,
       inserted: 0,
       existing: 0,
       processed: 0,
@@ -47,9 +60,11 @@ export async function runRightmoveCommercialImport({
     sourceConfig: {
       adapter: RIGHTMOVE_CUSTOM_SCRAPER_VERSION,
       search_url: searchUrl,
+      paginated_search_urls: pageUrls,
       request: {
         concurrency: 1,
         timeout_ms: 15000,
+        max_pages: maxPages,
       },
       ...sourceConfig,
     },
@@ -57,10 +72,22 @@ export async function runRightmoveCommercialImport({
   return {
     ...result,
     searchUrl,
+    pageUrls,
     total: rows.length,
     failed: (result.failed ?? 0) + skipped.failed_missing_price,
     ...skipped,
   };
+}
+
+export function dedupeRightmoveRows(rows) {
+  const seen = new Set();
+  return rows.filter((row) => {
+    const key = row.normalized.sourceUrl || row.normalized.externalId || row.dedupeKeys?.sourceUrl || row.dedupeKeys?.dedupeKey;
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function reportRightmoveSkips(skipped) {

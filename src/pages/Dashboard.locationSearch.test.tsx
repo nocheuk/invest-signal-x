@@ -28,6 +28,11 @@ const nationalScanState = vi.hoisted(() => ({
     locationQuery: "Bournemouth",
     startedAt: "2026-05-28T04:59:00Z",
     finishedAt: "2026-05-28T05:03:00Z",
+    locationsScanned: ["London", "Manchester", "Birmingham", "Leeds"],
+    totalConfiguredLocations: 160,
+    nextIndex: 4,
+    estimatedFullCycleDays: 40,
+    scanCycleProgress: 3,
   },
   isLoading: false,
   isError: false,
@@ -192,6 +197,11 @@ describe("Dashboard live location search", () => {
       locationQuery: "Bournemouth",
       startedAt: "2026-05-28T04:59:00Z",
       finishedAt: "2026-05-28T05:03:00Z",
+      locationsScanned: ["London", "Manchester", "Birmingham", "Leeds"],
+      totalConfiguredLocations: 160,
+      nextIndex: 4,
+      estimatedFullCycleDays: 40,
+      scanCycleProgress: 3,
     };
     nationalScanState.isLoading = false;
     nationalScanState.isError = false;
@@ -537,6 +547,9 @@ describe("Dashboard live location search", () => {
     expect(screen.getByText(/Last national scan:/)).toBeInTheDocument();
     expect(screen.getByText("Next scheduled scan: daily at 6am UK time")).toBeInTheDocument();
     expect(screen.getByText("Sources: Rightmove Commercial + Acuitus")).toBeInTheDocument();
+    expect(screen.getByText("Last run locations: London, Manchester, Birmingham, Leeds")).toBeInTheDocument();
+    expect(screen.getByText(/Queue: 160 locations/)).toBeInTheDocument();
+    expect(screen.getByText(/Cycle progress: 3%/)).toBeInTheDocument();
   });
 
   it("shows a no-run state when no completed national scan exists", () => {

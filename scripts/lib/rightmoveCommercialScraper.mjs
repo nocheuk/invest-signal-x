@@ -62,6 +62,27 @@ export function scrapeRightmoveCommercialHtmlToImportRows({ html, pageUrl, sourc
   });
 }
 
+export function extractRightmovePaginationUrls({ html, pageUrl, maxPages = 2 } = {}) {
+  if (maxPages <= 1) return [];
+  assertParseableHtml(html);
+  const $ = load(html);
+  const urls = [];
+  const seen = new Set([normalizeRightmoveUrl(pageUrl, pageUrl)]);
+
+  $('a[href]').each((_, anchor) => {
+    const href = $(anchor).attr("href");
+    const text = clean($(anchor).text());
+    const label = clean($(anchor).attr("aria-label"));
+    const url = normalizeRightmoveUrl(href, pageUrl);
+    if (!url || seen.has(url) || !isRightmoveSearchPageUrl(url)) return;
+    if (!looksLikePaginationLink({ href, text, label, url })) return;
+    seen.add(url);
+    urls.push(url);
+  });
+
+  return urls.slice(0, Math.max(maxPages - 1, 0));
+}
+
 export function parseRightmoveCommercialListings({ html, pageUrl, sourceName = "Rightmove Commercial" }) {
   assertParseableHtml(html);
   const $ = load(html);
@@ -345,6 +366,26 @@ function normalizeRightmoveUrl(url, pageUrl) {
   } catch {
     return undefined;
   }
+}
+
+function isRightmoveSearchPageUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.endsWith("rightmove.co.uk") && parsed.pathname.includes("/commercial-property-for-sale/");
+  } catch {
+    return false;
+  }
+}
+
+function looksLikePaginationLink({ href = "", text = "", label = "", url = "" }) {
+  const haystack = `${href} ${text} ${label} ${url}`.toLowerCase();
+  return (
+    /(?:\?|&)index=\d+/.test(haystack) ||
+    /(?:\?|&)page=\d+/.test(haystack) ||
+    /\/page-\d+/.test(haystack) ||
+    /\bnext\b/.test(haystack) ||
+    /\bpage\s+\d+\b/.test(haystack)
+  );
 }
 
 function extractPropertyId(url = "") {

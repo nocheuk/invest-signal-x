@@ -259,15 +259,27 @@ Manual import tools under `/admin/import` remain admin-only.
 
 ### Scheduled National England Scan
 
-DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a priority England location queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus is included once per scheduled run from its main listings page.
+DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus is included once per scheduled run from its main listings page.
 
-Priority locations live in `scripts/lib/nationalScan.mjs`:
+The queue lives in `scripts/lib/englandLocationQueue.mjs` and includes:
 
-```text
-London, Manchester, Birmingham, Leeds, Liverpool, Bristol, Southampton, Bournemouth, Poole, Sheffield, Nottingham, Leicester, Newcastle, Portsmouth, Brighton, Reading, Oxford, Cambridge, Milton Keynes, Dorset, Hampshire, Surrey, Kent, Essex, Sussex
-```
+- all official English cities
+- major commercial towns such as Bournemouth, Poole, Reading, Warrington, Watford and Stockport
+- selected regional/county search areas such as Dorset, Hampshire, Surrey, Kent, Essex and Sussex
 
-The default batch size is 4 Rightmove locations per run. The scheduler stores the next queue index in `national_scan_runs.metadata.next_index`, so each run continues from the previous position and wraps around after Sussex. Duplicate source URLs refresh existing deals through the import pipeline instead of creating duplicate deals.
+The default batch size is 4 Rightmove locations per run. The scheduler stores the next queue index in `national_scan_runs.metadata.next_index`, so each run continues from the previous position and wraps around after the final queued location. Duplicate source URLs refresh existing deals through the import pipeline instead of creating duplicate deals.
+
+Each scan run stores coverage diagnostics in `national_scan_runs.metadata`:
+
+- total configured locations
+- locations scanned in the batch
+- next queue index
+- estimated full-cycle duration
+- scan cycle progress
+
+On Vercel Hobby the cron is daily, so it can take multiple days to rotate through every city/town in the queue. With the current 160-location queue and a 4-location batch, one full cycle takes about 40 days. A future Pro plan can scan more often and/or use a larger safe batch size.
+
+Rightmove pagination is supported conservatively when the first search page exposes pagination links. The scraper follows a small number of discovered search-result pages, keeps requests serial, and deduplicates repeated source URLs before writing through the import pipeline.
 
 Vercel Cron is configured in `vercel.json`:
 

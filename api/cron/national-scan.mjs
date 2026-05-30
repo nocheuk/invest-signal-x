@@ -24,6 +24,7 @@ export default async function handler(req, res) {
       at: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
       locations: result.locations,
+      diagnostics: result.diagnostics,
       totals: result.totals,
     }));
     return res.status(200).json(result);

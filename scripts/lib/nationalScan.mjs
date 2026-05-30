@@ -7,36 +7,11 @@ import {
   RIGHTMOVE_COMMERCIAL_SOURCE_NAME,
   runRightmoveLocationSearch,
 } from "./rightmoveLocationSearch.mjs";
+import { ENGLAND_NATIONAL_SCAN_LOCATIONS } from "./englandLocationQueue.mjs";
 
 export const NATIONAL_SCAN_TYPE = "england_national_scan";
 export const NATIONAL_SCAN_BATCH_SIZE = 4;
-export const ENGLAND_PRIORITY_LOCATIONS = [
-  "London",
-  "Manchester",
-  "Birmingham",
-  "Leeds",
-  "Liverpool",
-  "Bristol",
-  "Southampton",
-  "Bournemouth",
-  "Poole",
-  "Sheffield",
-  "Nottingham",
-  "Leicester",
-  "Newcastle",
-  "Portsmouth",
-  "Brighton",
-  "Reading",
-  "Oxford",
-  "Cambridge",
-  "Milton Keynes",
-  "Dorset",
-  "Hampshire",
-  "Surrey",
-  "Kent",
-  "Essex",
-  "Sussex",
-];
+export const ENGLAND_PRIORITY_LOCATIONS = ENGLAND_NATIONAL_SCAN_LOCATIONS;
 
 export function verifyCronSecret({ authorizationHeader = "", querySecret = "", env = process.env } = {}) {
   const expected = env.CRON_SECRET;
@@ -61,6 +36,24 @@ export function selectNationalScanBatch({ lastNextIndex = 0, batchSize = NATIONA
   };
 }
 
+export function buildNationalScanDiagnostics({ batch, totalLocations, batchSize = NATIONAL_SCAN_BATCH_SIZE, runsPerDay = 1 } = {}) {
+  const scannedCount = batch?.locations?.length ?? 0;
+  const safeTotal = Math.max(Number(totalLocations) || 0, 0);
+  const safeBatchSize = Math.max(Number(batchSize) || scannedCount || 1, 1);
+  const runsForFullCycle = safeTotal > 0 ? Math.ceil(safeTotal / safeBatchSize) : 0;
+  return {
+    totalConfiguredLocations: safeTotal,
+    locationsScanned: batch?.locations ?? [],
+    locationsScannedCount: scannedCount,
+    startIndex: batch?.startIndex ?? 0,
+    nextIndex: batch?.nextIndex ?? 0,
+    batchSize: safeBatchSize,
+    runsForFullCycle,
+    estimatedFullCycleDays: runsPerDay > 0 ? Math.ceil(runsForFullCycle / runsPerDay) : runsForFullCycle,
+    scanCycleProgress: safeTotal > 0 ? Math.round(((batch?.nextIndex ?? 0) / safeTotal) * 100) : 0,
+  };
+}
+
 export async function runNationalScan({
   supabase,
   dryRun = false,
@@ -75,8 +68,20 @@ export async function runNationalScan({
 
   const lastNextIndex = dryRun ? 0 : await loadLastNextIndex({ supabase });
   const batch = selectNationalScanBatch({ lastNextIndex, batchSize, locations });
+  const diagnostics = buildNationalScanDiagnostics({ batch, totalLocations: locations.length, batchSize, runsPerDay: 1 });
   const batchId = crypto.randomUUID();
   const results = [];
+  const sharedMetadata = {
+    batch_start_index: batch.startIndex,
+    next_index: batch.nextIndex,
+    scheduled_at: now.toISOString(),
+    total_configured_locations: diagnostics.totalConfiguredLocations,
+    locations_scanned: diagnostics.locationsScanned,
+    locations_scanned_count: diagnostics.locationsScannedCount,
+    scan_batch_size: diagnostics.batchSize,
+    estimated_full_cycle_days: diagnostics.estimatedFullCycleDays,
+    scan_cycle_progress: diagnostics.scanCycleProgress,
+  };
 
   for (const locationQuery of batch.locations) {
     const result = await runAndRecordScan({
@@ -86,7 +91,7 @@ export async function runNationalScan({
       scanType: NATIONAL_SCAN_TYPE,
       locationQuery,
       sourceName: RIGHTMOVE_COMMERCIAL_SOURCE_NAME,
-      metadata: { batch_start_index: batch.startIndex, next_index: batch.nextIndex, scheduled_at: now.toISOString() },
+      metadata: sharedMetadata,
       run: () => adapters.rightmove({ locationQuery, dryRun }),
     });
     results.push(result);
@@ -100,7 +105,7 @@ export async function runNationalScan({
       scanType: NATIONAL_SCAN_TYPE,
       locationQuery: "England",
       sourceName: ACUITUS_SOURCE_NAME,
-      metadata: { batch_start_index: batch.startIndex, next_index: batch.nextIndex, scheduled_at: now.toISOString(), national_source: true },
+      metadata: { ...sharedMetadata, national_source: true },
       run: () => adapters.acuitus({ dryRun }),
     });
     results.push(result);
@@ -117,6 +122,7 @@ export async function runNationalScan({
     locations: batch.locations,
     startIndex: batch.startIndex,
     nextIndex: batch.nextIndex,
+    diagnostics,
     sources: results,
     totals: aggregateNationalResults(results),
     alerts: alertResult,
