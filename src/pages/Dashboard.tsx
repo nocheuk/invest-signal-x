@@ -53,15 +53,19 @@ export default function Dashboard() {
   const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence">("score");
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
 
+  const currentFilterScope = useMemo(() => {
+    return filterAndSortDeals(deals, { region, asset, source, rating: "all", confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
+  }, [deals, region, asset, source, minYield, maxPrice, confidence, search, locationQuery, sort, weights]);
+
   const kpis = useMemo(() => {
-    const greens = deals.filter(d => d.rating === "green").length;
-    const yields = deals.filter(d => d.netInitialYield > 0).map(d => d.netInitialYield);
+    const greens = currentFilterScope.filter(d => d.rating === "green").length;
+    const yields = currentFilterScope.filter(d => d.netInitialYield > 0).map(d => d.netInitialYield);
     const avg = yields.reduce((a, b) => a + b, 0) / yields.length;
-    const top = [...deals].sort((a, b) => b.score - a.score)[0];
-    const withPrice = deals.filter((deal) => deal.guidePrice > 0).length;
-    const needsReviewCount = deals.filter((deal) => deal.needsReview).length;
+    const top = [...currentFilterScope].sort((a, b) => b.score - a.score)[0];
+    const withPrice = currentFilterScope.filter((deal) => deal.guidePrice > 0).length;
+    const needsReviewCount = currentFilterScope.filter((deal) => deal.needsReview).length;
     return {
-      total: deals.length,
+      total: currentFilterScope.length,
       withPrice,
       greens,
       avgYield: Number.isFinite(avg) ? avg : 0,
@@ -69,7 +73,7 @@ export default function Dashboard() {
       watched: ids.length,
       needsReviewCount,
     };
-  }, [deals, ids.length]);
+  }, [currentFilterScope, ids.length]);
 
   const filtered = useMemo(() => {
     return filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
@@ -136,7 +140,16 @@ export default function Dashboard() {
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <Kpi label="Live deals loaded" value={kpis.total.toLocaleString()} icon={Activity} accent="text-foreground" sub={`${kpis.withPrice} with guide price`} />
-          <Kpi label="Green deals" value={kpis.greens.toString()} icon={Target} accent="text-signal-green" sub="from current data" />
+          <Kpi
+            label="Green deals"
+            value={kpis.greens.toString()}
+            icon={Target}
+            accent="text-signal-green"
+            sub="from current"
+            onClick={() => setRating("green")}
+            active={rating === "green"}
+            ariaLabel={`Show ${kpis.greens} green deals from current filters`}
+          />
           <Kpi label="Average yield (NIY)" value={formatPct(kpis.avgYield, 2)} icon={TrendingUp} accent="text-foreground" sub="net initial" />
           <Kpi label="Highest score" value={kpis.top.toString()} icon={Sparkles} accent="text-primary" sub="current data" />
           <Kpi label="Watchlisted deals" value={kpis.watched.toString()} icon={Bookmark} accent="text-foreground" sub={`${kpis.needsReviewCount} need review`} />
@@ -303,6 +316,19 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {rating === "green" && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-md border border-signal-green/40 bg-signal-green/10 px-2.5 py-1 text-signal-green">Green deals</span>
+              <button
+                type="button"
+                onClick={() => setRating("all")}
+                className="rounded-md border border-border/60 bg-surface-2 px-2.5 py-1 text-muted-foreground hover:text-foreground"
+              >
+                Clear green filter
+              </button>
+            </div>
+          )}
+
           {savedSearches.savedSearches.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-muted-foreground">Saved searches</span>
@@ -402,15 +428,56 @@ function formatEnvDiagnostics(env?: Record<string, boolean>) {
   return Object.entries(env).map(([key, value]) => `${key}=${value ? "set" : "missing"}`).join(", ");
 }
 
-function Kpi({ label, value, sub, icon: Icon, accent }: { label: string; value: string; sub: string; icon: React.ComponentType<{ className?: string }>; accent: string }) {
-  return (
-    <div className="ds-card p-4 space-y-2">
+function Kpi({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  accent,
+  onClick,
+  active,
+  ariaLabel,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  onClick?: () => void;
+  active?: boolean;
+  ariaLabel?: string;
+}) {
+  const content = (
+    <>
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</span>
         <Icon className={cn("h-3.5 w-3.5 text-muted-foreground")} />
       </div>
       <div className={cn("font-mono text-2xl font-semibold tabular", accent)}>{value}</div>
       <div className="text-[11px] text-muted-foreground">{sub}</div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={ariaLabel ?? label}
+        aria-pressed={active}
+        className={cn(
+          "ds-card p-4 space-y-2 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          active && "border-signal-green/50 bg-signal-green/10"
+        )}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="ds-card p-4 space-y-2">
+      {content}
     </div>
   );
 }

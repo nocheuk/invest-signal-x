@@ -1,6 +1,7 @@
 import type { Deal } from "@/lib/deals";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { sourceLabel } from "@/lib/dashboardFilters";
+import { getDealAnalysis } from "@/lib/dealAnalysis";
 
 type JsPdfDocument = {
   setProperties: (properties: Record<string, string>) => void;
@@ -43,6 +44,7 @@ export function buildMemoFilename(title: string) {
 
 export function buildMemoSections(deal: Deal) {
   const reasons = deal.scoreReasons;
+  const analysis = getDealAnalysis(deal);
   return {
     summary: [
       ["Location", deal.location],
@@ -55,8 +57,11 @@ export function buildMemoSections(deal: Deal) {
       ["DealSignal Score", `${deal.score}/100`],
       ["Data Confidence", deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100 (${deal.confidenceLevel ?? "unknown"})` : "Not available"],
     ],
-    positiveDrivers: reasons?.positiveDrivers?.length ? reasons.positiveDrivers : ["No positive drivers available from imported data yet."],
-    risks: [
+    investmentSummary: analysis.investmentSummary,
+    opportunitySignals: analysis.opportunitySignals.length ? analysis.opportunitySignals : ["No opportunity signal available from imported data yet."],
+    riskSignals: analysis.riskSignals.length ? analysis.riskSignals : ["No specific risk signal recorded yet."],
+    positiveDrivers: analysis.opportunitySignals.length ? analysis.opportunitySignals : ["No positive drivers available from imported data yet."],
+    risks: analysis.riskSignals.length ? analysis.riskSignals : [
       deal.mainRiskFlag || "Needs review",
       ...(deal.redFlags ?? []),
       ...(reasons?.negativeDrivers ?? []),
@@ -117,8 +122,11 @@ function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date
 
   y = writeKeyValueGrid(doc, sections.summary, margin, y, page.width - margin * 2);
   y += 6;
-  y = writeListSection(doc, "Positive drivers", sections.positiveDrivers, margin, y, page);
-  y = writeListSection(doc, "Risks and warnings", sections.risks.length ? sections.risks : ["No risks recorded yet."], margin, y, page);
+  y = ensureSpace(doc, y, 30, page, margin);
+  sectionTitle(doc, "Investment summary", margin, y);
+  y = writeWrapped(doc, sections.investmentSummary, margin, y + 7, page.width - margin * 2, 4.8) + 4;
+  y = writeListSection(doc, "Opportunity signals", sections.opportunitySignals, margin, y, page);
+  y = writeListSection(doc, "Risk signals", sections.riskSignals, margin, y, page);
   y = writeListSection(doc, "Missing data / needs review", sections.missingData, margin, y, page);
   y = writeListSection(doc, "Verify before relying", sections.verify, margin, y, page);
 

@@ -8,6 +8,7 @@ import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore, matchReasons } from "@/lib/strategy";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
+import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { cn } from "@/lib/utils";
 
 export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: "default" | "feature" }) {
@@ -15,11 +16,11 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
   const reasons = matchReasons(deal, weights);
+  const analysis = getDealAnalysis(deal);
   const watched = isWatched(deal.id);
   const sourceLabel = getSourceLabel(deal);
-  const positiveDrivers = deal.scoreReasons?.positiveDrivers ?? [];
-  const missingWarnings = deal.scoreReasons?.missingDataWarnings ?? [];
-  const cardReasons = positiveDrivers.length > 0 ? positiveDrivers.slice(0, 2) : reasons;
+  const cardReasons = analysis.opportunitySignals.length > 0 ? analysis.opportunitySignals.slice(0, 2) : reasons;
+  const riskSignals = analysis.riskSignals.slice(0, 2);
   const [imageAvailable, setImageAvailable] = useState(Boolean(deal.imageUrl));
   const tenantLabel = deal.tenant && deal.tenant !== "Unknown" ? deal.tenant : "Tenant not available";
 
@@ -107,9 +108,9 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
           </ul>
         )}
 
-        {missingWarnings.length > 0 && (
+        {riskSignals.length > 0 && (
           <div className="text-[11px] text-signal-amber">
-            Missing: {missingWarnings.slice(0, 2).join(", ")}
+            Risks: {riskSignals.join(", ")}
           </div>
         )}
 

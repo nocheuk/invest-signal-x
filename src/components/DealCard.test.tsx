@@ -104,4 +104,22 @@ describe("DealCard", () => {
     expect(screen.getAllByText("Not available").length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText("Tenant not available")).toBeInTheDocument();
   });
+
+  it("shows opportunity and risk signals from Deal Analysis V2", () => {
+    renderCard(deal({
+      passingRent: 90000,
+      netInitialYield: 9,
+      grossYield: 9,
+      pricePerSqft: 100,
+      scoreReasons: {
+        positiveDrivers: ["Yield above benchmark"],
+        negativeDrivers: [],
+        missingDataWarnings: ["Lease information missing"],
+        verifyBeforeTrusting: [],
+      },
+    }));
+
+    expect(screen.getByText("Yield above benchmark")).toBeInTheDocument();
+    expect(screen.getByText(/Lease information missing/)).toBeInTheDocument();
+  });
 });

@@ -36,6 +36,11 @@ export interface Deal {
     missingDataWarnings: string[];
     verifyBeforeTrusting: string[];
   };
+  analysis?: {
+    opportunitySignals: string[];
+    riskSignals: string[];
+    investmentSummary: string;
+  };
   guidePrice: number; // £
   passingRent: number; // £ pa
   sqft: number;
