@@ -10,11 +10,12 @@ import { useDeals } from "@/hooks/useDeals";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavedSearches, type SavedSearchFilters } from "@/hooks/useSavedSearches";
+import { useSavedAlerts, type SavedAlert, type SaveAlertInput } from "@/hooks/useSavedAlerts";
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
-import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save } from "lucide-react";
+import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save, Bell, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +23,7 @@ import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
 import { ALL_REAL_DEALS_FILTER, buildSourceOptions, DEMO_SOURCE_FILTER, filterAndSortDeals, isSeedDeal } from "@/lib/dashboardFilters";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { defaultAlertName } from "@/lib/alerts";
 
 const EMPTY_DEALS = [];
 
@@ -32,6 +34,7 @@ export default function Dashboard() {
   const auth = useAuth();
   const profile = useProfile();
   const savedSearches = useSavedSearches();
+  const savedAlerts = useSavedAlerts();
   const locationImport = useLocationImport();
   const nationalScanStatus = useNationalScanStatus();
   const [searchParams] = useSearchParams();
@@ -52,6 +55,8 @@ export default function Dashboard() {
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
   const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence">("score");
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
+  const [editingAlertId, setEditingAlertId] = useState<string | null>(null);
+  const [editingAlert, setEditingAlert] = useState<SaveAlertInput | null>(null);
 
   const currentFilterScope = useMemo(() => {
     return filterAndSortDeals(deals, { region, asset, source, rating: "all", confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
@@ -95,6 +100,21 @@ export default function Dashboard() {
   const locationImportDiagnostics = locationImport.error instanceof LocationImportError ? locationImport.error.diagnostics : undefined;
 
   const currentSavedFilters: SavedSearchFilters = { locationQuery, source, asset, minYield, maxPrice };
+  const currentAlertCriteria: SaveAlertInput = {
+    name: defaultAlertName({
+      locationQuery,
+      assetType: asset,
+      minYield,
+      maxPrice,
+      minScore: rating === "green" ? 78 : rating === "amber" ? 60 : 0,
+    }),
+    locationQuery: locationQuery.trim(),
+    minYield,
+    maxPrice,
+    assetType: asset,
+    minScore: rating === "green" ? 78 : rating === "amber" ? 60 : 0,
+    enabled: true,
+  };
   const saveLocationSearch = async () => {
     if (!locationQuery.trim()) return;
     await savedSearches.saveSearch({
@@ -108,6 +128,31 @@ export default function Dashboard() {
     setAsset(filters.asset || "All");
     setMinYield(filters.minYield || 0);
     setMaxPrice(filters.maxPrice || 0);
+  };
+  const createAlertFromFilters = async () => {
+    await savedAlerts.saveAlert(currentAlertCriteria);
+  };
+  const startEditingAlert = (alert: SavedAlert) => {
+    setEditingAlertId(alert.id);
+    setEditingAlert({
+      id: alert.id,
+      name: alert.name,
+      locationQuery: alert.locationQuery,
+      minYield: alert.minYield,
+      maxPrice: alert.maxPrice,
+      assetType: alert.assetType,
+      minScore: alert.minScore,
+      enabled: alert.enabled,
+    });
+  };
+  const saveEditedAlert = async () => {
+    if (!editingAlert) return;
+    await savedAlerts.saveAlert(editingAlert);
+    setEditingAlertId(null);
+    setEditingAlert(null);
+  };
+  const toggleAlert = async (alert: SavedAlert) => {
+    await savedAlerts.saveAlert({ ...alertToInput(alert), enabled: !alert.enabled });
   };
   const runLiveLocationSearch = async () => {
     if (!locationQuery.trim()) return;
@@ -303,6 +348,16 @@ export default function Dashboard() {
               >
                 <Save className="h-3.5 w-3.5" /> Save
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={savedAlerts.isSaving}
+                onClick={() => void createAlertFromFilters()}
+                className="h-9 gap-1.5 text-xs"
+              >
+                <Bell className="h-3.5 w-3.5" /> Create Alert
+              </Button>
               <span className="text-xs text-muted-foreground">Sort</span>
               <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
                 <SelectTrigger className="h-9 w-[130px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
@@ -344,6 +399,74 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-medium">My Alerts</h3>
+                <p className="text-xs text-muted-foreground">Daily emails for new imported deals matching your saved criteria.</p>
+              </div>
+              {savedAlerts.isLoading && <div className="text-xs text-muted-foreground">Loading alerts...</div>}
+            </div>
+            {savedAlerts.error && (
+              <div className="rounded-md border border-signal-amber/40 bg-signal-amber/10 px-3 py-2 text-xs text-muted-foreground">
+                Could not load or save alerts. Check that the Saved Alerts migration has been applied.
+              </div>
+            )}
+            {savedAlerts.alerts.length === 0 && !savedAlerts.isLoading ? (
+              <div className="rounded-md border border-border/60 bg-surface-2/40 px-3 py-2 text-xs text-muted-foreground">
+                No saved alerts yet. Use Create Alert to save the current filters.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {savedAlerts.alerts.map((alert) => (
+                  <div key={alert.id} className="rounded-md border border-border/60 bg-surface-2/40 px-3 py-2">
+                    {editingAlertId === alert.id && editingAlert ? (
+                      <div className="grid gap-2 md:grid-cols-6">
+                        <Input value={editingAlert.name} onChange={(event) => setEditingAlert({ ...editingAlert, name: event.target.value })} className="h-8 text-xs md:col-span-2" aria-label="Alert name" />
+                        <Input value={editingAlert.locationQuery} onChange={(event) => setEditingAlert({ ...editingAlert, locationQuery: event.target.value })} className="h-8 text-xs" aria-label="Alert location" placeholder="Location" />
+                        <Input value={editingAlert.minYield} onChange={(event) => setEditingAlert({ ...editingAlert, minYield: Number(event.target.value) || 0 })} className="h-8 text-xs" aria-label="Alert minimum yield" type="number" min="0" step="0.1" />
+                        <Input value={editingAlert.maxPrice} onChange={(event) => setEditingAlert({ ...editingAlert, maxPrice: Number(event.target.value) || 0 })} className="h-8 text-xs" aria-label="Alert maximum price" type="number" min="0" />
+                        <Input value={editingAlert.minScore} onChange={(event) => setEditingAlert({ ...editingAlert, minScore: Number(event.target.value) || 0 })} className="h-8 text-xs" aria-label="Alert minimum score" type="number" min="0" max="100" />
+                        <div className="flex gap-2 md:col-span-6">
+                          <Button type="button" size="sm" className="h-8 text-xs" onClick={() => void saveEditedAlert()} disabled={savedAlerts.isSaving}>Save alert</Button>
+                          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => { setEditingAlertId(null); setEditingAlert(null); }}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{alert.name}</span>
+                            <span className={cn("rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wide", alert.enabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                              {alert.enabled ? "Enabled" : "Disabled"}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {alert.locationQuery || "All locations"} · {alert.assetType || "All assets"} · min yield {alert.minYield || 0}% · max {alert.maxPrice ? `£${alert.maxPrice.toLocaleString()}` : "any price"} · score {alert.minScore || 0}+
+                          </div>
+                          <div className="mt-1 text-[11px] text-muted-foreground">
+                            Last run: {alert.lastRunAt ? new Date(alert.lastRunAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "Not run yet"} · matches found: {alert.matchesFound}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => void toggleAlert(alert)} disabled={savedAlerts.isSaving}>
+                            {alert.enabled ? "Disable" : "Enable"}
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => startEditingAlert(alert)}>
+                            <Pencil className="h-3.5 w-3.5" /> Edit
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => void savedAlerts.deleteAlert(alert.id)} disabled={savedAlerts.isDeleting}>
+                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           {showLocationSearchCta && (
             <div className="ds-card p-4 flex flex-wrap items-center justify-between gap-3">
@@ -426,6 +549,19 @@ export default function Dashboard() {
 function formatEnvDiagnostics(env?: Record<string, boolean>) {
   if (!env) return "-";
   return Object.entries(env).map(([key, value]) => `${key}=${value ? "set" : "missing"}`).join(", ");
+}
+
+function alertToInput(alert: SavedAlert): SaveAlertInput {
+  return {
+    id: alert.id,
+    name: alert.name,
+    locationQuery: alert.locationQuery,
+    minYield: alert.minYield,
+    maxPrice: alert.maxPrice,
+    assetType: alert.assetType,
+    minScore: alert.minScore,
+    enabled: alert.enabled,
+  };
 }
 
 function Kpi({

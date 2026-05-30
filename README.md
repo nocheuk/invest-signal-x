@@ -287,6 +287,7 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 CRON_SECRET=...
+APP_BASE_URL=https://your-production-app.example.com
 ```
 
 `CRON_SECRET` protects `/api/cron/national-scan`. Call the endpoint with:
@@ -323,6 +324,42 @@ Scan run records are stored in `national_scan_runs` with:
 - failed/skipped counts
 - started/finished timestamps
 - raw result metadata
+
+### Saved Alerts V1
+
+Users can save dashboard investment criteria as alerts from the dashboard using **Create Alert**. Saved alerts are stored in `saved_alerts` and include:
+
+- location query
+- minimum yield
+- maximum guide price
+- asset type
+- minimum DealSignal score
+- enabled/disabled state
+
+The daily national scan evaluates active saved alerts after the import batch completes. Matching uses only real imported deal rows refreshed or inserted by the scan window:
+
+- location query must match deal title, location or region when provided
+- `min_yield` compares against `net_initial_yield`
+- `max_price` compares against `guide_price`; missing prices do not match a max-price alert
+- `asset_type` must match unless set to `All`
+- `min_score` compares against the current DealSignal score
+
+Duplicate alert emails are suppressed by `alert_matches` with a unique `(alert_id, deal_id)` constraint. Once a deal has matched a saved alert, the same deal is not emailed again for that alert on later refreshes.
+
+Alert runs are tracked in:
+
+- `alert_runs`: daily/batch run status, matched deal count, email count, metadata and errors
+- `alert_matches`: alert/deal matches, match reasons, payload snapshot and email status
+
+Email delivery is provider-backed. V1 supports Resend from server-side code without exposing keys to the frontend:
+
+```bash
+RESEND_API_KEY=...
+ALERT_EMAIL_FROM="DealSignal <alerts@yourdomain.com>"
+APP_BASE_URL=https://your-production-app.example.com
+```
+
+If `RESEND_API_KEY` is not configured, DealSignal still records alert matches and payloads, but `email_status` is stored as `provider_not_configured` and no email is sent. Apply the `saved_alerts` migration before deploying this feature.
 
 ## Custom HTML Scraper Template
 

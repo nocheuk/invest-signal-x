@@ -1,4 +1,5 @@
 import { runCustomHtmlScraperImport } from "../scrape-site.mjs";
+import { runSavedAlertsForRecentDeals } from "./alerts.mjs";
 import {
   ACUITUS_LISTINGS_URL,
   ACUITUS_SOURCE_NAME,
@@ -66,6 +67,7 @@ export async function runNationalScan({
   batchSize = NATIONAL_SCAN_BATCH_SIZE,
   locations = ENGLAND_PRIORITY_LOCATIONS,
   includeAcuitus = true,
+  evaluateAlerts = true,
   adapters = defaultNationalAdapters(),
   now = new Date(),
 } = {}) {
@@ -104,6 +106,10 @@ export async function runNationalScan({
     results.push(result);
   }
 
+  const alertResult = !dryRun && evaluateAlerts
+    ? await runSavedAlertsForRecentDeals({ supabase, since: now, now: new Date() })
+    : null;
+
   return {
     dryRun,
     batchId,
@@ -113,6 +119,7 @@ export async function runNationalScan({
     nextIndex: batch.nextIndex,
     sources: results,
     totals: aggregateNationalResults(results),
+    alerts: alertResult,
   };
 }
 
