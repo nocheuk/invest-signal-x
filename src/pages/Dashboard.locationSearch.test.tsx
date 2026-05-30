@@ -4,6 +4,7 @@ import type React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Deal } from "@/lib/deals";
+import type { SavedAlert } from "@/hooks/useSavedAlerts";
 import Dashboard from "@/pages/Dashboard";
 
 const dealsState = vi.hoisted(() => ({
@@ -12,6 +13,12 @@ const dealsState = vi.hoisted(() => ({
 
 const savedSearchState = vi.hoisted(() => ({
   saveSearch: vi.fn(),
+}));
+
+const savedAlertState = vi.hoisted(() => ({
+  alerts: [] as SavedAlert[],
+  saveAlert: vi.fn(),
+  deleteAlert: vi.fn(),
 }));
 
 const nationalScanState = vi.hoisted(() => ({
@@ -88,6 +95,18 @@ vi.mock("@/hooks/useSavedSearches", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useSavedAlerts", () => ({
+  useSavedAlerts: () => ({
+    alerts: savedAlertState.alerts,
+    isLoading: false,
+    isSaving: false,
+    isDeleting: false,
+    saveAlert: savedAlertState.saveAlert,
+    deleteAlert: savedAlertState.deleteAlert,
+    error: null,
+  }),
+}));
+
 vi.mock("@/hooks/useNationalScanStatus", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/useNationalScanStatus")>("@/hooks/useNationalScanStatus");
   return {
@@ -146,6 +165,9 @@ describe("Dashboard live location search", () => {
   beforeEach(() => {
     dealsState.deals = [];
     savedSearchState.saveSearch.mockReset();
+    savedAlertState.alerts = [];
+    savedAlertState.saveAlert.mockReset();
+    savedAlertState.deleteAlert.mockReset();
     nationalScanState.data = {
       id: "scan-1",
       sourceName: "Rightmove Commercial",
@@ -320,6 +342,65 @@ describe("Dashboard live location search", () => {
         filters: expect.objectContaining({ locationQuery: "Poole", source: "All real deals" }),
       }));
     });
+  });
+
+  it("creates an alert from the active dashboard filters", async () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    fireEvent.change(screen.getByLabelText("Location filter"), { target: { value: "Poole" } });
+    fireEvent.click(screen.getByRole("button", { name: /create alert/i }));
+
+    await waitFor(() => {
+      expect(savedAlertState.saveAlert).toHaveBeenCalledWith(expect.objectContaining({
+        name: expect.stringContaining("Poole"),
+        locationQuery: "Poole",
+        assetType: "All",
+        enabled: true,
+      }));
+    });
+  });
+
+  it("edits, toggles, and deletes saved alerts", async () => {
+    savedAlertState.alerts = [{
+      id: "alert-1",
+      name: "Bournemouth retail alert",
+      locationQuery: "Bournemouth",
+      minYield: 7,
+      maxPrice: 1000000,
+      assetType: "Retail",
+      minScore: 70,
+      enabled: true,
+      createdAt: "2026-05-30T09:00:00Z",
+      updatedAt: "2026-05-30T09:00:00Z",
+      lastRunAt: "2026-05-30T10:00:00Z",
+      matchesFound: 2,
+    }];
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("Bournemouth retail alert")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+    await waitFor(() => expect(savedAlertState.saveAlert).toHaveBeenCalledWith(expect.objectContaining({ id: "alert-1", enabled: false })));
+
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
+    fireEvent.change(screen.getByLabelText("Alert name"), { target: { value: "Updated alert" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save alert" }));
+    await waitFor(() => expect(savedAlertState.saveAlert).toHaveBeenCalledWith(expect.objectContaining({ id: "alert-1", name: "Updated alert" })));
+
+    fireEvent.click(screen.getByRole("button", { name: /delete/i }));
+    await waitFor(() => expect(savedAlertState.deleteAlert).toHaveBeenCalledWith("alert-1"));
   });
 
   it("counts real green deals, filters when clicked, and clears the filter", () => {

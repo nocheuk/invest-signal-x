@@ -92,6 +92,21 @@ export type Database = {
         Insert: { id?: string; user_id: string; name: string; filters?: Json; alert_enabled?: boolean; alert_frequency?: string };
         Update: Partial<Database["public"]["Tables"]["saved_searches"]["Insert"]>;
       };
+      saved_alerts: {
+        Row: { id: string; user_id: string; name: string; location_query: string; min_yield: number; max_price: number; asset_type: string; min_score: number; enabled: boolean; created_at: string; updated_at: string };
+        Insert: { id?: string; user_id: string; name: string; location_query?: string; min_yield?: number; max_price?: number; asset_type?: string; min_score?: number; enabled?: boolean };
+        Update: Partial<Omit<Database["public"]["Tables"]["saved_alerts"]["Insert"], "user_id">>;
+      };
+      alert_runs: {
+        Row: { id: string; run_date: string; status: string; deals_matched: number; emails_sent: number; metadata: Json; error_message: string | null; started_at: string; finished_at: string | null };
+        Insert: { id?: string; run_date?: string; status?: string; deals_matched?: number; emails_sent?: number; metadata?: Json; error_message?: string | null; started_at?: string; finished_at?: string | null };
+        Update: Partial<Database["public"]["Tables"]["alert_runs"]["Insert"]>;
+      };
+      alert_matches: {
+        Row: { id: string; alert_run_id: string; alert_id: string; user_id: string; deal_id: string; matched_at: string; email_sent: boolean; email_sent_at: string | null; email_status: string; match_reasons: string[]; payload: Json };
+        Insert: { id?: string; alert_run_id: string; alert_id: string; user_id: string; deal_id: string; matched_at?: string; email_sent?: boolean; email_sent_at?: string | null; email_status?: string; match_reasons?: string[]; payload?: Json };
+        Update: Partial<Database["public"]["Tables"]["alert_matches"]["Insert"]>;
+      };
       import_sources: {
         Row: { id: string; name: string; source_type: string; base_url: string | null; config: Json; is_active: boolean; created_at: string; updated_at: string };
         Insert: { id?: string; name: string; source_type: string; base_url?: string | null; config?: Json; is_active?: boolean };

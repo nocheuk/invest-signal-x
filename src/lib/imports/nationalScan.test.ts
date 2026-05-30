@@ -86,6 +86,7 @@ describe("national scan scheduler", () => {
       batchSize: 2,
       locations: ["London", "Manchester", "Birmingham"],
       includeAcuitus: false,
+      evaluateAlerts: false,
       adapters: {
         rightmove: async ({ locationQuery }: { locationQuery: string }) => ({
           source: "Rightmove Commercial",
