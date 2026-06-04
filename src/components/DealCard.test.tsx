@@ -152,4 +152,20 @@ describe("DealCard", () => {
     expect(screen.getByText("Yield above benchmark")).toBeInTheDocument();
     expect(screen.getByText(/Lease information missing/)).toBeInTheDocument();
   });
+
+  it("shows a Green Candidate badge and qualification reason", () => {
+    renderCard(deal({
+      score: 73,
+      rating: "amber",
+      dataConfidenceScore: 85,
+      confidenceLevel: "high",
+      guidePrice: 700000,
+      passingRent: 62100,
+      grossYield: 8.87,
+      netInitialYield: 8.25,
+    }));
+
+    expect(screen.getByText("Green Candidate")).toBeInTheDocument();
+    expect(screen.getByText(/Green Candidate: Score 73 is above/)).toBeInTheDocument();
+  });
 });

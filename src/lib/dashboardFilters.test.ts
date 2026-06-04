@@ -247,6 +247,32 @@ describe("dashboard deal filters", () => {
     expect(filterAndSortDeals([imported, acuitus], { ...base, confidence: "all", sort: "confidence" }, weights).map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
   });
 
+  it("filters green candidates separately from verified green deals", () => {
+    const candidate = deal({
+      id: "imp-candidate",
+      score: 73,
+      rating: "amber",
+      dataConfidenceScore: 85,
+      guidePrice: 700000,
+      netInitialYield: 8.25,
+      passingRent: 62100,
+      isImported: true,
+      importSourceName: RIGHTMOVE_COMMERCIAL_SOURCE,
+    });
+    const verified = deal({
+      id: "imp-verified",
+      score: 82,
+      rating: "green",
+      dataConfidenceScore: 85,
+      isImported: true,
+      importSourceName: RIGHTMOVE_COMMERCIAL_SOURCE,
+    });
+    const base = { region: "All UK", asset: "All", source: "All", confidence: "all" as const, minYield: 0, maxPrice: 0, search: "", locationQuery: "", sort: "score" as const };
+
+    expect(filterAndSortDeals([candidate, verified], { ...base, rating: "green-candidate" }, weights).map((item) => item.id)).toEqual(["imp-candidate"]);
+    expect(filterAndSortDeals([candidate, verified], { ...base, rating: "verified-green" }, weights).map((item) => item.id)).toEqual(["imp-verified"]);
+  });
+
   it("filters by dedicated location query across town, postcode, region, and title", () => {
     const poole = deal({
       id: "imp-poole",

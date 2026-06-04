@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { Bookmark, MapPin, TrendingUp, AlertTriangle, Sparkles } from "lucide-react";
 import type { Deal } from "@/lib/deals";
 import { formatGBP, formatPct } from "@/lib/deals";
-import { RatingBadge, ScorePill } from "@/components/RatingBadge";
+import { ClassificationBadge, ScorePill } from "@/components/RatingBadge";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore, matchReasons } from "@/lib/strategy";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
+import { classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { cn } from "@/lib/utils";
 
 export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: "default" | "feature" }) {
@@ -22,6 +23,8 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
   const sourceLabel = getSourceLabel(deal);
   const cardReasons = analysis.opportunitySignals.length > 0 ? analysis.opportunitySignals.slice(0, 2) : reasons;
   const riskSignals = analysis.riskSignals.slice(0, 2);
+  const classification = classifyDeal(deal);
+  const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
   const [imageAvailable, setImageAvailable] = useState(Boolean(deal.imageUrl));
   const tenantLabel = deal.tenant && deal.tenant !== "Unknown" ? deal.tenant : "Tenant not available";
 
@@ -50,7 +53,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
         )}
         <div className={cn("absolute inset-0 ds-grid-bg opacity-40", deal.imageUrl && imageAvailable && "bg-background/20")} />
         <div className="absolute top-3 left-3">
-          <RatingBadge rating={deal.rating} />
+          <ClassificationBadge classification={classification} />
         </div>
         <button
           onClick={(e) => {
@@ -111,6 +114,12 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
               </li>
             ))}
           </ul>
+        )}
+
+        {candidateReasons.length > 0 && (
+          <div className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
+            Green Candidate: {candidateReasons.slice(0, 2).join("; ")}.
+          </div>
         )}
 
         {riskSignals.length > 0 && (

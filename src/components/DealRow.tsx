@@ -7,6 +7,7 @@ import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore } from "@/lib/strategy";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
+import { classifyDeal } from "@/lib/dealClassification";
 import { cn } from "@/lib/utils";
 
 export function DealRow({ deal }: { deal: Deal }) {
@@ -16,6 +17,7 @@ export function DealRow({ deal }: { deal: Deal }) {
   const watched = isWatched(deal.id);
   const pipelineStatus = getPipelineStatus(deal.id);
   const sourceLabel = getSourceLabel(deal);
+  const classification = classifyDeal(deal);
 
   return (
     <Link
@@ -32,6 +34,7 @@ export function DealRow({ deal }: { deal: Deal }) {
         )}>
           {deal.score}
         </div>
+        {classification === "green-candidate" && <span className="hidden lg:inline-flex rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">Candidate</span>}
         <div className="hidden sm:flex flex-col">
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Your</span>
           <span className="font-mono text-sm font-semibold tabular text-primary">{yourScore}</span>
