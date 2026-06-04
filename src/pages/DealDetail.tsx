@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { useDeal } from "@/hooks/useDeals";
 import { useDealSourceLinks } from "@/hooks/useDealSourceLinks";
-import { ScorePill, RatingBadge } from "@/components/RatingBadge";
+import { ClassificationBadge, ScorePill } from "@/components/RatingBadge";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { Hint } from "@/components/Hint";
 import { PIPELINE_STATUSES, type PipelineStatus, useWatchlist } from "@/lib/watchlist";
@@ -15,6 +15,7 @@ import { ArrowLeft, Bookmark, MapPin, Building2, AlertTriangle, ShieldCheck, Tre
 import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
+import { classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -55,6 +56,8 @@ export default function DealDetail() {
   const note = notes[deal.id] || "";
   const pipelineStatus = getPipelineStatus(deal.id) ?? "Saved";
   const dealAnalysis = getDealAnalysis(deal);
+  const classification = classifyDeal(deal);
+  const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
     try {
@@ -81,7 +84,7 @@ export default function DealDetail() {
             <div className="flex items-start justify-between flex-wrap gap-6">
               <div className="space-y-3 max-w-2xl">
                 <div className="flex items-center gap-2">
-                  <RatingBadge rating={deal.rating} />
+                  <ClassificationBadge classification={classification} />
                   <span className="text-xs text-muted-foreground">·</span>
                   <span className="text-xs text-muted-foreground">{deal.assetType} · {deal.source}</span>
                 </div>
@@ -202,6 +205,23 @@ export default function DealDetail() {
             </div>
           </section>
         )}
+
+        <section className="ds-card p-6 space-y-3">
+          <h2 className="font-display text-2xl">Green classification</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Verified Green is deliberately strict: score at least 78 and confidence at least 80. Green Candidate keeps that strict tier intact, but surfaces imported deals with score at least 72, confidence at least 75, a guide price, and either yield or passing rent available.
+          </p>
+          {classification === "green-candidate" && (
+            <ul className="space-y-1.5">
+              {candidateReasons.map((reason) => (
+                <li key={reason} className="flex items-start gap-2 text-xs text-primary">
+                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                  <span>{reason}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         {/* Underwriting breakdown grid */}
         <section className="space-y-3">

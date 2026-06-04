@@ -1,4 +1,5 @@
 import type { Deal } from "@/lib/deals";
+import { classifyDeal, type DealClassification } from "@/lib/dealClassification";
 import { personalisedScore, type StrategyWeights } from "@/lib/strategy";
 
 export const IMPORTED_SOURCE_FILTER = "Imported";
@@ -12,7 +13,7 @@ export type DashboardFilters = {
   region: string;
   asset: string;
   source: string;
-  rating: "all" | Deal["rating"];
+  rating: "all" | Deal["rating"] | DealClassification;
   confidence: "all" | NonNullable<Deal["confidenceLevel"]>;
   minYield: number;
   maxPrice: number;
@@ -28,7 +29,7 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
     (filters.region === "All UK" || deal.region === filters.region) &&
     (filters.asset === "All" || deal.assetType === filters.asset) &&
     sourceMatches(deal, filters.source) &&
-    (filters.rating === "all" || deal.rating === filters.rating) &&
+    ratingMatches(deal, filters.rating) &&
     (filters.confidence === "all" || deal.confidenceLevel === filters.confidence) &&
     (deal.netInitialYield >= filters.minYield) &&
     (!filters.maxPrice || deal.guidePrice <= filters.maxPrice) &&
@@ -41,6 +42,13 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
   if (filters.sort === "price") result = [...result].sort((a, b) => a.guidePrice - b.guidePrice);
   if (filters.sort === "confidence") result = [...result].sort((a, b) => (b.dataConfidenceScore ?? 0) - (a.dataConfidenceScore ?? 0));
   return result;
+}
+
+function ratingMatches(deal: Deal, rating: DashboardFilters["rating"]) {
+  if (rating === "all") return true;
+  if (rating === "green-candidate") return classifyDeal(deal) === "green-candidate";
+  if (rating === "verified-green") return classifyDeal(deal) === "verified-green";
+  return deal.rating === rating;
 }
 
 export function locationSearchableText(deal: Deal) {

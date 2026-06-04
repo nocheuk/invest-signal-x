@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { Rating } from "@/lib/deals";
+import type { DealClassification } from "@/lib/dealClassification";
 
 const styles: Record<Rating, string> = {
   green: "bg-signal-green-soft text-signal-green border-signal-green/30",
@@ -14,6 +15,36 @@ export function RatingBadge({ rating, className, dot = true }: { rating: Rating;
     <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide", styles[rating], className)}>
       {dot && <span className={cn("h-1.5 w-1.5 rounded-full", rating === "green" ? "bg-signal-green" : rating === "amber" ? "bg-signal-amber" : "bg-signal-red")} />}
       {labels[rating]}
+    </span>
+  );
+}
+
+const classificationStyles: Record<DealClassification, string> = {
+  "verified-green": "bg-signal-green-soft text-signal-green border-signal-green/30",
+  "green-candidate": "bg-primary/10 text-primary border-primary/30",
+  amber: "bg-signal-amber-soft text-signal-amber border-signal-amber/30",
+  red: "bg-signal-red-soft text-signal-red border-signal-red/30",
+};
+
+const classificationDots: Record<DealClassification, string> = {
+  "verified-green": "bg-signal-green",
+  "green-candidate": "bg-primary",
+  amber: "bg-signal-amber",
+  red: "bg-signal-red",
+};
+
+const classificationLabels: Record<DealClassification, string> = {
+  "verified-green": "Verified Green",
+  "green-candidate": "Green Candidate",
+  amber: "Amber",
+  red: "Red",
+};
+
+export function ClassificationBadge({ classification, className, dot = true }: { classification: DealClassification; className?: string; dot?: boolean }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide", classificationStyles[classification], className)}>
+      {dot && <span className={cn("h-1.5 w-1.5 rounded-full", classificationDots[classification])} />}
+      {classificationLabels[classification]}
     </span>
   );
 }

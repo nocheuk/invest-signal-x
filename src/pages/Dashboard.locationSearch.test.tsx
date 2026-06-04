@@ -481,21 +481,71 @@ describe("Dashboard live location search", () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getByRole("button", { name: "Show 1 green deals from current filters" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 1 verified green deals from current filters" })).toBeInTheDocument();
     expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
     expect(screen.getByText("Red Imported Deal")).toBeInTheDocument();
     expect(screen.queryByText("Seed Green Demo")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show 1 green deals from current filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 verified green deals from current filters" }));
 
     expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
     expect(screen.queryByText("Red Imported Deal")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Green deals")).toHaveLength(2);
+    expect(screen.getAllByText("Verified Green").length).toBeGreaterThanOrEqual(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Clear green filter" }));
 
     expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
     expect(screen.getByText("Red Imported Deal")).toBeInTheDocument();
+  });
+
+  it("counts and filters Green Candidates separately from Verified Green", () => {
+    dealsState.deals = [
+      dashboardDeal({
+        id: "imp-candidate",
+        title: "Candidate Imported Deal",
+        score: 73,
+        rating: "amber",
+        dataConfidenceScore: 85,
+        confidenceLevel: "high",
+        guidePrice: 700000,
+        passingRent: 62100,
+        netInitialYield: 8.25,
+      }),
+      dashboardDeal({
+        id: "imp-verified",
+        title: "Verified Imported Deal",
+        score: 82,
+        rating: "green",
+        dataConfidenceScore: 85,
+        confidenceLevel: "high",
+      }),
+      dashboardDeal({
+        id: "imp-red",
+        title: "Red Imported Deal",
+        score: 42,
+        rating: "red",
+        dataConfidenceScore: 61,
+        confidenceLevel: "medium",
+        netInitialYield: 0,
+      }),
+    ];
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByRole("button", { name: "Show 1 green candidate deals from current filters" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 green candidate deals from current filters" }));
+
+    expect(screen.getByText("Candidate Imported Deal")).toBeInTheDocument();
+    expect(screen.queryByText("Verified Imported Deal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Red Imported Deal")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Green Candidates").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows pipeline counts and filters dashboard deals by pipeline status", () => {
@@ -560,6 +610,7 @@ describe("Dashboard live location search", () => {
     expect(screen.getByText(/Cycle progress: 3%/)).toBeInTheDocument();
     expect(screen.getByText("Locations completed this cycle: 4/160")).toBeInTheDocument();
     expect(screen.getByText("Database: 42 deals · Rightmove 30 · Acuitus 12")).toBeInTheDocument();
+    expect(screen.getByText(/Verified Greens:/)).toBeInTheDocument();
   });
 
   it("shows a no-run state when no completed national scan exists", () => {

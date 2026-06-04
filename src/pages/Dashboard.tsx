@@ -13,6 +13,7 @@ import { useSavedSearches, type SavedSearchFilters } from "@/hooks/useSavedSearc
 import { useSavedAlerts, type SavedAlert, type SaveAlertInput } from "@/hooks/useSavedAlerts";
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
+import { countDealClassifications } from "@/lib/dealClassification";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save, Bell, Pencil, Trash2 } from "lucide-react";
@@ -51,7 +52,7 @@ export default function Dashboard() {
   const [minYield, setMinYield] = useState(0);
   const [maxPrice, setMaxPrice] = useState(0);
   const [locationQuery, setLocationQuery] = useState("");
-  const [rating, setRating] = useState<"all" | Rating>("all");
+  const [rating, setRating] = useState<"all" | Rating | "verified-green" | "green-candidate">("all");
   const [confidence, setConfidence] = useState<"all" | "high" | "medium" | "low">("all");
   const [pipelineStatus, setPipelineStatus] = useState<"all" | PipelineStatus>("all");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
@@ -66,6 +67,7 @@ export default function Dashboard() {
 
   const kpis = useMemo(() => {
     const greens = currentFilterScope.filter(d => d.rating === "green").length;
+    const classifications = countDealClassifications(currentFilterScope);
     const yields = currentFilterScope.filter(d => d.netInitialYield > 0).map(d => d.netInitialYield);
     const avg = yields.reduce((a, b) => a + b, 0) / yields.length;
     const top = [...currentFilterScope].sort((a, b) => b.score - a.score)[0];
@@ -75,6 +77,10 @@ export default function Dashboard() {
       total: currentFilterScope.length,
       withPrice,
       greens,
+      verifiedGreens: classifications["verified-green"],
+      greenCandidates: classifications["green-candidate"],
+      amber: classifications.amber,
+      red: classifications.red,
       avgYield: Number.isFinite(avg) ? avg : 0,
       top: top?.score ?? 0,
       watched: ids.length,
@@ -117,13 +123,13 @@ export default function Dashboard() {
       assetType: asset,
       minYield,
       maxPrice,
-      minScore: rating === "green" ? 78 : rating === "amber" ? 60 : 0,
+      minScore: rating === "verified-green" ? 78 : rating === "green-candidate" ? 72 : rating === "amber" ? 60 : 0,
     }),
     locationQuery: locationQuery.trim(),
     minYield,
     maxPrice,
     assetType: asset,
-    minScore: rating === "green" ? 78 : rating === "amber" ? 60 : 0,
+    minScore: rating === "verified-green" ? 78 : rating === "green-candidate" ? 72 : rating === "amber" ? 60 : 0,
     enabled: true,
   };
   const saveLocationSearch = async () => {
@@ -194,17 +200,26 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <Kpi label="Live deals loaded" value={kpis.total.toLocaleString()} icon={Activity} accent="text-foreground" sub={`${kpis.withPrice} with guide price`} />
           <Kpi
-            label="Green deals"
-            value={kpis.greens.toString()}
+            label="Verified Green"
+            value={kpis.verifiedGreens.toString()}
             icon={Target}
             accent="text-signal-green"
             sub="from current"
-            onClick={() => setRating("green")}
-            active={rating === "green"}
-            ariaLabel={`Show ${kpis.greens} green deals from current filters`}
+            onClick={() => setRating("verified-green")}
+            active={rating === "verified-green"}
+            ariaLabel={`Show ${kpis.verifiedGreens} verified green deals from current filters`}
+          />
+          <Kpi
+            label="Green Candidates"
+            value={kpis.greenCandidates.toString()}
+            icon={Sparkles}
+            accent="text-primary"
+            sub="high-potential"
+            onClick={() => setRating("green-candidate")}
+            active={rating === "green-candidate"}
+            ariaLabel={`Show ${kpis.greenCandidates} green candidate deals from current filters`}
           />
           <Kpi label="Average yield (NIY)" value={formatPct(kpis.avgYield, 2)} icon={TrendingUp} accent="text-foreground" sub="net initial" />
-          <Kpi label="Highest score" value={kpis.top.toString()} icon={Sparkles} accent="text-primary" sub="current data" />
           <Kpi label="Watchlisted deals" value={kpis.watched.toString()} icon={Bookmark} accent="text-foreground" sub={`${kpis.needsReviewCount} need review`} />
         </div>
 
@@ -241,6 +256,9 @@ export default function Dashboard() {
                   </div>
                   <div>
                     Database: {nationalScanStatus.data.totalDeals.toLocaleString()} deals · Rightmove {nationalScanStatus.data.totalRightmoveDeals.toLocaleString()} · Acuitus {nationalScanStatus.data.totalAcuitusDeals.toLocaleString()}
+                  </div>
+                  <div>
+                    Verified Greens: {kpis.verifiedGreens} · Green Candidates: {kpis.greenCandidates} · Amber: {kpis.amber} · Red: {kpis.red}
                   </div>
                 </>
               )}
@@ -379,13 +397,14 @@ export default function Dashboard() {
                 {sourceOptions.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={rating} onValueChange={(v) => setRating(v as Rating | "all")}>
-              <SelectTrigger className="h-9 w-[120px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
+            <Select value={rating} onValueChange={(v) => setRating(v as typeof rating)}>
+              <SelectTrigger className="h-9 w-[170px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All ratings</SelectItem>
-                <SelectItem value="green">🟢 Green</SelectItem>
-                <SelectItem value="amber">🟡 Amber</SelectItem>
-                <SelectItem value="red">🔴 Red</SelectItem>
+                <SelectItem value="verified-green">Verified Green</SelectItem>
+                <SelectItem value="green-candidate">Green Candidate</SelectItem>
+                <SelectItem value="amber">Amber</SelectItem>
+                <SelectItem value="red">Red</SelectItem>
               </SelectContent>
             </Select>
             <Select value={confidence} onValueChange={(v) => setConfidence(v as typeof confidence)}>
@@ -438,9 +457,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {rating === "green" && (
+          {(rating === "verified-green" || rating === "green-candidate") && (
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-md border border-signal-green/40 bg-signal-green/10 px-2.5 py-1 text-signal-green">Green deals</span>
+              <span className="rounded-md border border-signal-green/40 bg-signal-green/10 px-2.5 py-1 text-signal-green">
+                {rating === "verified-green" ? "Verified Green" : "Green Candidates"}
+              </span>
               <button
                 type="button"
                 onClick={() => setRating("all")}
@@ -692,7 +713,7 @@ function Kpi({
         aria-pressed={active}
         className={cn(
           "ds-card p-4 space-y-2 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          active && "border-signal-green/50 bg-signal-green/10"
+          active && "border-primary/50 bg-primary/10"
         )}
       >
         {content}
