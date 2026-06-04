@@ -250,6 +250,39 @@ describe("Dashboard live location search", () => {
     })));
   });
 
+  it("shows KPI totals with database context, imported context, yield sample size, and real watchlist activity", () => {
+    dealsState.deals = [
+      dashboardDeal({ id: "imp-yield-1", title: "Yield Deal One", netInitialYield: 8, guidePrice: 350000 }),
+      dashboardDeal({ id: "imp-yield-2", title: "Yield Deal Two", netInitialYield: 6, guidePrice: 450000, importSourceName: "Eddisons" }),
+      dashboardDeal({ id: "imp-no-yield", title: "Sparse Deal", netInitialYield: 0, guidePrice: 0, importSourceName: "Acuitus" }),
+    ];
+    watchlistState.ids = ["imp-yield-1"];
+    watchlistState.pipelineCounts = {
+      Saved: 1,
+      Reviewing: 1,
+      "Viewing Booked": 0,
+      "Offer Submitted": 1,
+      Passed: 0,
+      Purchased: 0,
+    };
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("Filtered deals")).toBeInTheDocument();
+    expect(screen.getByText(/42 total DB.*3 imported.*2 priced/)).toBeInTheDocument();
+    expect(screen.getByText("Average yield (NIY)")).toBeInTheDocument();
+    expect(screen.getByText("NIY from 2 deals")).toBeInTheDocument();
+    expect(screen.getByText("Watchlisted deals")).toBeInTheDocument();
+    expect(screen.getByText("2 active opportunities")).toBeInTheDocument();
+    expect(screen.queryByText(/need review/)).not.toBeInTheDocument();
+  });
+
   it("shows an empty-location CTA and refreshes deals after import completes", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
@@ -612,7 +645,7 @@ describe("Dashboard live location search", () => {
     expect(screen.getByText(/Cycle progress: 3%/)).toBeInTheDocument();
     expect(screen.getByText("Locations completed this cycle: 4/160")).toBeInTheDocument();
     expect(screen.getByText("Database: 42 deals · Rightmove 30 · Acuitus 12 · Eddisons 5")).toBeInTheDocument();
-    expect(screen.getByText(/Verified Greens:/)).toBeInTheDocument();
+    expect(screen.getByText(/Loaded ratings: Verified Greens/)).toBeInTheDocument();
   });
 
   it("shows inventory audit metrics and outputs an admin report", () => {

@@ -13,10 +13,10 @@ const rows = vi.hoisted(() => ({
     metadata: Record<string, unknown>;
   }>,
   sourceLinks: [
-    { deal_id: "imp-rightmove-1", import_sources: { name: "Rightmove Commercial" } },
-    { deal_id: "imp-rightmove-2", import_sources: { name: "Rightmove Commercial" } },
-    { deal_id: "imp-acuitus-1", import_sources: { name: "Acuitus" } },
-    { deal_id: "imp-eddisons-1", import_sources: { name: "Eddisons" } },
+    { deal_id: "imp-rightmove-1", source_url: "https://www.rightmove.co.uk/commercial-property-for-sale/property-1.html", import_sources: { name: "Rightmove Commercial" }, raw_imports: null },
+    { deal_id: "imp-rightmove-2", source_url: "", import_sources: { name: "Rightmove Commercial" }, raw_imports: null },
+    { deal_id: "imp-acuitus-1", source_url: "https://www.acuitus.co.uk/property", import_sources: { name: "Acuitus" }, raw_imports: null },
+    { deal_id: "imp-eddisons-1", source_url: "https://www.eddisons.com/property-search/commercial-property", import_sources: null, raw_imports: null },
   ],
   dealCount: 42,
 }));
@@ -37,6 +37,12 @@ function resetRows() {
     },
   }];
   rows.dealCount = 42;
+  rows.sourceLinks = [
+    { deal_id: "imp-rightmove-1", source_url: "https://www.rightmove.co.uk/commercial-property-for-sale/property-1.html", import_sources: { name: "Rightmove Commercial" }, raw_imports: null },
+    { deal_id: "imp-rightmove-2", source_url: "", import_sources: { name: "Rightmove Commercial" }, raw_imports: null },
+    { deal_id: "imp-acuitus-1", source_url: "https://www.acuitus.co.uk/property", import_sources: { name: "Acuitus" }, raw_imports: null },
+    { deal_id: "imp-eddisons-1", source_url: "https://www.eddisons.com/property-search/commercial-property", import_sources: null, raw_imports: null },
+  ];
 }
 
 const calls = vi.hoisted(() => ({
@@ -57,7 +63,9 @@ vi.mock("@/lib/supabase/client", () => ({
       }
       if (table === "deal_source_links") {
         return {
-          select: async () => ({ data: rows.sourceLinks, error: null }),
+          select: () => ({
+            range: async (from: number, to: number) => ({ data: rows.sourceLinks.slice(from, to + 1), error: null }),
+          }),
         };
       }
       return {
@@ -127,6 +135,27 @@ describe("useNationalScanStatus", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toBeNull();
+  });
+
+  it("counts source links beyond Supabase's default 1000 row page", async () => {
+    rows.sourceLinks = [
+      ...Array.from({ length: 1000 }, (_, index) => ({
+        deal_id: `imp-rightmove-${index}`,
+        source_url: `https://www.rightmove.co.uk/commercial-property-for-sale/property-${index}.html`,
+        import_sources: { name: "Rightmove Commercial" },
+        raw_imports: null,
+      })),
+      { deal_id: "imp-eddisons-page-2", source_url: "https://www.eddisons.com/property-search/page-2", import_sources: { name: "Eddisons" }, raw_imports: null },
+    ];
+
+    const { result } = renderHook(() => useNationalScanStatus(), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toMatchObject({
+      totalRightmoveDeals: 1000,
+      totalEddisonsDeals: 1,
+    });
+    expect(calls.tables.filter((table) => table === "deal_source_links")).toHaveLength(2);
   });
 
   it("formats scan times in UK time", () => {
