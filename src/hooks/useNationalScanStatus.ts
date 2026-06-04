@@ -15,6 +15,7 @@ export type NationalScanStatus = {
   totalDeals: number;
   totalRightmoveDeals: number;
   totalAcuitusDeals: number;
+  totalEddisonsDeals: number;
   locationsCompletedInCurrentCycle: number;
 };
 
@@ -55,6 +56,7 @@ export function useNationalScanStatus() {
         totalDeals,
         totalRightmoveDeals: sourceCounts.rightmove,
         totalAcuitusDeals: sourceCounts.acuitus,
+        totalEddisonsDeals: sourceCounts.eddisons,
         locationsCompletedInCurrentCycle: totalConfiguredLocations > 0 && nextIndex === 0 ? totalConfiguredLocations : nextIndex,
       };
     },
@@ -76,13 +78,15 @@ async function loadSourceDealCounts(supabase: ReturnType<typeof requireSupabase>
   if (error) throw error;
   const rightmove = new Set<string>();
   const acuitus = new Set<string>();
+  const eddisons = new Set<string>();
   for (const row of data ?? []) {
     const importSource = Array.isArray(row.import_sources) ? row.import_sources[0] : row.import_sources;
     const name = String(importSource?.name ?? "").toLowerCase();
     if (name.includes("rightmove")) rightmove.add(row.deal_id);
     if (name.includes("acuitus")) acuitus.add(row.deal_id);
+    if (name.includes("eddisons")) eddisons.add(row.deal_id);
   }
-  return { rightmove: rightmove.size, acuitus: acuitus.size };
+  return { rightmove: rightmove.size, acuitus: acuitus.size, eddisons: eddisons.size };
 }
 
 export function formatNationalScanTime(value: string | null | undefined) {

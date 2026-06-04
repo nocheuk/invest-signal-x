@@ -36,6 +36,7 @@ const nationalScanState = vi.hoisted(() => ({
     totalDeals: 42,
     totalRightmoveDeals: 30,
     totalAcuitusDeals: 12,
+    totalEddisonsDeals: 5,
     locationsCompletedInCurrentCycle: 4,
   },
   isLoading: false,
@@ -209,6 +210,7 @@ describe("Dashboard live location search", () => {
       totalDeals: 42,
       totalRightmoveDeals: 30,
       totalAcuitusDeals: 12,
+      totalEddisonsDeals: 5,
       locationsCompletedInCurrentCycle: 4,
     };
     nationalScanState.isLoading = false;
@@ -604,13 +606,64 @@ describe("Dashboard live location search", () => {
     expect(screen.getByText("National scan status")).toBeInTheDocument();
     expect(screen.getByText(/Last national scan:/)).toBeInTheDocument();
     expect(screen.getByText("Next scheduled scan: daily at 6am UK time")).toBeInTheDocument();
-    expect(screen.getByText("Sources: Rightmove Commercial + Acuitus")).toBeInTheDocument();
+    expect(screen.getByText("Sources: Rightmove Commercial + Acuitus + Eddisons")).toBeInTheDocument();
     expect(screen.getByText("Last run locations: London, Manchester, Birmingham, Leeds")).toBeInTheDocument();
     expect(screen.getByText(/Queue: 160 locations/)).toBeInTheDocument();
     expect(screen.getByText(/Cycle progress: 3%/)).toBeInTheDocument();
     expect(screen.getByText("Locations completed this cycle: 4/160")).toBeInTheDocument();
-    expect(screen.getByText("Database: 42 deals · Rightmove 30 · Acuitus 12")).toBeInTheDocument();
+    expect(screen.getByText("Database: 42 deals · Rightmove 30 · Acuitus 12 · Eddisons 5")).toBeInTheDocument();
     expect(screen.getByText(/Verified Greens:/)).toBeInTheDocument();
+  });
+
+  it("shows inventory audit metrics and outputs an admin report", () => {
+    dealsState.deals = [
+      dashboardDeal({
+        id: "imp-rightmove-audit",
+        title: "Rightmove Audit Deal",
+        importSourceName: "Rightmove Commercial",
+        score: 82,
+        rating: "green",
+        dataConfidenceScore: 86,
+        postedAt: "2026-06-04T09:00:00Z",
+      }),
+      dashboardDeal({
+        id: "imp-acuitus-audit",
+        title: "Acuitus Audit Deal",
+        importSourceName: "Acuitus",
+        score: 73,
+        rating: "amber",
+        dataConfidenceScore: 80,
+        postedAt: "2026-06-03T09:00:00Z",
+      }),
+      dashboardDeal({
+        id: "imp-eddisons-audit",
+        title: "Eddisons Audit Deal",
+        importSourceName: "Eddisons",
+        score: 42,
+        rating: "red",
+        dataConfidenceScore: 50,
+        postedAt: "2026-05-20T09:00:00Z",
+      }),
+    ];
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("Inventory audit")).toBeInTheDocument();
+    expect(screen.getByText("Admin diagnostics")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /generate inventory report/i }));
+
+    expect(screen.getByText(/Total deals: 3/)).toBeInTheDocument();
+    expect(screen.getByText(/Total imported deals: 3/)).toBeInTheDocument();
+    expect(screen.getByText(/Rightmove deals: 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Acuitus deals: 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Eddisons deals: 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Locations completed in current scan cycle: 4\/160/)).toBeInTheDocument();
   });
 
   it("shows a no-run state when no completed national scan exists", () => {

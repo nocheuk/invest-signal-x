@@ -1,4 +1,6 @@
 import { runCustomHtmlScraperImport } from "../scrape-site.mjs";
+import { runEddisonsImport } from "../scrape-eddisons.mjs";
+import { EDDISONS_SALE_LISTINGS_URL, EDDISONS_SOURCE_NAME } from "./eddisonsScraper.mjs";
 import { runSavedAlertsForRecentDeals } from "./alerts.mjs";
 import {
   ACUITUS_LISTINGS_URL,
@@ -60,6 +62,7 @@ export async function runNationalScan({
   batchSize = NATIONAL_SCAN_BATCH_SIZE,
   locations = ENGLAND_PRIORITY_LOCATIONS,
   includeAcuitus = true,
+  includeEddisons = true,
   evaluateAlerts = true,
   adapters = defaultNationalAdapters(),
   now = new Date(),
@@ -111,6 +114,20 @@ export async function runNationalScan({
     results.push(result);
   }
 
+  if (includeEddisons) {
+    const result = await runAndRecordScan({
+      supabase,
+      dryRun,
+      batchId,
+      scanType: NATIONAL_SCAN_TYPE,
+      locationQuery: "England",
+      sourceName: EDDISONS_SOURCE_NAME,
+      metadata: { ...sharedMetadata, national_source: true },
+      run: () => adapters.eddisons({ dryRun }),
+    });
+    results.push(result);
+  }
+
   const alertResult = !dryRun && evaluateAlerts
     ? await runSavedAlertsForRecentDeals({ supabase, since: now, now: new Date() })
     : null;
@@ -140,6 +157,16 @@ function defaultNationalAdapters() {
       sourceConfig: {
         national_scan: true,
         page_url: ACUITUS_LISTINGS_URL,
+      },
+    }),
+    eddisons: ({ dryRun }) => runEddisonsImport({
+      searchUrl: EDDISONS_SALE_LISTINGS_URL,
+      sourceName: EDDISONS_SOURCE_NAME,
+      dryRun,
+      maxPages: 2,
+      sourceConfig: {
+        national_scan: true,
+        page_url: EDDISONS_SALE_LISTINGS_URL,
       },
     }),
   };

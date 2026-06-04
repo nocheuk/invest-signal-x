@@ -115,10 +115,14 @@ describe("national scan scheduler", () => {
           calls.push("acuitus");
           return { source: "Acuitus", inserted: 3, existing: 4, failed: 1, skipped_duplicate: 4, processed: 3, total: 8, unique: 7 };
         },
+        eddisons: async () => {
+          calls.push("eddisons");
+          return { source: "Eddisons", inserted: 2, existing: 1, failed: 0, skipped_duplicate: 1, processed: 2, total: 4, unique: 3 };
+        },
       },
     });
 
-    expect(calls).toEqual(["rightmove:London", "rightmove:Manchester", "acuitus"]);
+    expect(calls).toEqual(["rightmove:London", "rightmove:Manchester", "acuitus", "eddisons"]);
     expect(result.locations).toEqual(["London", "Manchester"]);
     expect(result.nextIndex).toBe(2);
     expect(result.diagnostics).toMatchObject({
@@ -127,10 +131,10 @@ describe("national scan scheduler", () => {
       nextIndex: 2,
     });
     expect(result.totals).toMatchObject({
-      inserted: 5,
-      existing: 8,
+      inserted: 7,
+      existing: 9,
       failed: 1,
-      skippedDuplicate: 8,
+      skippedDuplicate: 9,
     });
   });
 
@@ -141,6 +145,7 @@ describe("national scan scheduler", () => {
       batchSize: 2,
       locations: ["London", "Manchester", "Birmingham"],
       includeAcuitus: false,
+      includeEddisons: false,
       evaluateAlerts: false,
       adapters: {
         rightmove: async ({ locationQuery }: { locationQuery: string }) => ({
