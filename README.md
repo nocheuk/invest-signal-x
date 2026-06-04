@@ -259,7 +259,7 @@ Manual import tools under `/admin/import` remain admin-only.
 
 ### Scheduled National England Scan
 
-DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus is included once per scheduled run from its main listings page.
+DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus and Eddisons are included once per scheduled run from their main sale/listing pages.
 
 The queue lives in `scripts/lib/englandLocationQueue.mjs` and includes:
 
@@ -279,7 +279,7 @@ Each scan run stores coverage diagnostics in `national_scan_runs.metadata`:
 
 On Vercel Hobby the cron is daily, so it can take multiple days to rotate through every city/town in the queue. With the current 160-location queue and a 16-location batch, one full cycle takes about 10 days. A future Pro plan can scan more often and/or use a larger safe batch size.
 
-Rightmove pagination is supported conservatively when the first search page exposes pagination links. The scraper follows a small number of discovered search-result pages, keeps requests serial, and deduplicates repeated source URLs before writing through the import pipeline.
+Rightmove and Eddisons pagination are supported conservatively when the first search page exposes pagination links. The scrapers follow a small number of discovered search-result pages, keep requests serial, and deduplicate repeated source URLs before writing through the import pipeline.
 
 Vercel Cron is configured in `vercel.json`:
 
@@ -409,6 +409,20 @@ Acuitus example:
 
 ```bash
 npm run scrape:site -- --url "https://www.acuitus.co.uk/find-a-property/" --source-name "Acuitus" --selector-config ./scrapers/acuitus.json --dry-run
+```
+
+Eddisons sale-listing scraper:
+
+```bash
+npm run scrape:eddisons -- --dry-run
+```
+
+The Eddisons scraper targets `https://www.eddisons.com/property-search?purchase-type-id=for-sale&limit=24`, parses server-rendered `.property-card` listings, skips rent-only and POA rows, and imports only rows with a concrete sale guide price. It maps title/address, guide price, passing rent when visible, floor area, asset type, image URL and source URL into the shared import pipeline. Increase or reduce the page cap with `--max-pages=2`.
+
+Run a live Eddisons import:
+
+```bash
+npm run scrape:eddisons
 ```
 
 Live imports require:

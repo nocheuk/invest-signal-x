@@ -7,6 +7,7 @@ export const DEMO_SOURCE_FILTER = "Demo/Seed";
 export const ALL_REAL_DEALS_FILTER = "All real deals";
 export const NEEDS_REVIEW_FILTER = "Needs review";
 export const ACUITUS_SOURCE = "Acuitus";
+export const EDDISONS_SOURCE = "Eddisons";
 export const RIGHTMOVE_COMMERCIAL_SOURCE = "Rightmove Commercial";
 
 export type DashboardFilters = {
@@ -84,6 +85,7 @@ export function buildSourceOptions(deals: Deal[]) {
   return [...new Set([
     RIGHTMOVE_COMMERCIAL_SOURCE,
     ACUITUS_SOURCE,
+    EDDISONS_SOURCE,
     IMPORTED_SOURCE_FILTER,
     NEEDS_REVIEW_FILTER,
     DEMO_SOURCE_FILTER,
@@ -117,5 +119,6 @@ function normalizeSourceLabel(name: string, sourceType?: string) {
   const value = `${name} ${sourceType ?? ""}`.toLowerCase();
   if (value.includes("rightmove")) return RIGHTMOVE_COMMERCIAL_SOURCE;
   if (value.includes("acuitus")) return ACUITUS_SOURCE;
+  if (value.includes("eddisons")) return EDDISONS_SOURCE;
   return name;
 }

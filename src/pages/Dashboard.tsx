@@ -14,9 +14,10 @@ import { useSavedAlerts, type SavedAlert, type SaveAlertInput } from "@/hooks/us
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
 import { countDealClassifications } from "@/lib/dealClassification";
+import { buildInventoryAudit, formatInventoryAuditReport } from "@/lib/inventoryAudit";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
-import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save, Bell, Pencil, Trash2 } from "lucide-react";
+import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save, Bell, Pencil, Trash2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,6 +61,7 @@ export default function Dashboard() {
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
   const [editingAlertId, setEditingAlertId] = useState<string | null>(null);
   const [editingAlert, setEditingAlert] = useState<SaveAlertInput | null>(null);
+  const [inventoryReport, setInventoryReport] = useState("");
 
   const currentFilterScope = useMemo(() => {
     return filterAndSortDeals(deals, { region, asset, source, rating: "all", confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
@@ -109,6 +111,7 @@ export default function Dashboard() {
   }), [ids.length, pipelineCounts]);
   const canShowDiagnostics = import.meta.env.DEV || isAdminUser(auth.user);
   const showDebugCounts = canShowDiagnostics;
+  const inventoryAudit = useMemo(() => buildInventoryAudit({ deals, scanStatus: nationalScanStatus.data }), [deals, nationalScanStatus.data]);
   const hasLocationFilter = locationQuery.trim().length > 0;
   const showLocationSearchCta = isSupabaseConfigured && hasLocationFilter && filtered.length < 3;
   const canRunLiveLocationSearch = Boolean(auth.user && auth.session?.access_token);
@@ -181,6 +184,9 @@ export default function Dashboard() {
       // The mutation state renders the user-facing error message.
     }
   };
+  const generateInventoryReport = () => {
+    setInventoryReport(formatInventoryAuditReport(inventoryAudit));
+  };
 
   return (
     <AppLayout>
@@ -239,7 +245,7 @@ export default function Dashboard() {
             </div>
             <div className="text-xs text-muted-foreground sm:text-right">
               <div>Next scheduled scan: daily at 6am UK time</div>
-              <div>Sources: Rightmove Commercial + Acuitus</div>
+              <div>Sources: Rightmove Commercial + Acuitus + Eddisons</div>
               {nationalScanStatus.data && (
                 <>
                   <div>Last run locations: {nationalScanStatus.data.locationsScanned.length ? nationalScanStatus.data.locationsScanned.join(", ") : "Not available"}</div>
@@ -255,7 +261,7 @@ export default function Dashboard() {
                     Locations completed this cycle: {nationalScanStatus.data.locationsCompletedInCurrentCycle}/{nationalScanStatus.data.totalConfiguredLocations || "unknown"}
                   </div>
                   <div>
-                    Database: {nationalScanStatus.data.totalDeals.toLocaleString()} deals · Rightmove {nationalScanStatus.data.totalRightmoveDeals.toLocaleString()} · Acuitus {nationalScanStatus.data.totalAcuitusDeals.toLocaleString()}
+                    Database: {nationalScanStatus.data.totalDeals.toLocaleString()} deals · Rightmove {nationalScanStatus.data.totalRightmoveDeals.toLocaleString()} · Acuitus {nationalScanStatus.data.totalAcuitusDeals.toLocaleString()} · Eddisons {nationalScanStatus.data.totalEddisonsDeals.toLocaleString()}
                   </div>
                   <div>
                     Verified Greens: {kpis.verifiedGreens} · Green Candidates: {kpis.greenCandidates} · Amber: {kpis.amber} · Red: {kpis.red}
@@ -264,6 +270,43 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+        )}
+
+        {canShowDiagnostics && (
+          <section className="ds-card p-4 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Inventory audit</div>
+                <h2 className="text-sm font-medium mt-1">Admin diagnostics</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Real inventory counts from the current deal set and latest scan status.</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={generateInventoryReport} className="h-9 gap-1.5 text-xs">
+                <FileText className="h-3.5 w-3.5" /> Generate inventory report
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              <InventoryMetric label="Total deals" value={inventoryAudit.totalDeals} />
+              <InventoryMetric label="Imported" value={inventoryAudit.totalImportedDeals} />
+              <InventoryMetric label="Rightmove" value={inventoryAudit.rightmoveDeals} />
+              <InventoryMetric label="Acuitus" value={inventoryAudit.acuitusDeals} />
+              <InventoryMetric label="Eddisons" value={inventoryAudit.eddisonsDeals} />
+              <InventoryMetric label="Verified Greens" value={inventoryAudit.verifiedGreens} />
+              <InventoryMetric label="Green Candidates" value={inventoryAudit.greenCandidates} />
+              <InventoryMetric label="Amber" value={inventoryAudit.amber} />
+              <InventoryMetric label="Red" value={inventoryAudit.red} />
+              <InventoryMetric label="Added today" value={inventoryAudit.addedToday} />
+              <InventoryMetric label="Added this week" value={inventoryAudit.addedThisWeek} />
+              <InventoryMetric
+                label="Locations completed"
+                value={inventoryAudit.totalConfiguredLocations ? `${inventoryAudit.locationsCompletedInCurrentCycle}/${inventoryAudit.totalConfiguredLocations}` : inventoryAudit.locationsCompletedInCurrentCycle}
+              />
+            </div>
+            {inventoryReport && (
+              <pre className="max-h-72 overflow-auto rounded-md border border-border/60 bg-surface-2 p-3 text-xs text-muted-foreground whitespace-pre-wrap">
+                {inventoryReport}
+              </pre>
+            )}
+          </section>
         )}
 
         <section className="ds-card p-4 space-y-3">
@@ -670,6 +713,16 @@ function PipelineMetric({ label, value }: { label: string; value: number }) {
     <div className="rounded-md border border-border/60 bg-surface-2/60 px-3 py-2">
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="font-mono text-sm font-semibold tabular">{value}</div>
+    </div>
+  );
+}
+
+function InventoryMetric({ label, value }: { label: string; value: number | string }) {
+  const formatted = typeof value === "number" ? value.toLocaleString() : value;
+  return (
+    <div className="rounded-md border border-border/60 bg-surface-2/60 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="font-mono text-sm font-semibold tabular">{formatted}</div>
     </div>
   );
 }

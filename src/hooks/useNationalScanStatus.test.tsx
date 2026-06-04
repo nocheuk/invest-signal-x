@@ -16,6 +16,7 @@ const rows = vi.hoisted(() => ({
     { deal_id: "imp-rightmove-1", import_sources: { name: "Rightmove Commercial" } },
     { deal_id: "imp-rightmove-2", import_sources: { name: "Rightmove Commercial" } },
     { deal_id: "imp-acuitus-1", import_sources: { name: "Acuitus" } },
+    { deal_id: "imp-eddisons-1", import_sources: { name: "Eddisons" } },
   ],
   dealCount: 42,
 }));
@@ -115,6 +116,7 @@ describe("useNationalScanStatus", () => {
       totalDeals: 42,
       totalRightmoveDeals: 2,
       totalAcuitusDeals: 1,
+      totalEddisonsDeals: 1,
       locationsCompletedInCurrentCycle: 4,
     });
   });

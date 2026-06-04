@@ -5,6 +5,7 @@ import {
   ALL_REAL_DEALS_FILTER,
   buildSourceOptions,
   DEMO_SOURCE_FILTER,
+  EDDISONS_SOURCE,
   filterAndSortDeals,
   IMPORTED_SOURCE_FILTER,
   NEEDS_REVIEW_FILTER,
@@ -86,6 +87,21 @@ const acuitus = deal({
   netInitialYield: 0,
 });
 
+const eddisons = deal({
+  id: "imp-eddisons",
+  title: "Eddisons Freehold Retail",
+  location: "Leeds, LS1 4AP",
+  assetType: "Retail",
+  importSourceName: EDDISONS_SOURCE,
+  isImported: true,
+  needsReview: true,
+  dataConfidenceScore: 75,
+  confidenceLevel: "medium",
+  score: 64,
+  rating: "amber",
+  netInitialYield: 0,
+});
+
 const demo = deal({ id: "ds-demo" });
 
 describe("dashboard deal filters", () => {
@@ -135,6 +151,7 @@ describe("dashboard deal filters", () => {
     expect(allImported.map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
     expect(rightmove.map((item) => item.id)).toEqual(["imp-bournemouth"]);
     expect(buildSourceOptions([demo, imported])).toContain(RIGHTMOVE_COMMERCIAL_SOURCE);
+    expect(buildSourceOptions([demo, imported])).toContain(EDDISONS_SOURCE);
     expect(buildSourceOptions([demo, imported])).not.toContain("Rightmove Bournemouth Commercial Custom");
   });
 
@@ -228,6 +245,22 @@ describe("dashboard deal filters", () => {
 
     expect(sourceResult.map((item) => item.id)).toEqual(["imp-acuitus"]);
     expect(reviewResult.map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
+  });
+
+  it("normalizes and filters Eddisons source labels", () => {
+    expect(sourceLabel(eddisons)).toBe(EDDISONS_SOURCE);
+    expect(filterAndSortDeals([demo, imported, eddisons], {
+      region: "All UK",
+      asset: "All",
+      source: EDDISONS_SOURCE,
+      rating: "all",
+      confidence: "all",
+      minYield: 0,
+      maxPrice: 0,
+      search: "",
+      locationQuery: "",
+      sort: "score",
+    }, weights).map((item) => item.id)).toEqual(["imp-eddisons"]);
   });
 
   it("searches imported and demo deals across title, location, postcode, asset, tenant, and source", () => {
