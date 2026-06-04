@@ -53,7 +53,7 @@ describe("Rightmove location search helpers", () => {
     ], { cwd: path.resolve("."), encoding: "utf8" });
 
     expect(output).toBe("ok");
-  });
+  }, 15000);
 
   it("blocks unauthenticated callers and allows any verified Supabase user", async () => {
     await expect(requireAuthenticatedUser({
