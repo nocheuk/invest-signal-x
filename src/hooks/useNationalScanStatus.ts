@@ -72,21 +72,69 @@ async function loadTotalDealCount(supabase: ReturnType<typeof requireSupabase>) 
 }
 
 async function loadSourceDealCounts(supabase: ReturnType<typeof requireSupabase>) {
-  const { data, error } = await supabase
-    .from("deal_source_links")
-    .select("deal_id,import_sources(name)");
-  if (error) throw error;
+  const rows = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("deal_source_links")
+      .select("deal_id,source_url,import_sources(name),raw_imports(payload,normalized_payload)")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+
   const rightmove = new Set<string>();
   const acuitus = new Set<string>();
   const eddisons = new Set<string>();
-  for (const row of data ?? []) {
+  for (const row of rows) {
     const importSource = Array.isArray(row.import_sources) ? row.import_sources[0] : row.import_sources;
-    const name = String(importSource?.name ?? "").toLowerCase();
-    if (name.includes("rightmove")) rightmove.add(row.deal_id);
-    if (name.includes("acuitus")) acuitus.add(row.deal_id);
-    if (name.includes("eddisons")) eddisons.add(row.deal_id);
+    const rawImport = Array.isArray(row.raw_imports) ? row.raw_imports[0] : row.raw_imports;
+    const sourceText = sourceClassificationText({
+      importSourceName: importSource?.name,
+      sourceUrl: row.source_url,
+      payload: rawImport?.payload,
+      normalizedPayload: rawImport?.normalized_payload,
+    });
+    if (sourceText.includes("rightmove")) rightmove.add(row.deal_id);
+    if (sourceText.includes("acuitus")) acuitus.add(row.deal_id);
+    if (sourceText.includes("eddisons")) eddisons.add(row.deal_id);
   }
   return { rightmove: rightmove.size, acuitus: acuitus.size, eddisons: eddisons.size };
+}
+
+function sourceClassificationText({
+  importSourceName,
+  sourceUrl,
+  payload,
+  normalizedPayload,
+}: {
+  importSourceName?: unknown;
+  sourceUrl?: unknown;
+  payload?: unknown;
+  normalizedPayload?: unknown;
+}) {
+  return [
+    importSourceName,
+    sourceUrl,
+    flattenSourcePayload(payload),
+    flattenSourcePayload(normalizedPayload),
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function flattenSourcePayload(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const record = value as Record<string, unknown>;
+  return [
+    record.source,
+    record.sourceName,
+    record.source_name,
+    record.sourceUrl,
+    record.source_url,
+    record.url,
+    record.pageUrl,
+    record.page_url,
+  ].filter(Boolean).map(String).join(" ");
 }
 
 export function formatNationalScanTime(value: string | null | undefined) {

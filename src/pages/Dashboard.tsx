@@ -13,8 +13,8 @@ import { useSavedSearches, type SavedSearchFilters } from "@/hooks/useSavedSearc
 import { useSavedAlerts, type SavedAlert, type SaveAlertInput } from "@/hooks/useSavedAlerts";
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
-import { countDealClassifications } from "@/lib/dealClassification";
 import { buildInventoryAudit, formatInventoryAuditReport } from "@/lib/inventoryAudit";
+import { buildDashboardKpis } from "@/lib/dashboardKpis";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save, Bell, Pencil, Trash2, FileText } from "lucide-react";
@@ -68,27 +68,14 @@ export default function Dashboard() {
   }, [deals, region, asset, source, minYield, maxPrice, confidence, search, locationQuery, sort, weights]);
 
   const kpis = useMemo(() => {
-    const greens = currentFilterScope.filter(d => d.rating === "green").length;
-    const classifications = countDealClassifications(currentFilterScope);
-    const yields = currentFilterScope.filter(d => d.netInitialYield > 0).map(d => d.netInitialYield);
-    const avg = yields.reduce((a, b) => a + b, 0) / yields.length;
-    const top = [...currentFilterScope].sort((a, b) => b.score - a.score)[0];
-    const withPrice = currentFilterScope.filter((deal) => deal.guidePrice > 0).length;
-    const needsReviewCount = currentFilterScope.filter((deal) => deal.needsReview).length;
-    return {
-      total: currentFilterScope.length,
-      withPrice,
-      greens,
-      verifiedGreens: classifications["verified-green"],
-      greenCandidates: classifications["green-candidate"],
-      amber: classifications.amber,
-      red: classifications.red,
-      avgYield: Number.isFinite(avg) ? avg : 0,
-      top: top?.score ?? 0,
-      watched: ids.length,
-      needsReviewCount,
-    };
-  }, [currentFilterScope, ids.length]);
+    return buildDashboardKpis({
+      allDeals: deals,
+      filteredDeals: currentFilterScope,
+      watchlistIds: ids,
+      pipelineCounts,
+      totalDatabaseDeals: nationalScanStatus.data?.totalDeals,
+    });
+  }, [currentFilterScope, deals, ids, pipelineCounts, nationalScanStatus.data?.totalDeals]);
 
   const filtered = useMemo(() => {
     const base = filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
@@ -102,7 +89,6 @@ export default function Dashboard() {
     return isSupabaseConfigured ? options.filter((option) => option !== DEMO_SOURCE_FILTER && option !== "All") : options;
   }, [deals]);
   const needsReview = useMemo(() => filtered.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [filtered]);
-  const importedCount = useMemo(() => deals.filter((deal) => deal.isImported || deal.importSourceName).length, [deals]);
   const pipelineAnalytics = useMemo(() => ({
     totalSaved: ids.length,
     activeOpportunities: pipelineCounts.Reviewing + pipelineCounts["Viewing Booked"] + pipelineCounts["Offer Submitted"],
@@ -204,7 +190,13 @@ export default function Dashboard() {
 
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <Kpi label="Live deals loaded" value={kpis.total.toLocaleString()} icon={Activity} accent="text-foreground" sub={`${kpis.withPrice} with guide price`} />
+          <Kpi
+            label="Filtered deals"
+            value={kpis.filteredDeals.toLocaleString()}
+            icon={Activity}
+            accent="text-foreground"
+            sub={`${kpis.totalDatabaseDeals.toLocaleString()} total DB · ${kpis.importedDeals.toLocaleString()} imported · ${kpis.withGuidePrice.toLocaleString()} priced`}
+          />
           <Kpi
             label="Verified Green"
             value={kpis.verifiedGreens.toString()}
@@ -225,8 +217,20 @@ export default function Dashboard() {
             active={rating === "green-candidate"}
             ariaLabel={`Show ${kpis.greenCandidates} green candidate deals from current filters`}
           />
-          <Kpi label="Average yield (NIY)" value={formatPct(kpis.avgYield, 2)} icon={TrendingUp} accent="text-foreground" sub="net initial" />
-          <Kpi label="Watchlisted deals" value={kpis.watched.toString()} icon={Bookmark} accent="text-foreground" sub={`${kpis.needsReviewCount} need review`} />
+          <Kpi
+            label="Average yield (NIY)"
+            value={formatPct(kpis.averageYield, 2)}
+            icon={TrendingUp}
+            accent="text-foreground"
+            sub={kpis.yieldSampleSize ? `NIY from ${kpis.yieldSampleSize.toLocaleString()} deals` : "No yield samples"}
+          />
+          <Kpi
+            label="Watchlisted deals"
+            value={kpis.watchlistedDeals.toString()}
+            icon={Bookmark}
+            accent="text-foreground"
+            sub={`${kpis.activeWatchlistDeals.toLocaleString()} active opportunities`}
+          />
         </div>
 
         {isSupabaseConfigured && (
@@ -264,7 +268,7 @@ export default function Dashboard() {
                     Database: {nationalScanStatus.data.totalDeals.toLocaleString()} deals · Rightmove {nationalScanStatus.data.totalRightmoveDeals.toLocaleString()} · Acuitus {nationalScanStatus.data.totalAcuitusDeals.toLocaleString()} · Eddisons {nationalScanStatus.data.totalEddisonsDeals.toLocaleString()}
                   </div>
                   <div>
-                    Verified Greens: {kpis.verifiedGreens} · Green Candidates: {kpis.greenCandidates} · Amber: {kpis.amber} · Red: {kpis.red}
+                    Loaded ratings: Verified Greens {inventoryAudit.verifiedGreens} · Green Candidates {inventoryAudit.greenCandidates} · Amber {inventoryAudit.amber} · Red {inventoryAudit.red}
                   </div>
                 </>
               )}
@@ -382,7 +386,7 @@ export default function Dashboard() {
           </div>
           {showDebugCounts && (
             <div className="text-[11px] text-muted-foreground font-mono tabular">
-              total fetched: {fetchedDeals.length} · visible: {filtered.length} · imported: {importedCount}
+              total DB: {kpis.totalDatabaseDeals} · fetched: {fetchedDeals.length} · visible: {filtered.length} · imported: {kpis.importedDeals}
             </div>
           )}
 
