@@ -16,6 +16,8 @@ import { formatNationalScanTime, formatScanDuration, useNationalScanStatus } fro
 import { buildInventoryAudit, formatInventoryAuditReport } from "@/lib/inventoryAudit";
 import { buildDashboardKpis } from "@/lib/dashboardKpis";
 import { buildFreshnessMetrics, filterByFreshness, formatImportDate, type FreshnessFilter, sortNewestDeals } from "@/lib/freshness";
+import { getAreaIntelligence } from "@/lib/areaIntelligence";
+import { top10ThisWeek, top25Opportunities, type ShortlistMode } from "@/lib/investorShortlist";
 import { ClassificationBadge } from "@/components/RatingBadge";
 import { classifyDeal } from "@/lib/dealClassification";
 import { StrategyControl } from "@/components/StrategyControl";
@@ -62,6 +64,7 @@ export default function Dashboard() {
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
   const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence" | "newest">("score");
   const [freshnessFilter, setFreshnessFilter] = useState<FreshnessFilter>("all");
+  const [shortlistMode, setShortlistMode] = useState<ShortlistMode>("balanced");
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
   const [editingAlertId, setEditingAlertId] = useState<string | null>(null);
   const [editingAlert, setEditingAlert] = useState<SaveAlertInput | null>(null);
@@ -97,6 +100,10 @@ export default function Dashboard() {
   }, [deals]);
   const needsReview = useMemo(() => filtered.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [filtered]);
   const recentlyAdded = useMemo(() => sortNewestDeals(filtered.filter((deal) => deal.isImported || deal.importSourceName)).slice(0, 5), [filtered]);
+  const areaIntelligenceByDealId = useMemo(() => new Map(deals.map((deal) => [deal.id, getAreaIntelligence(deal, deals)])), [deals]);
+  const topThisWeek = useMemo(() => top10ThisWeek(filtered, deals, now, shortlistMode), [filtered, deals, now, shortlistMode]);
+  const topOpportunities = useMemo(() => top25Opportunities(filtered, deals, shortlistMode), [filtered, deals, shortlistMode]);
+  const shortlist = topThisWeek.length > 0 ? topThisWeek : topOpportunities.slice(0, 10);
   const pipelineAnalytics = useMemo(() => ({
     totalSaved: ids.length,
     activeOpportunities: pipelineCounts.Reviewing + pipelineCounts["Viewing Booked"] + pipelineCounts["Offer Submitted"],
@@ -404,6 +411,48 @@ export default function Dashboard() {
           </div>
         </section>
 
+        {shortlist.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="font-display text-2xl">Top Opportunities</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {topThisWeek.length > 0 ? "Top 10 this week from the active filters." : "Top opportunities from the active filters."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <ShortlistModeButton label="Balanced" mode="balanced" active={shortlistMode === "balanced"} onClick={setShortlistMode} />
+                <ShortlistModeButton label="Top Yield" mode="top-yield" active={shortlistMode === "top-yield"} onClick={setShortlistMode} />
+                <ShortlistModeButton label="Most Undervalued" mode="most-undervalued" active={shortlistMode === "most-undervalued"} onClick={setShortlistMode} />
+                <ShortlistModeButton label="Highest Confidence" mode="highest-confidence" active={shortlistMode === "highest-confidence"} onClick={setShortlistMode} />
+              </div>
+            </div>
+            <div className="ds-card overflow-hidden">
+              {shortlist.map((item) => (
+                <div key={item.deal.id} className="grid grid-cols-12 gap-3 items-start px-4 py-3 border-b border-border/40 last:border-b-0 text-sm">
+                  <div className="col-span-2 md:col-span-1 font-mono text-sm font-semibold tabular text-primary">#{item.rank}</div>
+                  <div className="col-span-10 md:col-span-4 min-w-0">
+                    <div className="font-medium truncate">{item.deal.title}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">{item.deal.location} · {getSourceLabel(item.deal)}</div>
+                  </div>
+                  <div className="col-span-4 md:col-span-2 font-mono text-xs tabular text-muted-foreground">
+                    Shortlist {item.shortlistScore} · Deal {item.deal.score}
+                  </div>
+                  <div className="col-span-8 md:col-span-3 text-[11px] text-muted-foreground">
+                    {item.reasons.slice(0, 2).join(" · ")}
+                  </div>
+                  <div className="col-span-12 md:col-span-2 flex justify-start md:justify-end">
+                    <ClassificationBadge classification={classifyDeal(item.deal)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              Top 25 Opportunities available in this ranking: {topOpportunities.length.toLocaleString()}.
+            </div>
+          </section>
+        )}
+
         {recentlyAdded.length > 0 && (
           <section className="space-y-3">
             <div className="flex items-end justify-between">
@@ -447,7 +496,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="grid md:grid-cols-3 gap-4">
-              {needsReview.slice(0, 3).map((d) => <DealCard key={d.id} deal={d} variant="feature" />)}
+              {needsReview.slice(0, 3).map((d) => <DealCard key={d.id} deal={d} variant="feature" areaIntelligence={areaIntelligenceByDealId.get(d.id)} />)}
             </div>
           </section>
         )}
@@ -461,7 +510,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid md:grid-cols-3 gap-4">
-            {best.map((d) => <DealCard key={d.id} deal={d} variant="feature" />)}
+            {best.map((d) => <DealCard key={d.id} deal={d} variant="feature" areaIntelligence={areaIntelligenceByDealId.get(d.id)} />)}
           </div>
         </section>
         )}
@@ -828,6 +877,24 @@ function PipelineMetric({ label, value }: { label: string; value: number }) {
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="font-mono text-sm font-semibold tabular">{value}</div>
     </div>
+  );
+}
+
+function ShortlistModeButton({ label, mode, active, onClick }: { label: string; mode: ShortlistMode; active: boolean; onClick: (mode: ShortlistMode) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(mode)}
+      aria-pressed={active}
+      className={cn(
+        "rounded-md border px-2.5 py-1 text-xs transition-colors",
+        active
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border/60 bg-surface-2 text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {label}
+    </button>
   );
 }
 

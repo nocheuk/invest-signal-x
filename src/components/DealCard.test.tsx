@@ -160,6 +160,35 @@ describe("DealCard", () => {
     expect(screen.getByText(/Lease information missing/)).toBeInTheDocument();
   });
 
+  it("shows area intelligence comparisons when local stats are available", () => {
+    render(
+      <MemoryRouter>
+        <DealCard
+          deal={deal({ netInitialYield: 8.5, pricePerSqft: 118 })}
+          areaIntelligence={{
+            stats: {
+              group: "city",
+              area: "Bournemouth",
+              dealCount: 5,
+              averageYield: 6.7,
+              medianYield: 6.8,
+              averagePricePerSqft: 165,
+              medianPricePerSqft: 160,
+            },
+            yieldDelta: 1.8,
+            pricePerSqftDelta: -47,
+            insights: ["Above average yield", "Below average £/sqft"],
+          }}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Yield vs area")).toBeInTheDocument();
+    expect(screen.getByText("+1.8 pts vs local avg")).toBeInTheDocument();
+    expect(screen.getByText("£/sqft vs area")).toBeInTheDocument();
+    expect(screen.getByText("-£47/sqft vs local avg")).toBeInTheDocument();
+  });
+
   it("shows a Green Candidate badge and qualification reason", () => {
     renderCard(deal({
       score: 73,
