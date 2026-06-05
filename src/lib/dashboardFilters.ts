@@ -20,7 +20,7 @@ export type DashboardFilters = {
   maxPrice: number;
   search: string;
   locationQuery: string;
-  sort: "score" | "yield" | "price" | "confidence";
+  sort: "score" | "yield" | "price" | "confidence" | "newest";
 };
 
 export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, weights: StrategyWeights) {
@@ -42,6 +42,7 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
   if (filters.sort === "yield") result = [...result].sort((a, b) => b.netInitialYield - a.netInitialYield);
   if (filters.sort === "price") result = [...result].sort((a, b) => a.guidePrice - b.guidePrice);
   if (filters.sort === "confidence") result = [...result].sort((a, b) => (b.dataConfidenceScore ?? 0) - (a.dataConfidenceScore ?? 0));
+  if (filters.sort === "newest") result = [...result].sort((a, b) => dateValue(b.postedAt) - dateValue(a.postedAt));
   return result;
 }
 
@@ -113,6 +114,11 @@ export function extractPostcode(location: string) {
 
 function normalize(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function dateValue(value: string) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function normalizeSourceLabel(name: string, sourceType?: string) {

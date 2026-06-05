@@ -12,18 +12,21 @@ import { useProfile } from "@/hooks/useProfile";
 import { useSavedSearches, type SavedSearchFilters } from "@/hooks/useSavedSearches";
 import { useSavedAlerts, type SavedAlert, type SaveAlertInput } from "@/hooks/useSavedAlerts";
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
-import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
+import { formatNationalScanTime, formatScanDuration, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
 import { buildInventoryAudit, formatInventoryAuditReport } from "@/lib/inventoryAudit";
 import { buildDashboardKpis } from "@/lib/dashboardKpis";
+import { buildFreshnessMetrics, filterByFreshness, formatImportDate, type FreshnessFilter, sortNewestDeals } from "@/lib/freshness";
+import { ClassificationBadge } from "@/components/RatingBadge";
+import { classifyDeal } from "@/lib/dealClassification";
 import { StrategyControl } from "@/components/StrategyControl";
 import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
-import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save, Bell, Pencil, Trash2, FileText } from "lucide-react";
+import { Activity, Target, TrendingUp, Bookmark, Sparkles, ArrowUpRight, Filter, Search, Save, Bell, Pencil, Trash2, FileText, CalendarDays, Clock3, RadioTower } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Hint } from "@/components/Hint";
 import { cn } from "@/lib/utils";
-import { ALL_REAL_DEALS_FILTER, buildSourceOptions, DEMO_SOURCE_FILTER, filterAndSortDeals, isSeedDeal } from "@/lib/dashboardFilters";
+import { ALL_REAL_DEALS_FILTER, buildSourceOptions, DEMO_SOURCE_FILTER, filterAndSortDeals, isSeedDeal, sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { defaultAlertName } from "@/lib/alerts";
 import { isAdminUser } from "@/lib/admin";
@@ -57,7 +60,8 @@ export default function Dashboard() {
   const [confidence, setConfidence] = useState<"all" | "high" | "medium" | "low">("all");
   const [pipelineStatus, setPipelineStatus] = useState<"all" | PipelineStatus>("all");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
-  const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence">("score");
+  const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence" | "newest">("score");
+  const [freshnessFilter, setFreshnessFilter] = useState<FreshnessFilter>("all");
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
   const [editingAlertId, setEditingAlertId] = useState<string | null>(null);
   const [editingAlert, setEditingAlert] = useState<SaveAlertInput | null>(null);
@@ -76,12 +80,15 @@ export default function Dashboard() {
       totalDatabaseDeals: nationalScanStatus.data?.totalDeals,
     });
   }, [currentFilterScope, deals, ids, pipelineCounts, nationalScanStatus.data?.totalDeals]);
+  const now = useMemo(() => new Date(), []);
+  const freshnessKpis = useMemo(() => buildFreshnessMetrics(currentFilterScope, now), [currentFilterScope, now]);
 
   const filtered = useMemo(() => {
     const base = filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
-    if (pipelineStatus === "all") return base;
-    return base.filter((deal) => pipelineItems[deal.id]?.status === pipelineStatus);
-  }, [deals, region, asset, source, minYield, maxPrice, rating, confidence, search, locationQuery, sort, weights, pipelineStatus, pipelineItems]);
+    const fresh = filterByFreshness(base, freshnessFilter, now);
+    if (pipelineStatus === "all") return fresh;
+    return fresh.filter((deal) => pipelineItems[deal.id]?.status === pipelineStatus);
+  }, [deals, region, asset, source, minYield, maxPrice, rating, confidence, search, locationQuery, sort, weights, freshnessFilter, now, pipelineStatus, pipelineItems]);
 
   const best = useMemo(() => [...filtered].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights)).slice(0, 3), [filtered, weights]);
   const sourceOptions = useMemo(() => {
@@ -89,6 +96,7 @@ export default function Dashboard() {
     return isSupabaseConfigured ? options.filter((option) => option !== DEMO_SOURCE_FILTER && option !== "All") : options;
   }, [deals]);
   const needsReview = useMemo(() => filtered.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [filtered]);
+  const recentlyAdded = useMemo(() => sortNewestDeals(filtered.filter((deal) => deal.isImported || deal.importSourceName)).slice(0, 5), [filtered]);
   const pipelineAnalytics = useMemo(() => ({
     totalSaved: ids.length,
     activeOpportunities: pipelineCounts.Reviewing + pipelineCounts["Viewing Booked"] + pipelineCounts["Offer Submitted"],
@@ -233,6 +241,49 @@ export default function Dashboard() {
           />
         </div>
 
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Kpi
+            label="New Today"
+            value={freshnessKpis.newToday.toLocaleString()}
+            icon={Clock3}
+            accent="text-primary"
+            sub="imported in 24h"
+            onClick={() => setFreshnessFilter(freshnessFilter === "today" ? "all" : "today")}
+            active={freshnessFilter === "today"}
+            ariaLabel={`Show ${freshnessKpis.newToday} deals imported today`}
+          />
+          <Kpi
+            label="New This Week"
+            value={freshnessKpis.newThisWeek.toLocaleString()}
+            icon={CalendarDays}
+            accent="text-foreground"
+            sub="imported in 7d"
+            onClick={() => setFreshnessFilter(freshnessFilter === "week" ? "all" : "week")}
+            active={freshnessFilter === "week"}
+            ariaLabel={`Show ${freshnessKpis.newThisWeek} deals imported this week`}
+          />
+          <Kpi
+            label="New Green Candidates"
+            value={freshnessKpis.newGreenCandidates.toLocaleString()}
+            icon={Sparkles}
+            accent="text-primary"
+            sub="candidate / 7d"
+            onClick={() => setFreshnessFilter(freshnessFilter === "green-candidates-week" ? "all" : "green-candidates-week")}
+            active={freshnessFilter === "green-candidates-week"}
+            ariaLabel={`Show ${freshnessKpis.newGreenCandidates} new green candidate deals`}
+          />
+          <Kpi
+            label="New Sources Today"
+            value={freshnessKpis.newSourcesToday.toLocaleString()}
+            icon={RadioTower}
+            accent="text-foreground"
+            sub="source listings / 24h"
+            onClick={() => setFreshnessFilter(freshnessFilter === "sources-today" ? "all" : "sources-today")}
+            active={freshnessFilter === "sources-today"}
+            ariaLabel={`Show ${freshnessKpis.newSourcesToday} source listings imported today`}
+          />
+        </div>
+
         {isSupabaseConfigured && (
           <div className="ds-card p-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -269,6 +320,12 @@ export default function Dashboard() {
                   </div>
                   <div>
                     Loaded ratings: Verified Greens {inventoryAudit.verifiedGreens} · Green Candidates {inventoryAudit.greenCandidates} · Amber {inventoryAudit.amber} · Red {inventoryAudit.red}
+                  </div>
+                  <div>
+                    Freshness: {freshnessKpis.newToday.toLocaleString()} added today · {freshnessKpis.newThisWeek.toLocaleString()} this week
+                  </div>
+                  <div>
+                    Last successful scan duration: {formatScanDuration(nationalScanStatus.data.lastSuccessfulScanDurationMs)} · Inserted: {nationalScanStatus.data.lastScanInsertedCount.toLocaleString()}
                   </div>
                 </>
               )}
@@ -345,6 +402,36 @@ export default function Dashboard() {
             ))}
           </div>
         </section>
+
+        {recentlyAdded.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-end justify-between">
+              <div>
+                <h2 className="font-display text-2xl">Recently Added</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Newest imported opportunities from the active filters.</p>
+              </div>
+              <button onClick={() => setSort("newest")} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+                Sort newest <ArrowUpRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="ds-card overflow-hidden">
+              {recentlyAdded.map((deal) => (
+                <div key={deal.id} className="grid grid-cols-12 gap-3 items-center px-4 py-3 border-b border-border/40 last:border-b-0 text-sm">
+                  <div className="col-span-12 md:col-span-5 min-w-0">
+                    <div className="font-medium truncate">{deal.title}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">{deal.location}</div>
+                  </div>
+                  <div className="col-span-5 md:col-span-2 text-xs text-muted-foreground">{formatImportDate(deal.postedAt)}</div>
+                  <div className="col-span-4 md:col-span-2 text-xs text-muted-foreground truncate">{getSourceLabel(deal)}</div>
+                  <div className="col-span-3 md:col-span-1 font-mono text-sm font-semibold tabular text-right md:text-left">{deal.score}</div>
+                  <div className="col-span-12 md:col-span-2 flex justify-start md:justify-end">
+                    <ClassificationBadge classification={classifyDeal(deal)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Needs review */}
         {needsReview.length > 0 && (
@@ -496,6 +583,7 @@ export default function Dashboard() {
                 <SelectTrigger className="h-9 w-[130px] bg-surface-2 border-border/60 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="score">Highest score</SelectItem>
+                  <SelectItem value="newest">Newest</SelectItem>
                   <SelectItem value="confidence">Highest confidence</SelectItem>
                   <SelectItem value="yield">Highest yield</SelectItem>
                   <SelectItem value="price">Lowest price</SelectItem>
@@ -528,6 +616,19 @@ export default function Dashboard() {
                 className="rounded-md border border-border/60 bg-surface-2 px-2.5 py-1 text-muted-foreground hover:text-foreground"
               >
                 Clear pipeline filter
+              </button>
+            </div>
+          )}
+
+          {freshnessFilter !== "all" && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-primary">{freshnessFilterLabel(freshnessFilter)}</span>
+              <button
+                type="button"
+                onClick={() => setFreshnessFilter("all")}
+                className="rounded-md border border-border/60 bg-surface-2 px-2.5 py-1 text-muted-foreground hover:text-foreground"
+              >
+                Clear freshness filter
               </button>
             </div>
           )}
@@ -697,6 +798,14 @@ export default function Dashboard() {
 function formatEnvDiagnostics(env?: Record<string, boolean>) {
   if (!env) return "-";
   return Object.entries(env).map(([key, value]) => `${key}=${value ? "set" : "missing"}`).join(", ");
+}
+
+function freshnessFilterLabel(filter: FreshnessFilter) {
+  if (filter === "today") return "New Today";
+  if (filter === "week") return "New This Week";
+  if (filter === "green-candidates-week") return "New Green Candidates";
+  if (filter === "sources-today") return "New Sources Today";
+  return "Freshness";
 }
 
 function alertToInput(alert: SavedAlert): SaveAlertInput {
