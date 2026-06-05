@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Bookmark, Settings, Search, LogOut, UploadCloud } from "lucide-react";
+import { Bell, Bookmark, Database, LayoutDashboard, ListFilter, Settings, Search, LogOut, UploadCloud } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,10 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/watchlist", label: "Watchlist", icon: Bookmark },
+  { to: "/deals", label: "All Deals", icon: ListFilter },
+  { to: "/pipeline", label: "Pipeline", icon: Bookmark },
+  { to: "/alerts", label: "Alerts", icon: Bell },
+  { to: "/sources", label: "Sources / Scans", icon: Database },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -36,14 +39,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
   };
 
   const handleSearch = (value: string) => {
-    const params = new URLSearchParams(pathname === "/dashboard" ? search : "");
+    const params = new URLSearchParams(pathname === "/deals" ? search : "");
     if (value.trim()) {
       params.set("q", value);
     } else {
       params.delete("q");
     }
     const query = params.toString();
-    navigate(`/dashboard${query ? `?${query}` : ""}`, { replace: pathname === "/dashboard" });
+    navigate(`/deals${query ? `?${query}` : ""}`, { replace: pathname === "/deals" });
   };
 
   return (
@@ -55,7 +58,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map(({ to, label, icon: Icon }) => {
-            const active = pathname === to || (to === "/dashboard" && pathname.startsWith("/deal/"));
+            const active = pathname === to || (to === "/deals" && pathname.startsWith("/deal/")) || (to === "/pipeline" && pathname === "/watchlist");
             return (
               <Link
                 key={to}
@@ -69,7 +72,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               >
                 <Icon className="h-4 w-4" />
                 <span>{label}</span>
-                {to === "/watchlist" && ids.length > 0 && (
+                {to === "/pipeline" && ids.length > 0 && (
                   <span className="ml-auto text-[10px] font-mono tabular bg-primary/15 text-primary px-1.5 py-0.5 rounded">
                     {ids.length}
                   </span>
@@ -126,7 +129,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         {/* Mobile nav */}
         <nav className="lg:hidden flex overflow-x-auto scrollbar-none gap-1 px-3 py-2 border-b border-border/60 bg-background">
           {navItems.map(({ to, label, icon: Icon }) => {
-            const active = pathname === to;
+            const active = pathname === to || (to === "/pipeline" && pathname === "/watchlist");
             return (
               <Link key={to} to={to} className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap",
