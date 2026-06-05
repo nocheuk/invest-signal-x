@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -23,30 +24,32 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <WatchlistProvider>
-          <StrategyProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/deal/:id" element={<ProtectedRoute><DealDetail /></ProtectedRoute>} />
-                <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                <Route path="/admin/import" element={<ProtectedRoute><AdminRoute><AdminImport /></AdminRoute></ProtectedRoute>} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </StrategyProvider>
-        </WatchlistProvider>
-      </AuthProvider>
-    </TooltipProvider>
+    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="dealsignal-theme" enableSystem>
+      <TooltipProvider>
+        <AuthProvider>
+          <WatchlistProvider>
+            <StrategyProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/deal/:id" element={<ProtectedRoute><DealDetail /></ProtectedRoute>} />
+                  <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
+                  <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                  <Route path="/admin/import" element={<ProtectedRoute><AdminRoute><AdminImport /></AdminRoute></ProtectedRoute>} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </StrategyProvider>
+          </WatchlistProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

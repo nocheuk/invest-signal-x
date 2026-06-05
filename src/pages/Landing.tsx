@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Bell, Bookmark, FileText, MapPin, Search, ShieldCheck, TrendingUp } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const CAPABILITIES = [
   {
@@ -51,6 +52,7 @@ export default function Landing() {
             <a href="#disclaimer" className="hover:text-foreground transition-colors">Disclaimer</a>
           </nav>
           <div className="flex items-center gap-2">
+            <ThemeToggle compact />
             <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground hidden sm:inline">Sign in</Link>
             <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Link to="/pricing#request-access">Request beta access</Link>

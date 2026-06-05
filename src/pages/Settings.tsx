@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Settings() {
   const auth = useAuth();
@@ -50,6 +51,16 @@ export default function Settings() {
               desc="Save deals, update review status and keep private notes from deal cards or deal detail."
               to="/dashboard"
             />
+          </div>
+        </Section>
+
+        <Section title="Appearance" desc="Dark mode is the default. Your preference is saved on this device.">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-surface-2 p-4">
+            <div>
+              <div className="text-sm font-semibold">Theme</div>
+              <p className="text-xs text-muted-foreground mt-1">Choose dark, light or follow your system setting.</p>
+            </div>
+            <ThemeToggle />
           </div>
         </Section>
 
