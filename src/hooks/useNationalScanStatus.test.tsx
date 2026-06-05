@@ -21,6 +21,8 @@ const rows = vi.hoisted(() => ({
     { deal_id: "imp-allsop-1", source_url: "https://www.allsop.co.uk/investment-overview/property/ci00436", import_sources: { name: "Allsop" }, raw_imports: null },
   ],
   dealCount: 42,
+  sourceLinksError: null as string | null,
+  dealCountError: null as string | null,
 }));
 
 function resetRows() {
@@ -40,6 +42,8 @@ function resetRows() {
     },
   }];
   rows.dealCount = 42;
+  rows.sourceLinksError = null;
+  rows.dealCountError = null;
   rows.sourceLinks = [
     { deal_id: "imp-rightmove-1", source_url: "https://www.rightmove.co.uk/commercial-property-for-sale/property-1.html", import_sources: { name: "Rightmove Commercial" }, raw_imports: null },
     { deal_id: "imp-rightmove-2", source_url: "", import_sources: { name: "Rightmove Commercial" }, raw_imports: null },
@@ -62,13 +66,16 @@ vi.mock("@/lib/supabase/client", () => ({
       calls.tables.push(table);
       if (table === "deals") {
         return {
-          select: async () => ({ count: rows.dealCount, error: null }),
+          select: async () => ({ count: rows.dealCount, error: rows.dealCountError ? { message: rows.dealCountError } : null }),
         };
       }
       if (table === "deal_source_links") {
         return {
           select: () => ({
-            range: async (from: number, to: number) => ({ data: rows.sourceLinks.slice(from, to + 1), error: null }),
+            range: async (from: number, to: number) => ({
+              data: rows.sourceLinksError ? null : rows.sourceLinks.slice(from, to + 1),
+              error: rows.sourceLinksError ? { message: rows.sourceLinksError } : null,
+            }),
           }),
         };
       }
@@ -165,6 +172,22 @@ describe("useNationalScanStatus", () => {
       totalAllsopDeals: 1,
     });
     expect(calls.tables.filter((table) => table === "deal_source_links")).toHaveLength(2);
+  });
+
+  it("returns the scan row with safe count fallbacks when dashboard count queries fail", async () => {
+    rows.sourceLinksError = "count query failed";
+    rows.dealCountError = "deal count failed";
+    const { result } = renderHook(() => useNationalScanStatus(), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toMatchObject({
+      id: "scan-1",
+      totalDeals: 0,
+      totalRightmoveDeals: 0,
+      totalAcuitusDeals: 0,
+      totalEddisonsDeals: 0,
+      totalAllsopDeals: 0,
+    });
   });
 
   it("formats scan times and durations", () => {

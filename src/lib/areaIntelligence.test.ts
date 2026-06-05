@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Deal } from "@/lib/deals";
-import { buildAreaStats, formatAreaDelta, getAreaIntelligence } from "@/lib/areaIntelligence";
+import { buildAreaIntelligenceIndex, buildAreaStats, formatAreaDelta, getAreaIntelligenceFromIndex, getAreaIntelligence } from "@/lib/areaIntelligence";
 
 function deal(overrides: Partial<Deal>): Deal {
   return {
@@ -73,6 +73,36 @@ describe("area intelligence", () => {
     expect(intelligence.yieldDelta).toBeCloseTo(2);
     expect(intelligence.pricePerSqftDelta).toBeCloseTo(-50);
     expect(intelligence.insights).toEqual(expect.arrayContaining(["Above average yield", "Below average £/sqft"]));
+  });
+
+  it("reuses a prebuilt area index without rebuilding peer groups per deal", () => {
+    const target = deal({ id: "target", netInitialYield: 9, pricePerSqft: 90 });
+    const peers = [
+      target,
+      deal({ id: "peer-1", netInitialYield: 6, pricePerSqft: 160 }),
+      deal({ id: "peer-2", netInitialYield: 8, pricePerSqft: 120 }),
+      deal({ id: "peer-3", netInitialYield: 7, pricePerSqft: 140 }),
+    ];
+    const index = buildAreaIntelligenceIndex(peers);
+
+    expect(getAreaIntelligenceFromIndex(target, index).yieldDelta).toBeCloseTo(2);
+    expect(getAreaIntelligenceFromIndex(peers[1], index).yieldDelta).toBeCloseTo(-2);
+  });
+
+  it("handles production-sized imported deal sets without quadratic dashboard work", () => {
+    const manyDeals = Array.from({ length: 1500 }, (_, index) => deal({
+      id: `deal-${index}`,
+      location: `Bournemouth, BH${index % 10}`,
+      region: "Dorset",
+      netInitialYield: 5 + (index % 6),
+      pricePerSqft: 80 + (index % 50),
+    }));
+    const index = buildAreaIntelligenceIndex(manyDeals);
+
+    const intelligence = manyDeals.slice(0, 50).map((item) => getAreaIntelligenceFromIndex(item, index));
+
+    expect(intelligence).toHaveLength(50);
+    expect(intelligence[0].stats?.dealCount).toBe(1499);
   });
 
   it("falls back to region and marks limited area data", () => {

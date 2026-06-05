@@ -773,4 +773,22 @@ describe("Dashboard live location search", () => {
 
     expect(screen.getByText("National scan has not run yet")).toBeInTheDocument();
   });
+
+  it("keeps the dashboard usable when national scan status fails", () => {
+    nationalScanState.data = null;
+    nationalScanState.isError = true;
+    dealsState.deals = [dashboardDeal({ id: "imp-live-error-state", title: "Live Deal Still Visible" })];
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText("Could not load national scan status")).toBeInTheDocument();
+    expect(screen.getAllByText("Live Deal Still Visible").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("All live opportunities")).toBeInTheDocument();
+  });
 });

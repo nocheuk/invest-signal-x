@@ -23,6 +23,7 @@ export type NationalScanStatus = {
 };
 
 export const nationalScanStatusQueryKey = ["national-scan-status"];
+const EMPTY_SOURCE_COUNTS = { rightmove: 0, acuitus: 0, eddisons: 0, allsop: 0 };
 
 export function useNationalScanStatus() {
   return useQuery({
@@ -41,8 +42,18 @@ export function useNationalScanStatus() {
       const row = data?.[0];
       if (!row) return null;
       const metadata = (row.metadata ?? {}) as Record<string, unknown>;
-      const sourceCounts = await loadSourceDealCounts(supabase);
-      const totalDeals = await loadTotalDealCount(supabase);
+      const sourceCounts = await withTimeout(
+        loadSourceDealCounts(supabase),
+        8000,
+        EMPTY_SOURCE_COUNTS,
+        "national scan source counts"
+      );
+      const totalDeals = await withTimeout(
+        loadTotalDealCount(supabase),
+        5000,
+        0,
+        "national scan deal count"
+      );
       const totalConfiguredLocations = Number(metadata.total_configured_locations ?? 0);
       const nextIndex = Number(metadata.next_index ?? 0);
       return {
@@ -69,6 +80,35 @@ export function useNationalScanStatus() {
   });
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`Timed out loading ${label}`);
+      resolve(fallback);
+    }, ms);
+  });
+
+  try {
+    return await Promise.race([
+      promise.catch((error) => {
+        const message = errorMessage(error);
+        console.warn(`Could not load ${label}`, message);
+        return fallback;
+      }),
+      timeout,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) return String((error as { message: unknown }).message);
+  return String(error);
+}
+
 async function loadTotalDealCount(supabase: ReturnType<typeof requireSupabase>) {
   const { count, error } = await supabase
     .from("deals")
@@ -83,7 +123,7 @@ async function loadSourceDealCounts(supabase: ReturnType<typeof requireSupabase>
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("deal_source_links")
-      .select("deal_id,source_url,import_sources(name),raw_imports(payload,normalized_payload)")
+      .select("deal_id,source_url,import_sources(name)")
       .range(from, from + pageSize - 1);
     if (error) throw error;
     rows.push(...(data ?? []));
@@ -96,12 +136,9 @@ async function loadSourceDealCounts(supabase: ReturnType<typeof requireSupabase>
   const allsop = new Set<string>();
   for (const row of rows) {
     const importSource = Array.isArray(row.import_sources) ? row.import_sources[0] : row.import_sources;
-    const rawImport = Array.isArray(row.raw_imports) ? row.raw_imports[0] : row.raw_imports;
     const sourceText = sourceClassificationText({
       importSourceName: importSource?.name,
       sourceUrl: row.source_url,
-      payload: rawImport?.payload,
-      normalizedPayload: rawImport?.normalized_payload,
     });
     if (sourceText.includes("rightmove")) rightmove.add(row.deal_id);
     if (sourceText.includes("acuitus")) acuitus.add(row.deal_id);
@@ -114,35 +151,14 @@ async function loadSourceDealCounts(supabase: ReturnType<typeof requireSupabase>
 function sourceClassificationText({
   importSourceName,
   sourceUrl,
-  payload,
-  normalizedPayload,
 }: {
   importSourceName?: unknown;
   sourceUrl?: unknown;
-  payload?: unknown;
-  normalizedPayload?: unknown;
 }) {
   return [
     importSourceName,
     sourceUrl,
-    flattenSourcePayload(payload),
-    flattenSourcePayload(normalizedPayload),
   ].filter(Boolean).join(" ").toLowerCase();
-}
-
-function flattenSourcePayload(value: unknown): string {
-  if (!value || typeof value !== "object") return "";
-  const record = value as Record<string, unknown>;
-  return [
-    record.source,
-    record.sourceName,
-    record.source_name,
-    record.sourceUrl,
-    record.source_url,
-    record.url,
-    record.pageUrl,
-    record.page_url,
-  ].filter(Boolean).map(String).join(" ");
 }
 
 function scanDurationMs(startedAt: string | null | undefined, finishedAt: string | null | undefined) {

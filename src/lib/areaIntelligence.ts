@@ -19,25 +19,54 @@ export type AreaIntelligence = {
   insights: string[];
 };
 
-export function buildAreaStats(deals: Deal[], { excludeDealId }: { excludeDealId?: string } = {}) {
-  const imported = deals.filter((deal) => isImportedDeal(deal) && deal.id !== excludeDealId);
+type AreaGroupRecord = {
+  group: AreaGroup;
+  area: string;
+  deals: Deal[];
+};
+
+export type AreaIntelligenceIndex = Record<AreaGroup, Map<string, AreaGroupRecord>>;
+
+export const EMPTY_AREA_INTELLIGENCE_INDEX: AreaIntelligenceIndex = {
+  city: new Map(),
+  postcodeArea: new Map(),
+  region: new Map(),
+};
+
+export function buildAreaIntelligenceIndex(deals: Deal[]): AreaIntelligenceIndex {
+  const imported = deals.filter(isImportedDeal);
   return {
-    city: groupStats(imported, cityKey),
-    postcodeArea: groupStats(imported, postcodeAreaKey),
-    region: groupStats(imported, regionKey),
+    city: groupRecords(imported, cityKey, "city"),
+    postcodeArea: groupRecords(imported, postcodeAreaKey, "postcodeArea"),
+    region: groupRecords(imported, regionKey, "region"),
+  };
+}
+
+export function buildAreaStats(deals: Deal[], { excludeDealId }: { excludeDealId?: string } = {}) {
+  const index = buildAreaIntelligenceIndex(deals);
+  return {
+    city: statsFromRecords(index.city, excludeDealId),
+    postcodeArea: statsFromRecords(index.postcodeArea, excludeDealId),
+    region: statsFromRecords(index.region, excludeDealId),
   };
 }
 
 export function getAreaIntelligence(deal: Deal, deals: Deal[]): AreaIntelligence {
-  const statsByGroup = buildAreaStats(deals, { excludeDealId: deal.id });
+  return getAreaIntelligenceFromIndex(deal, buildAreaIntelligenceIndex(deals));
+}
+
+export function getAreaIntelligenceFromIndex(deal: Deal, index: AreaIntelligenceIndex): AreaIntelligence {
   const city = cityKey(deal);
   const postcodeArea = postcodeAreaKey(deal);
   const region = regionKey(deal);
-  const stats =
-    (city ? statsByGroup.city.get(city) : undefined) ??
-    (postcodeArea ? statsByGroup.postcodeArea.get(postcodeArea) : undefined) ??
-    (region ? statsByGroup.region.get(region) : undefined) ??
-    null;
+  const candidateRecords = [
+    city ? index.city.get(city) : undefined,
+    postcodeArea ? index.postcodeArea.get(postcodeArea) : undefined,
+    region ? index.region.get(region) : undefined,
+  ].filter(Boolean) as AreaGroupRecord[];
+  const stats = candidateRecords
+    .map((record) => statsForGroup(record.area, record.deals.filter((peer) => peer.id !== deal.id), record.group))
+    .find((candidate) => candidate.dealCount > 0) ?? null;
 
   const yieldDelta = delta(deal.netInitialYield, stats?.averageYield);
   const pricePerSqft = deal.pricePerSqft || calculatedPricePerSqft(deal);
@@ -61,14 +90,23 @@ export function formatAreaValue(value: number | null, unit: "yield" | "price") {
   return unit === "yield" ? `${value.toFixed(1)}%` : `£${Math.round(value)}`;
 }
 
-function groupStats(deals: Deal[], keyFn: (deal: Deal) => string) {
-  const groups = new Map<string, Deal[]>();
+function groupRecords(deals: Deal[], keyFn: (deal: Deal) => string, group: AreaGroup) {
+  const groups = new Map<string, AreaGroupRecord>();
   for (const deal of deals) {
     const key = keyFn(deal);
     if (!key) continue;
-    groups.set(key, [...(groups.get(key) ?? []), deal]);
+    const existing = groups.get(key);
+    if (existing) existing.deals.push(deal);
+    else groups.set(key, { group, area: key, deals: [deal] });
   }
-  return new Map([...groups.entries()].map(([area, groupDeals]) => [area, statsForGroup(area, groupDeals, keyFn === cityKey ? "city" : keyFn === postcodeAreaKey ? "postcodeArea" : "region")]));
+  return groups;
+}
+
+function statsFromRecords(records: Map<string, AreaGroupRecord>, excludeDealId?: string) {
+  return new Map([...records.entries()].map(([area, record]) => [
+    area,
+    statsForGroup(area, excludeDealId ? record.deals.filter((deal) => deal.id !== excludeDealId) : record.deals, record.group),
+  ]));
 }
 
 function statsForGroup(area: string, deals: Deal[], group: AreaGroup): AreaStats {
