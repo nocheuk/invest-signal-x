@@ -37,6 +37,7 @@ const nationalScanState = vi.hoisted(() => ({
     totalRightmoveDeals: 30,
     totalAcuitusDeals: 12,
     totalEddisonsDeals: 5,
+    totalAllsopDeals: 4,
     locationsCompletedInCurrentCycle: 4,
     lastSuccessfulScanDurationMs: 240000,
     lastScanInsertedCount: 7,
@@ -213,6 +214,7 @@ describe("Dashboard live location search", () => {
       totalRightmoveDeals: 30,
       totalAcuitusDeals: 12,
       totalEddisonsDeals: 5,
+      totalAllsopDeals: 4,
       locationsCompletedInCurrentCycle: 4,
       lastSuccessfulScanDurationMs: 240000,
       lastScanInsertedCount: 7,
@@ -688,12 +690,12 @@ describe("Dashboard live location search", () => {
     expect(screen.getByText("National scan status")).toBeInTheDocument();
     expect(screen.getByText(/Last national scan:/)).toBeInTheDocument();
     expect(screen.getByText("Next scheduled scan: daily at 6am UK time")).toBeInTheDocument();
-    expect(screen.getByText("Sources: Rightmove Commercial + Acuitus + Eddisons")).toBeInTheDocument();
+    expect(screen.getByText("Sources: Rightmove Commercial + Acuitus + Eddisons + Allsop")).toBeInTheDocument();
     expect(screen.getByText("Last run locations: London, Manchester, Birmingham, Leeds")).toBeInTheDocument();
     expect(screen.getByText(/Queue: 160 locations/)).toBeInTheDocument();
     expect(screen.getByText(/Cycle progress: 3%/)).toBeInTheDocument();
     expect(screen.getByText("Locations completed this cycle: 4/160")).toBeInTheDocument();
-    expect(screen.getByText("Database: 42 deals · Rightmove 30 · Acuitus 12 · Eddisons 5")).toBeInTheDocument();
+    expect(screen.getByText("Database: 42 deals · Rightmove 30 · Acuitus 12 · Eddisons 5 · Allsop 4")).toBeInTheDocument();
     expect(screen.getByText(/Loaded ratings: Verified Greens/)).toBeInTheDocument();
   });
 
@@ -726,6 +728,15 @@ describe("Dashboard live location search", () => {
         dataConfidenceScore: 50,
         postedAt: "2026-05-20T09:00:00Z",
       }),
+      dashboardDeal({
+        id: "imp-allsop-audit",
+        title: "Allsop Audit Deal",
+        importSourceName: "Allsop",
+        score: 72,
+        rating: "amber",
+        dataConfidenceScore: 78,
+        postedAt: "2026-06-04T10:00:00Z",
+      }),
     ];
 
     render(
@@ -740,11 +751,12 @@ describe("Dashboard live location search", () => {
     expect(screen.getByText("Admin diagnostics")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /generate inventory report/i }));
 
-    expect(screen.getByText(/Total deals: 3/)).toBeInTheDocument();
-    expect(screen.getByText(/Total imported deals: 3/)).toBeInTheDocument();
+    expect(screen.getByText(/Total deals: 4/)).toBeInTheDocument();
+    expect(screen.getByText(/Total imported deals: 4/)).toBeInTheDocument();
     expect(screen.getByText(/Rightmove deals: 1/)).toBeInTheDocument();
     expect(screen.getByText(/Acuitus deals: 1/)).toBeInTheDocument();
     expect(screen.getByText(/Eddisons deals: 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Allsop deals: 1/)).toBeInTheDocument();
     expect(screen.getByText(/Locations completed in current scan cycle: 4\/160/)).toBeInTheDocument();
   });
 

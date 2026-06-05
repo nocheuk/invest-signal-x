@@ -12,6 +12,7 @@
     "import:deals": "tsx scripts/import-deals.mjs",
     "import:rightmove": "node --import tsx scripts/import-rightmove.mjs",
     "scrape:rightmove": "node --import tsx scripts/scrape-rightmove.mjs",
+    "scrape:allsop": "node --import tsx scripts/scrape-allsop.mjs",
     "scrape:eddisons": "node --import tsx scripts/scrape-eddisons.mjs",
     "scrape:site": "node --import tsx scripts/scrape-site.mjs",
     "scan:national": "node --import tsx scripts/scan-national.mjs",

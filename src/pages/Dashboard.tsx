@@ -300,7 +300,7 @@ export default function Dashboard() {
             </div>
             <div className="text-xs text-muted-foreground sm:text-right">
               <div>Next scheduled scan: daily at 6am UK time</div>
-              <div>Sources: Rightmove Commercial + Acuitus + Eddisons</div>
+              <div>Sources: Rightmove Commercial + Acuitus + Eddisons + Allsop</div>
               {nationalScanStatus.data && (
                 <>
                   <div>Last run locations: {nationalScanStatus.data.locationsScanned.length ? nationalScanStatus.data.locationsScanned.join(", ") : "Not available"}</div>
@@ -316,7 +316,7 @@ export default function Dashboard() {
                     Locations completed this cycle: {nationalScanStatus.data.locationsCompletedInCurrentCycle}/{nationalScanStatus.data.totalConfiguredLocations || "unknown"}
                   </div>
                   <div>
-                    Database: {nationalScanStatus.data.totalDeals.toLocaleString()} deals · Rightmove {nationalScanStatus.data.totalRightmoveDeals.toLocaleString()} · Acuitus {nationalScanStatus.data.totalAcuitusDeals.toLocaleString()} · Eddisons {nationalScanStatus.data.totalEddisonsDeals.toLocaleString()}
+                    Database: {nationalScanStatus.data.totalDeals.toLocaleString()} deals · Rightmove {nationalScanStatus.data.totalRightmoveDeals.toLocaleString()} · Acuitus {nationalScanStatus.data.totalAcuitusDeals.toLocaleString()} · Eddisons {nationalScanStatus.data.totalEddisonsDeals.toLocaleString()} · Allsop {nationalScanStatus.data.totalAllsopDeals.toLocaleString()}
                   </div>
                   <div>
                     Loaded ratings: Verified Greens {inventoryAudit.verifiedGreens} · Green Candidates {inventoryAudit.greenCandidates} · Amber {inventoryAudit.amber} · Red {inventoryAudit.red}
@@ -351,6 +351,7 @@ export default function Dashboard() {
               <InventoryMetric label="Rightmove" value={inventoryAudit.rightmoveDeals} />
               <InventoryMetric label="Acuitus" value={inventoryAudit.acuitusDeals} />
               <InventoryMetric label="Eddisons" value={inventoryAudit.eddisonsDeals} />
+              <InventoryMetric label="Allsop" value={inventoryAudit.allsopDeals} />
               <InventoryMetric label="Verified Greens" value={inventoryAudit.verifiedGreens} />
               <InventoryMetric label="Green Candidates" value={inventoryAudit.greenCandidates} />
               <InventoryMetric label="Amber" value={inventoryAudit.amber} />

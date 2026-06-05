@@ -259,7 +259,7 @@ Manual import tools under `/admin/import` remain admin-only.
 
 ### Scheduled National England Scan
 
-DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus and Eddisons are included once per scheduled run from their main sale/listing pages.
+DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus, Eddisons and Allsop are included once per scheduled run from their main sale/listing pages.
 
 The queue lives in `scripts/lib/englandLocationQueue.mjs` and includes:
 
@@ -279,7 +279,7 @@ Each scan run stores coverage diagnostics in `national_scan_runs.metadata`:
 
 On Vercel Hobby the cron is daily, so it can take multiple days to rotate through every city/town in the queue. With the current 160-location queue and a 16-location batch, one full cycle takes about 10 days. A future Pro plan can scan more often and/or use a larger safe batch size.
 
-Rightmove and Eddisons pagination are supported conservatively when the first search page exposes pagination links. The scrapers follow a small number of discovered search-result pages, keep requests serial, and deduplicate repeated source URLs before writing through the import pipeline.
+Rightmove, Eddisons and Allsop pagination are supported conservatively when the first search page exposes pagination links. The scrapers follow a small number of discovered search-result pages, keep requests serial, and deduplicate repeated source URLs before writing through the import pipeline.
 
 Vercel Cron is configured in `vercel.json`:
 
@@ -424,6 +424,22 @@ Run a live Eddisons import:
 ```bash
 npm run scrape:eddisons
 ```
+
+Allsop commercial auction scraper:
+
+```bash
+npm run scrape:allsop -- --dry-run
+```
+
+The Allsop scraper uses Allsop's public property-search JSON endpoint server-side, filters to commercial sale/acquisition lots, skips POA and non-commercial rows, and maps title, overview URL, address, guide price, passing rent/income where visible, yield where visible, floor area, asset type, description, image URL and auction/reference data into the shared import pipeline. Increase or reduce the page cap with `--max-pages=2`.
+
+Run a live Allsop import:
+
+```bash
+npm run scrape:allsop
+```
+
+Limitations: Allsop lot numbers are imported when the source payload exposes them. Some current search rows expose investment references instead of auction lot numbers; those are still deduped by source URL/reference and need legal-pack verification before underwriting.
 
 Live imports require:
 
