@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { isAdminUser } from "@/lib/admin";
 import { useProfile } from "@/hooks/useProfile";
 import { ReactNode } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -109,6 +110,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle compact />
             <div className="hidden sm:inline-flex items-center rounded-md px-2 py-1 text-xs gap-1.5 text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-signal-green animate-pulse" />
               Live sources ready

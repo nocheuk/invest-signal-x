@@ -73,9 +73,72 @@
     --sidebar-ring: 221 83% 53%;
   }
 
-  /* Force dark — DealSignal is a dark-first product */
+  .light {
+    --background: 210 40% 98%;
+    --foreground: 222 36% 10%;
+
+    --surface: 0 0% 100%;
+    --surface-2: 214 32% 94%;
+    --surface-3: 214 24% 90%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 36% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 36% 10%;
+
+    --primary: 221 83% 50%;
+    --primary-foreground: 210 40% 98%;
+    --primary-glow: 217 91% 58%;
+
+    --secondary: 214 32% 94%;
+    --secondary-foreground: 222 36% 10%;
+
+    --muted: 214 32% 94%;
+    --muted-foreground: 215 18% 42%;
+
+    --accent: 221 83% 50%;
+    --accent-foreground: 210 40% 98%;
+
+    --signal-green: 152 68% 34%;
+    --signal-green-soft: 152 48% 91%;
+    --signal-amber: 36 88% 42%;
+    --signal-amber-soft: 38 80% 92%;
+    --signal-red: 0 70% 48%;
+    --signal-red-soft: 0 76% 94%;
+
+    --destructive: 0 70% 48%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 24% 84%;
+    --input: 214 24% 84%;
+    --ring: 221 83% 50%;
+
+    --gradient-radial: radial-gradient(ellipse at top, hsl(221 83% 50% / 0.10), transparent 60%);
+    --gradient-hero: linear-gradient(180deg, hsl(210 40% 98%) 0%, hsl(214 32% 94%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(221 83% 50%), hsl(217 91% 58%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(214 38% 97%) 100%);
+    --gradient-border: linear-gradient(135deg, hsl(221 83% 50% / 0.25), hsl(214 24% 84% / 0.55));
+
+    --shadow-glow: 0 24px 90px -36px hsl(221 83% 50% / 0.45);
+    --shadow-card: 0 1px 0 hsl(0 0% 100% / 0.8) inset, 0 12px 34px -24px hsl(222 36% 10% / 0.28);
+    --shadow-elevated: 0 28px 80px -42px hsl(222 36% 10% / 0.38);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 18% 42%;
+    --sidebar-primary: 221 83% 50%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 214 32% 94%;
+    --sidebar-accent-foreground: 222 36% 10%;
+    --sidebar-border: 214 24% 84%;
+    --sidebar-ring: 221 83% 50%;
+  }
+
   html {
     color-scheme: dark;
+  }
+  html.light {
+    color-scheme: light;
   }
 }
 
@@ -95,6 +158,11 @@
       radial-gradient(800px 400px at 100% 0%, hsl(217 91% 65% / 0.05), transparent 60%);
     background-attachment: fixed;
   }
+  .light body {
+    background-image:
+      radial-gradient(1200px 600px at 50% -120px, hsl(221 83% 50% / 0.10), transparent 62%),
+      radial-gradient(800px 420px at 100% 0%, hsl(152 68% 34% / 0.06), transparent 62%);
+  }
   .font-display {
     font-family: 'Instrument Serif', 'Times New Roman', serif;
     font-weight: 400;
@@ -111,14 +179,14 @@
 
 @layer components {
   .ds-card {
-    @apply rounded-xl border border-border/60 bg-[hsl(var(--surface))] shadow-[var(--shadow-card)];
+    @apply rounded-xl border border-border/70 bg-[hsl(var(--surface))] shadow-[var(--shadow-card)];
   }
   .ds-card-elevated {
-    @apply rounded-xl border border-border/60 shadow-[var(--shadow-elevated)];
+    @apply rounded-xl border border-border/70 shadow-[var(--shadow-elevated)];
     background: var(--gradient-card);
   }
   .ds-glass {
-    @apply rounded-xl border border-white/10 bg-surface/75 shadow-[var(--shadow-card)] backdrop-blur-xl;
+    @apply rounded-xl border border-border/70 bg-surface/75 shadow-[var(--shadow-card)] backdrop-blur-xl;
   }
   .ds-premium-panel {
     @apply rounded-xl border border-primary/20 shadow-[var(--shadow-elevated)] overflow-hidden;

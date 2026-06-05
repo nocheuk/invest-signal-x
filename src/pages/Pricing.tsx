@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const PLANS = [
   {
@@ -86,6 +87,7 @@ export default function Pricing() {
         <div className="container flex h-16 items-center justify-between">
           <Logo />
           <div className="flex items-center gap-4 text-sm">
+            <ThemeToggle compact />
             <Link to="/" className="text-muted-foreground hover:text-foreground">Home</Link>
             <Link to="/auth" className="text-muted-foreground hover:text-foreground">Sign in</Link>
           </div>
