@@ -11,12 +11,13 @@ import { PIPELINE_STATUSES, type PipelineStatus, useWatchlist } from "@/lib/watc
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bookmark, MapPin, Building2, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine } from "lucide-react";
+import { ArrowLeft, Bookmark, MapPin, Building2, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine, ExternalLink, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
-import { formatAreaValue, getAreaIntelligence } from "@/lib/areaIntelligence";
+import { formatAreaDelta, formatAreaValue, getAreaIntelligence } from "@/lib/areaIntelligence";
+import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -60,6 +61,11 @@ export default function DealDetail() {
   const areaIntelligence = getAreaIntelligence(deal, allDeals);
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
+  const primarySourceUrl = deal.sourceUrl ?? sourceLinks.data?.find((link) => link.source_url)?.source_url;
+  const sourceLabel = getSourceLabel(deal);
+  const visibleYield = deal.netInitialYield || deal.grossYield;
+  const pricePerSqft = deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0);
+  const addedDate = new Date(deal.postedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
     try {
@@ -79,14 +85,16 @@ export default function DealDetail() {
         </button>
 
         {/* Hero card */}
-        <div className={cn("ds-card-elevated overflow-hidden relative")}>
+        <div className={cn("ds-premium-panel overflow-hidden relative")}>
           <div className={cn("absolute inset-0 bg-gradient-to-br opacity-30", deal.thumbnail)} />
-          <div className="absolute inset-0 ds-grid-bg opacity-40" />
+          {deal.imageUrl && <img src={deal.imageUrl} alt={deal.title} className="absolute inset-0 h-full w-full object-cover opacity-60" />}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/20" />
+          <div className="absolute inset-0 ds-grid-bg opacity-30" />
           <div className="relative p-6 lg:p-8">
             <div className="flex items-start justify-between flex-wrap gap-6">
               <div className="space-y-3 max-w-2xl">
                 <div className="flex items-center gap-2">
-                  <ClassificationBadge classification={classification} />
+                  <ClassificationBadge classification={classification} className={classification === "green-candidate" ? "bg-primary/20 shadow-lg shadow-primary/20" : undefined} />
                   <span className="text-xs text-muted-foreground">·</span>
                   <span className="text-xs text-muted-foreground">{deal.assetType} · {deal.source}</span>
                 </div>
@@ -113,25 +121,50 @@ export default function DealDetail() {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <Button
+              <ActionButton
                 onClick={() => {
                   if (!watched) void saveToPipeline(deal.id);
                 }}
-                variant={watched ? "default" : "outline"}
-                className={cn("gap-2", watched && "bg-primary text-primary-foreground hover:bg-primary/90")}
+                active={watched}
+                icon={Bookmark}
               >
-                <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
                 {watched ? "In pipeline" : "Save to Pipeline"}
-              </Button>
-              <Button onClick={() => void handleDownloadMemo()} disabled={memoStatus === "loading"} variant="outline" className="gap-2">
-                <FileText className="h-4 w-4" />{memoStatus === "loading" ? "Generating memo..." : "Download memo (PDF)"}
-              </Button>
+              </ActionButton>
+              <ActionButton onClick={() => void handleDownloadMemo()} disabled={memoStatus === "loading"} icon={FileText}>
+                {memoStatus === "loading" ? "Generating memo..." : "Download Memo PDF"}
+              </ActionButton>
+              {primarySourceUrl && (
+                <Button asChild variant="outline" className="gap-2 border-white/10 bg-surface-2/70 hover:border-primary/40 hover:bg-primary/10">
+                  <a href={primarySourceUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-4 w-4" />Open Source Listing
+                  </a>
+                </Button>
+              )}
             </div>
             {memoStatus === "error" && (
               <div className="mt-3 text-xs text-signal-red">Could not generate the memo PDF. Please try again.</div>
             )}
           </div>
         </div>
+
+        <section className="ds-glass p-5 lg:p-6 space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Investment Snapshot</div>
+              <h2 className="font-display text-2xl mt-1">Key underwriting inputs</h2>
+            </div>
+            <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+            <SnapshotMetric label="Guide price" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"} />
+            <SnapshotMetric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "Not available"} />
+            <SnapshotMetric label="Sq ft" value={deal.sqft ? deal.sqft.toLocaleString() : "Not available"} />
+            <SnapshotMetric label="£/sqft" value={pricePerSqft ? formatGBP(Math.round(pricePerSqft)) : "Not available"} />
+            <SnapshotMetric label="Source" value={sourceLabel} />
+            <SnapshotMetric label="Added" value={addedDate} />
+            <SnapshotMetric label="Confidence" value={deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100` : "Not available"} />
+          </div>
+        </section>
 
         <div className="grid lg:grid-cols-3 gap-5">
           {/* Score breakdown */}
@@ -192,7 +225,7 @@ export default function DealDetail() {
         </div>
 
         {dealAnalysis && (
-          <section className="ds-card p-6 space-y-4">
+          <section className="ds-glass p-6 space-y-4">
             <div>
               <h2 className="font-display text-2xl">Deal analysis</h2>
               <p className="text-xs text-muted-foreground mt-0.5">Deterministic signals generated only from imported source data and underwriting fields.</p>
@@ -200,15 +233,16 @@ export default function DealDetail() {
             <p className="rounded-lg border border-border/60 bg-surface-2/40 p-4 text-sm leading-relaxed text-muted-foreground">
               {dealAnalysis.investmentSummary}
             </p>
-            <div className="grid md:grid-cols-3 gap-3">
+            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
               <ReasonList title="Opportunity signals" items={dealAnalysis.opportunitySignals} fallback="No strong opportunity signal found yet." tone="primary" />
               <ReasonList title="Risk signals" items={dealAnalysis.riskSignals} fallback="No specific risk signal recorded yet." tone="amber" />
+              <ReasonList title="Missing data" items={deal.scoreReasons?.missingDataWarnings ?? []} fallback="No missing-data warning recorded." tone="red" />
               <ReasonList title="Verify before trusting" items={deal.scoreReasons?.verifyBeforeTrusting ?? []} fallback="Standard title, lease and comparable checks still apply." tone="default" />
             </div>
           </section>
         )}
 
-        <section className="ds-card p-6 space-y-4">
+        <section className="ds-glass p-6 space-y-4">
           <div>
             <h2 className="font-display text-2xl">Area Intelligence</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -221,6 +255,7 @@ export default function DealDetail() {
               value={deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "Not available"}
               benchmarkLabel={areaIntelligence.stats ? `${areaIntelligence.stats.area} average` : "Area average"}
               benchmark={formatAreaValue(areaIntelligence.stats?.averageYield ?? null, "yield")}
+              delta={formatAreaDelta(areaIntelligence.yieldDelta, "yield")}
               sample={areaIntelligence.stats?.dealCount ?? 0}
             />
             <AreaIntelStat
@@ -231,6 +266,11 @@ export default function DealDetail() {
               sample={areaIntelligence.stats?.dealCount ?? 0}
             />
           </div>
+          {(!areaIntelligence.stats || areaIntelligence.stats.dealCount < 3) && (
+            <div className="rounded-lg border border-signal-amber/30 bg-signal-amber-soft/20 px-4 py-3 text-xs text-signal-amber">
+              Limited local sample. Treat area comparisons as directional until more imported deals are available.
+            </div>
+          )}
           <ReasonList title="Area insights" items={areaIntelligence.insights} fallback="Limited area data" tone="primary" />
         </section>
 
@@ -358,10 +398,51 @@ export default function DealDetail() {
 
 function HeroStat({ label, value }: { label: React.ReactNode; value: string }) {
   return (
-    <div className="bg-surface-2/70 backdrop-blur border border-border/40 rounded-lg p-3">
+    <div className="bg-surface-2/80 backdrop-blur border border-white/10 rounded-lg p-3 shadow-lg shadow-black/20">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="font-mono text-lg font-semibold tabular mt-0.5">{value}</div>
     </div>
+  );
+}
+
+function SnapshotMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-surface-2/60 p-3 transition-colors hover:border-primary/30">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-1 break-words font-mono text-sm font-semibold tabular">{value}</div>
+    </div>
+  );
+}
+
+function ActionButton({
+  children,
+  icon: Icon,
+  active,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      variant={active ? "default" : "outline"}
+      className={cn(
+        "gap-2 transition-all hover:-translate-y-0.5",
+        active
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "border-white/10 bg-surface-2/70 hover:border-primary/40 hover:bg-primary/10"
+      )}
+    >
+      <Icon className={cn("h-4 w-4", active && "fill-current")} />
+      {children}
+    </Button>
   );
 }
 
@@ -391,19 +472,20 @@ function UWCard({ icon: Icon, title, rows }: { icon: React.ComponentType<{ class
   );
 }
 
-function AreaIntelStat({ label, value, benchmarkLabel, benchmark, sample }: { label: string; value: string; benchmarkLabel: string; benchmark: string; sample: number }) {
+function AreaIntelStat({ label, value, benchmarkLabel, benchmark, sample, delta }: { label: string; value: string; benchmarkLabel: string; benchmark: string; sample: number; delta?: string }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-surface-2/40 p-4 space-y-3">
+    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
       <div>
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
         <div className="font-mono text-2xl font-semibold tabular mt-1">{value}</div>
+        {delta && <div className="mt-1 inline-flex rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary">{delta}</div>}
       </div>
       <div className="flex items-end justify-between gap-3 border-t border-border/40 pt-3">
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{benchmarkLabel}</div>
           <div className="font-mono text-lg font-semibold tabular mt-0.5">{benchmark}</div>
         </div>
-        <div className="text-[11px] text-muted-foreground">{sample ? `${sample} local deals` : "No local sample"}</div>
+        <div className="text-[11px] text-muted-foreground">{sample ? `${sample} local deal${sample === 1 ? "" : "s"}` : "No local sample"}</div>
       </div>
     </div>
   );
