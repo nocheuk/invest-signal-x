@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rows = vi.hoisted(() => ({
   deals: [{
@@ -50,6 +50,8 @@ const rows = vi.hoisted(() => ({
       source_type: "apify_rightmove_commercial",
     },
   }],
+  linkErrorForChunks: [] as number[],
+  linkChunkCalls: [] as string[][],
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -65,7 +67,14 @@ vi.mock("@/lib/supabase/client", () => ({
       }
       return {
         select: () => ({
-          in: async () => ({ data: rows.links, error: null }),
+          in: async (_column: string, values: string[]) => {
+            rows.linkChunkCalls.push(values);
+            const chunkIndex = rows.linkChunkCalls.length - 1;
+            if (rows.linkErrorForChunks.includes(chunkIndex)) {
+              return { data: null, error: { message: "metadata chunk failed" } };
+            }
+            return { data: rows.links.filter((link) => values.includes(link.deal_id)), error: null };
+          },
         }),
       };
     },
@@ -80,6 +89,11 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe("useDeals", () => {
+  beforeEach(() => {
+    rows.linkChunkCalls = [];
+    rows.linkErrorForChunks = [];
+  });
+
   it("loads and maps deals from Supabase", async () => {
     const { result } = renderHook(() => useDeals(), { wrapper });
 
@@ -93,5 +107,31 @@ describe("useDeals", () => {
       isImported: true,
       sourceUrl: "https://www.rightmove.co.uk/properties/123",
     });
+  });
+
+  it("chunks source metadata and still returns deals when a metadata chunk fails", async () => {
+    rows.deals = Array.from({ length: 151 }, (_, index) => ({
+      ...rows.deals[0],
+      id: `imp-live-${index}`,
+      title: `Live deal ${index}`,
+    }));
+    rows.links = rows.deals.map((row) => ({
+      deal_id: row.id,
+      source_url: `https://www.rightmove.co.uk/properties/${row.id}`,
+      import_sources: {
+        name: "Rightmove Commercial",
+        source_type: "custom_rightmove_commercial",
+      },
+    }));
+    rows.linkErrorForChunks = [1];
+
+    const { result } = renderHook(() => useDeals(), { wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(rows.linkChunkCalls).toHaveLength(2);
+    expect(rows.linkChunkCalls[0]).toHaveLength(150);
+    expect(result.current.data).toHaveLength(151);
+    expect(result.current.data?.[0]).toMatchObject({ importSourceName: "Rightmove Commercial" });
+    expect(result.current.data?.[150]).toMatchObject({ title: "Live deal 150" });
   });
 });

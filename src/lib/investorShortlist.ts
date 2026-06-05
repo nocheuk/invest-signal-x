@@ -1,6 +1,6 @@
 import type { Deal } from "@/lib/deals";
 import { classifyDeal, classificationLabel } from "@/lib/dealClassification";
-import { getAreaIntelligence, type AreaIntelligence } from "@/lib/areaIntelligence";
+import { buildAreaIntelligenceIndex, getAreaIntelligenceFromIndex, type AreaIntelligence, type AreaIntelligenceIndex } from "@/lib/areaIntelligence";
 import { isNewThisWeek } from "@/lib/freshness";
 
 export type ShortlistMode = "balanced" | "top-yield" | "most-undervalued" | "highest-confidence";
@@ -21,32 +21,35 @@ export function buildInvestorShortlist(
     limit = 25,
     onlyThisWeek = false,
     now = new Date(),
+    areaIndex,
   }: {
     allDeals?: Deal[];
     mode?: ShortlistMode;
     limit?: number;
     onlyThisWeek?: boolean;
     now?: Date;
+    areaIndex?: AreaIntelligenceIndex;
   } = {}
 ) {
+  const index = areaIndex ?? buildAreaIntelligenceIndex(allDeals);
   return deals
     .filter((deal) => isImportedDeal(deal) && (!onlyThisWeek || isNewThisWeek(deal, now)))
-    .map((deal) => rankDeal(deal, allDeals, mode))
+    .map((deal) => rankDeal(deal, index, mode))
     .sort((a, b) => b.shortlistScore - a.shortlistScore || b.deal.score - a.deal.score)
     .slice(0, limit)
     .map((item, index) => ({ ...item, rank: index + 1 }));
 }
 
-export function top10ThisWeek(deals: Deal[], allDeals = deals, now = new Date(), mode: ShortlistMode = "balanced") {
-  return buildInvestorShortlist(deals, { allDeals, now, mode, limit: 10, onlyThisWeek: true });
+export function top10ThisWeek(deals: Deal[], allDeals = deals, now = new Date(), mode: ShortlistMode = "balanced", areaIndex?: AreaIntelligenceIndex) {
+  return buildInvestorShortlist(deals, { allDeals, now, mode, limit: 10, onlyThisWeek: true, areaIndex });
 }
 
-export function top25Opportunities(deals: Deal[], allDeals = deals, mode: ShortlistMode = "balanced") {
-  return buildInvestorShortlist(deals, { allDeals, mode, limit: 25 });
+export function top25Opportunities(deals: Deal[], allDeals = deals, mode: ShortlistMode = "balanced", areaIndex?: AreaIntelligenceIndex) {
+  return buildInvestorShortlist(deals, { allDeals, mode, limit: 25, areaIndex });
 }
 
-function rankDeal(deal: Deal, allDeals: Deal[], mode: ShortlistMode): RankedOpportunity {
-  const areaIntelligence = getAreaIntelligence(deal, allDeals);
+function rankDeal(deal: Deal, areaIndex: AreaIntelligenceIndex, mode: ShortlistMode): RankedOpportunity {
+  const areaIntelligence = getAreaIntelligenceFromIndex(deal, areaIndex);
   const classification = classifyDeal(deal);
   const confidence = deal.dataConfidenceScore ?? 50;
   const yieldScore = clamp((deal.netInitialYield || deal.grossYield || 0) * 8);

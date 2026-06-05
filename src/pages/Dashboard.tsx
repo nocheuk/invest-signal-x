@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ASSET_TYPES, REGIONS, formatPct, type Rating } from "@/lib/deals";
 import { DealCard } from "@/components/DealCard";
 import { DealRow } from "@/components/DealRow";
@@ -16,7 +17,7 @@ import { formatNationalScanTime, formatScanDuration, useNationalScanStatus } fro
 import { buildInventoryAudit, formatInventoryAuditReport } from "@/lib/inventoryAudit";
 import { buildDashboardKpis } from "@/lib/dashboardKpis";
 import { buildFreshnessMetrics, filterByFreshness, formatImportDate, type FreshnessFilter, sortNewestDeals } from "@/lib/freshness";
-import { getAreaIntelligence } from "@/lib/areaIntelligence";
+import { EMPTY_AREA_INTELLIGENCE_INDEX, buildAreaIntelligenceIndex, getAreaIntelligenceFromIndex } from "@/lib/areaIntelligence";
 import { top10ThisWeek, top25Opportunities, type ShortlistMode } from "@/lib/investorShortlist";
 import { ClassificationBadge } from "@/components/RatingBadge";
 import { classifyDeal } from "@/lib/dealClassification";
@@ -36,6 +37,14 @@ import { isAdminUser } from "@/lib/admin";
 const EMPTY_DEALS = [];
 
 export default function Dashboard() {
+  return (
+    <ErrorBoundary fallback={<DashboardFallback />}>
+      <DashboardContent />
+    </ErrorBoundary>
+  );
+}
+
+function DashboardContent() {
   const { ids, pipelineItems, pipelineCounts } = useWatchlist();
   const { weights } = useStrategy();
   const dealsQuery = useDeals();
@@ -100,10 +109,39 @@ export default function Dashboard() {
   }, [deals]);
   const needsReview = useMemo(() => filtered.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [filtered]);
   const recentlyAdded = useMemo(() => sortNewestDeals(filtered.filter((deal) => deal.isImported || deal.importSourceName)).slice(0, 5), [filtered]);
-  const areaIntelligenceByDealId = useMemo(() => new Map(deals.map((deal) => [deal.id, getAreaIntelligence(deal, deals)])), [deals]);
-  const topThisWeek = useMemo(() => top10ThisWeek(filtered, deals, now, shortlistMode), [filtered, deals, now, shortlistMode]);
-  const topOpportunities = useMemo(() => top25Opportunities(filtered, deals, shortlistMode), [filtered, deals, shortlistMode]);
-  const shortlist = topThisWeek.length > 0 ? topThisWeek : topOpportunities.slice(0, 10);
+  const areaIntelligenceIndex = useMemo(() => {
+    try {
+      return buildAreaIntelligenceIndex(deals);
+    } catch (error) {
+      console.error("Could not build area intelligence index", error);
+      return EMPTY_AREA_INTELLIGENCE_INDEX;
+    }
+  }, [deals]);
+  const areaIntelligenceByDealId = useMemo(() => {
+    const visibleFeatureDeals = [...needsReview.slice(0, 3), ...best];
+    return new Map(visibleFeatureDeals.map((deal) => [deal.id, getAreaIntelligenceFromIndex(deal, areaIntelligenceIndex)]));
+  }, [areaIntelligenceIndex, best, needsReview]);
+  const shortlistResult = useMemo(() => {
+    try {
+      const topThisWeek = top10ThisWeek(filtered, deals, now, shortlistMode, areaIntelligenceIndex);
+      const topOpportunities = top25Opportunities(filtered, deals, shortlistMode, areaIntelligenceIndex);
+      return {
+        error: null as string | null,
+        topThisWeek,
+        topOpportunities,
+        shortlist: topThisWeek.length > 0 ? topThisWeek : topOpportunities.slice(0, 10),
+      };
+    } catch (error) {
+      console.error("Could not build investor shortlist", error);
+      return {
+        error: "Top Opportunities is temporarily unavailable.",
+        topThisWeek: [],
+        topOpportunities: [],
+        shortlist: [],
+      };
+    }
+  }, [areaIntelligenceIndex, filtered, deals, now, shortlistMode]);
+  const { topThisWeek, topOpportunities, shortlist } = shortlistResult;
   const pipelineAnalytics = useMemo(() => ({
     totalSaved: ids.length,
     activeOpportunities: pipelineCounts.Reviewing + pipelineCounts["Viewing Booked"] + pipelineCounts["Offer Submitted"],
@@ -450,6 +488,12 @@ export default function Dashboard() {
             <div className="text-[11px] text-muted-foreground">
               Top 25 Opportunities available in this ranking: {topOpportunities.length.toLocaleString()}.
             </div>
+          </section>
+        )}
+
+        {shortlist.length === 0 && shortlistResult.error && (
+          <section className="ds-card p-4 text-xs text-muted-foreground">
+            {shortlistResult.error}
           </section>
         )}
 
@@ -841,6 +885,22 @@ export default function Dashboard() {
         </section>
       </div>
       <StrategyOptimiserModal open={strategyOpen} onOpenChange={setStrategyOpen} />
+    </AppLayout>
+  );
+}
+
+function DashboardFallback() {
+  return (
+    <AppLayout>
+      <div className="container max-w-7xl py-8">
+        <div className="ds-card p-6">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Dashboard</div>
+          <h1 className="font-display text-2xl mt-2">Dashboard could not finish loading</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            The live deal feed is temporarily unavailable. Please refresh the page, or try again shortly.
+          </p>
+        </div>
+      </div>
     </AppLayout>
   );
 }
