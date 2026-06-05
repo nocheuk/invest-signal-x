@@ -142,6 +142,11 @@ function DashboardContent() {
     }
   }, [areaIntelligenceIndex, filtered, deals, now, shortlistMode]);
   const { topThisWeek, topOpportunities, shortlist } = shortlistResult;
+  const greenCandidateDeals = useMemo(() => filtered.filter((deal) => classifyDeal(deal) === "green-candidate"), [filtered]);
+  const heroDeals = useMemo(() => {
+    const rankedDeals = shortlist.map((item) => item.deal);
+    return (rankedDeals.length > 0 ? rankedDeals : greenCandidateDeals).slice(0, 3);
+  }, [greenCandidateDeals, shortlist]);
   const pipelineAnalytics = useMemo(() => ({
     totalSaved: ids.length,
     activeOpportunities: pipelineCounts.Reviewing + pipelineCounts["Viewing Booked"] + pipelineCounts["Offer Submitted"],
@@ -241,6 +246,50 @@ function DashboardContent() {
           </div>
         </div>
 
+        <section className="ds-premium-panel p-4 md:p-6 space-y-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Green Candidate focus</div>
+              <h2 className="font-display text-3xl md:text-4xl mt-1">Top Opportunities This Week</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Highest-ranked imported opportunities from the active filters, with Green Candidates promoted first.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <HeroMetric label="Candidates" value={greenCandidateDeals.length} />
+              <HeroMetric label="New / 7d" value={freshnessKpis.newGreenCandidates} />
+              <HeroMetric label="Verified" value={kpis.verifiedGreens} />
+            </div>
+          </div>
+          {heroDeals.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              {heroDeals.map((deal) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  variant="feature"
+                  areaIntelligence={getAreaIntelligenceFromIndex(deal, areaIntelligenceIndex)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="ds-glass p-5 text-sm text-muted-foreground">
+              No Green Candidates match the current filters yet. The national scan will continue adding new acquisition opportunities.
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+            <div className="text-xs text-muted-foreground">
+              Switch ranking emphasis without changing the underlying scoring model.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ShortlistModeButton label="Balanced" mode="balanced" active={shortlistMode === "balanced"} onClick={setShortlistMode} />
+              <ShortlistModeButton label="Top Yield" mode="top-yield" active={shortlistMode === "top-yield"} onClick={setShortlistMode} />
+              <ShortlistModeButton label="Most Undervalued" mode="most-undervalued" active={shortlistMode === "most-undervalued"} onClick={setShortlistMode} />
+              <ShortlistModeButton label="Highest Confidence" mode="highest-confidence" active={shortlistMode === "highest-confidence"} onClick={setShortlistMode} />
+            </div>
+          </div>
+        </section>
+
         {/* KPI cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <Kpi
@@ -293,6 +342,7 @@ function DashboardContent() {
             icon={Clock3}
             accent="text-primary"
             sub="imported in 24h"
+            trend={freshnessKpis.newToday > 0 ? "live movement" : undefined}
             onClick={() => setFreshnessFilter(freshnessFilter === "today" ? "all" : "today")}
             active={freshnessFilter === "today"}
             ariaLabel={`Show ${freshnessKpis.newToday} deals imported today`}
@@ -303,6 +353,7 @@ function DashboardContent() {
             icon={CalendarDays}
             accent="text-foreground"
             sub="imported in 7d"
+            trend={freshnessKpis.newThisWeek > 0 ? `${freshnessKpis.newThisWeek.toLocaleString()} fresh` : undefined}
             onClick={() => setFreshnessFilter(freshnessFilter === "week" ? "all" : "week")}
             active={freshnessFilter === "week"}
             ariaLabel={`Show ${freshnessKpis.newThisWeek} deals imported this week`}
@@ -313,6 +364,7 @@ function DashboardContent() {
             icon={Sparkles}
             accent="text-primary"
             sub="candidate / 7d"
+            trend={freshnessKpis.newGreenCandidates > 0 ? `+${freshnessKpis.newGreenCandidates.toLocaleString()} this week` : undefined}
             onClick={() => setFreshnessFilter(freshnessFilter === "green-candidates-week" ? "all" : "green-candidates-week")}
             active={freshnessFilter === "green-candidates-week"}
             ariaLabel={`Show ${freshnessKpis.newGreenCandidates} new green candidate deals`}
@@ -323,6 +375,7 @@ function DashboardContent() {
             icon={RadioTower}
             accent="text-foreground"
             sub="source listings / 24h"
+            trend={freshnessKpis.newSourcesToday > 0 ? `${freshnessKpis.newSourcesToday.toLocaleString()} sources` : undefined}
             onClick={() => setFreshnessFilter(freshnessFilter === "sources-today" ? "all" : "sources-today")}
             active={freshnessFilter === "sources-today"}
             ariaLabel={`Show ${freshnessKpis.newSourcesToday} source listings imported today`}
@@ -968,12 +1021,22 @@ function InventoryMetric({ label, value }: { label: string; value: number | stri
   );
 }
 
+function HeroMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="ds-glass min-w-20 px-3 py-2">
+      <div className="font-mono text-xl font-semibold tabular text-foreground">{value.toLocaleString()}</div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
 function Kpi({
   label,
   value,
   sub,
   icon: Icon,
   accent,
+  trend,
   onClick,
   active,
   ariaLabel,
@@ -983,6 +1046,7 @@ function Kpi({
   sub: string;
   icon: React.ComponentType<{ className?: string }>;
   accent: string;
+  trend?: string;
   onClick?: () => void;
   active?: boolean;
   ariaLabel?: string;
@@ -993,8 +1057,11 @@ function Kpi({
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</span>
         <Icon className={cn("h-3.5 w-3.5 text-muted-foreground")} />
       </div>
-      <div className={cn("font-mono text-2xl font-semibold tabular", accent)}>{value}</div>
-      <div className="text-[11px] text-muted-foreground">{sub}</div>
+      <div className={cn("font-mono text-3xl font-semibold leading-none tabular md:text-[2rem]", accent)}>{value}</div>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <span>{sub}</span>
+        {trend && <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-primary">{trend}</span>}
+      </div>
     </>
   );
 
@@ -1006,7 +1073,7 @@ function Kpi({
         aria-label={ariaLabel ?? label}
         aria-pressed={active}
         className={cn(
-          "ds-card p-4 space-y-2 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "ds-glass p-4 space-y-3 text-left transition-all duration-300 hover:border-primary/40 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           active && "border-primary/50 bg-primary/10"
         )}
       >
@@ -1016,7 +1083,7 @@ function Kpi({
   }
 
   return (
-    <div className="ds-card p-4 space-y-2">
+    <div className="ds-glass p-4 space-y-3 transition-colors hover:border-white/20">
       {content}
     </div>
   );

@@ -30,6 +30,8 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
   const [imageAvailable, setImageAvailable] = useState(Boolean(deal.imageUrl));
   const tenantLabel = deal.tenant && deal.tenant !== "Unknown" ? deal.tenant : "Tenant not available";
   const addedAgo = deal.isImported || deal.importSourceName ? formatAddedAgo(deal.postedAt) : "";
+  const visibleYield = deal.netInitialYield || deal.grossYield;
+  const pricePerSqft = deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0);
 
   useEffect(() => {
     setImageAvailable(Boolean(deal.imageUrl));
@@ -39,12 +41,12 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
     <Link
       to={`/deal/${deal.id}`}
       className={cn(
-        "group relative ds-card-elevated overflow-hidden transition-all hover:border-primary/40 hover:-translate-y-0.5 block",
+        "group relative ds-card-elevated overflow-hidden transition-all duration-300 hover:border-primary/50 hover:-translate-y-1 hover:shadow-[0_24px_70px_-24px_hsl(var(--primary)/0.45)] block",
         variant === "feature" ? "p-0" : "p-0"
       )}
     >
       {/* Top visual */}
-      <div data-testid="deal-card-media" className={cn("relative h-28 bg-gradient-to-br overflow-hidden ds-noise", deal.thumbnail)}>
+      <div data-testid="deal-card-media" className={cn("relative h-32 bg-gradient-to-br overflow-hidden ds-noise", deal.thumbnail)}>
         {deal.imageUrl && imageAvailable && (
           <img
             src={deal.imageUrl}
@@ -55,8 +57,8 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
           />
         )}
         <div className={cn("absolute inset-0 ds-grid-bg opacity-40", deal.imageUrl && imageAvailable && "bg-background/20")} />
-        <div className="absolute top-3 left-3">
-          <ClassificationBadge classification={classification} />
+        <div className="absolute top-3 left-3 max-w-[calc(100%-4.5rem)]">
+          <ClassificationBadge classification={classification} className={classification === "green-candidate" ? "bg-primary/20 shadow-lg shadow-primary/20" : undefined} />
         </div>
         <button
           onClick={(e) => {
@@ -77,27 +79,27 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
         </div>
       </div>
 
-      <div className="p-4 space-y-3">
-        <div className="space-y-1 pr-12">
+      <div className="p-4 space-y-3.5">
+        <div className="space-y-1">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground uppercase tracking-wide">
             <span>{deal.assetType}</span>
             <span className="opacity-40">•</span>
             <span className="truncate">{sourceLabel}</span>
           </div>
           {addedAgo && <div className="text-[11px] text-primary">{addedAgo}</div>}
-          <h3 className="font-semibold text-[15px] leading-tight">{deal.title}</h3>
+          <h3 className="font-semibold text-[15px] leading-tight transition-colors group-hover:text-primary-glow">{deal.title}</h3>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3" />{deal.location}
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
+        <div className="grid grid-cols-3 gap-2 rounded-lg border border-white/10 bg-surface-2/60 p-2.5">
           <Metric label="Guide" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"} />
-          <Metric label="NIY" value={deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "Not available"} />
-          <Metric label="WAULT" value={deal.wault ? `${deal.wault.toFixed(1)}y` : "Not available"} />
+          <Metric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "Not available"} emphasis={Boolean(visibleYield)} />
+          <Metric label="£/sqft" value={pricePerSqft ? formatGBP(Math.round(pricePerSqft)) : "Not available"} />
         </div>
 
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/40">
+        <div className="flex items-center justify-between gap-2 pt-1">
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
             <Sparkles className="h-3 w-3 text-primary" /> Your Score
           </div>
@@ -110,7 +112,7 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
         </div>
 
         {areaIntelligence?.stats && (
-          <div className="grid grid-cols-2 gap-2 rounded-md border border-border/50 bg-surface-2/40 p-2 text-[11px]">
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5 text-[11px]">
             <AreaMetric label="Yield vs area" value={formatAreaDelta(areaIntelligence.yieldDelta, "yield")} />
             <AreaMetric label="£/sqft vs area" value={formatAreaDelta(areaIntelligence.pricePerSqftDelta, "price")} />
           </div>
@@ -168,11 +170,11 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="font-mono text-sm font-semibold tabular">{value}</div>
+      <div className={cn("font-mono text-sm font-semibold tabular", emphasis && "text-signal-green")}>{value}</div>
     </div>
   );
 }
