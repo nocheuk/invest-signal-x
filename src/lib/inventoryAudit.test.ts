@@ -63,28 +63,33 @@ describe("inventory audit", () => {
         totalRightmoveDeals: 1,
         totalAcuitusDeals: 1,
         totalEddisonsDeals: 1,
+        totalAllsopDeals: 1,
         locationsCompletedInCurrentCycle: 12,
+        lastSuccessfulScanDurationMs: 300000,
+        lastScanInsertedCount: 2,
       },
       deals: [
         deal({ id: "imp-rightmove", importSourceName: "Rightmove Commercial", score: 82, rating: "green", dataConfidenceScore: 86 }),
         deal({ id: "imp-acuitus", importSourceName: "Acuitus", score: 73, rating: "amber", dataConfidenceScore: 80, postedAt: "2026-06-03T09:00:00Z" }),
         deal({ id: "imp-eddisons", importSourceName: "Eddisons", score: 65, rating: "amber", dataConfidenceScore: 70 }),
+        deal({ id: "imp-allsop", importSourceName: "Allsop", score: 72, rating: "amber", dataConfidenceScore: 78 }),
         deal({ id: "imp-red", importSourceName: "Rightmove Commercial", score: 40, rating: "red", dataConfidenceScore: 50, postedAt: "2026-05-20T09:00:00Z" }),
       ],
     });
 
     expect(metrics).toMatchObject({
-      totalDeals: 4,
-      totalImportedDeals: 4,
+      totalDeals: 5,
+      totalImportedDeals: 5,
       rightmoveDeals: 2,
       acuitusDeals: 1,
       eddisonsDeals: 1,
+      allsopDeals: 1,
       verifiedGreens: 1,
-      greenCandidates: 1,
+      greenCandidates: 2,
       amber: 1,
       red: 1,
-      addedToday: 2,
-      addedThisWeek: 3,
+      addedToday: 3,
+      addedThisWeek: 4,
       locationsCompletedInCurrentCycle: 12,
       totalConfiguredLocations: 160,
     });
@@ -97,6 +102,7 @@ describe("inventory audit", () => {
       rightmoveDeals: 4,
       acuitusDeals: 3,
       eddisonsDeals: 2,
+      allsopDeals: 1,
       verifiedGreens: 1,
       greenCandidates: 2,
       amber: 5,
@@ -109,6 +115,7 @@ describe("inventory audit", () => {
 
     expect(report).toContain("Total deals: 10");
     expect(report).toContain("Eddisons deals: 2");
+    expect(report).toContain("Allsop deals: 1");
     expect(report).toContain("Locations completed in current scan cycle: 12/160");
   });
 });

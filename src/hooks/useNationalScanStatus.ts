@@ -16,6 +16,7 @@ export type NationalScanStatus = {
   totalRightmoveDeals: number;
   totalAcuitusDeals: number;
   totalEddisonsDeals: number;
+  totalAllsopDeals: number;
   locationsCompletedInCurrentCycle: number;
   lastSuccessfulScanDurationMs: number;
   lastScanInsertedCount: number;
@@ -59,6 +60,7 @@ export function useNationalScanStatus() {
         totalRightmoveDeals: sourceCounts.rightmove,
         totalAcuitusDeals: sourceCounts.acuitus,
         totalEddisonsDeals: sourceCounts.eddisons,
+        totalAllsopDeals: sourceCounts.allsop,
         locationsCompletedInCurrentCycle: totalConfiguredLocations > 0 && nextIndex === 0 ? totalConfiguredLocations : nextIndex,
         lastSuccessfulScanDurationMs: scanDurationMs(row.started_at, row.finished_at),
         lastScanInsertedCount: Number(row.inserted ?? 0),
@@ -91,6 +93,7 @@ async function loadSourceDealCounts(supabase: ReturnType<typeof requireSupabase>
   const rightmove = new Set<string>();
   const acuitus = new Set<string>();
   const eddisons = new Set<string>();
+  const allsop = new Set<string>();
   for (const row of rows) {
     const importSource = Array.isArray(row.import_sources) ? row.import_sources[0] : row.import_sources;
     const rawImport = Array.isArray(row.raw_imports) ? row.raw_imports[0] : row.raw_imports;
@@ -103,8 +106,9 @@ async function loadSourceDealCounts(supabase: ReturnType<typeof requireSupabase>
     if (sourceText.includes("rightmove")) rightmove.add(row.deal_id);
     if (sourceText.includes("acuitus")) acuitus.add(row.deal_id);
     if (sourceText.includes("eddisons")) eddisons.add(row.deal_id);
+    if (sourceText.includes("allsop")) allsop.add(row.deal_id);
   }
-  return { rightmove: rightmove.size, acuitus: acuitus.size, eddisons: eddisons.size };
+  return { rightmove: rightmove.size, acuitus: acuitus.size, eddisons: eddisons.size, allsop: allsop.size };
 }
 
 function sourceClassificationText({

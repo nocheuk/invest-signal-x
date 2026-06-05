@@ -18,6 +18,7 @@ const rows = vi.hoisted(() => ({
     { deal_id: "imp-rightmove-2", source_url: "", import_sources: { name: "Rightmove Commercial" }, raw_imports: null },
     { deal_id: "imp-acuitus-1", source_url: "https://www.acuitus.co.uk/property", import_sources: { name: "Acuitus" }, raw_imports: null },
     { deal_id: "imp-eddisons-1", source_url: "https://www.eddisons.com/property-search/commercial-property", import_sources: null, raw_imports: null },
+    { deal_id: "imp-allsop-1", source_url: "https://www.allsop.co.uk/investment-overview/property/ci00436", import_sources: { name: "Allsop" }, raw_imports: null },
   ],
   dealCount: 42,
 }));
@@ -44,6 +45,7 @@ function resetRows() {
     { deal_id: "imp-rightmove-2", source_url: "", import_sources: { name: "Rightmove Commercial" }, raw_imports: null },
     { deal_id: "imp-acuitus-1", source_url: "https://www.acuitus.co.uk/property", import_sources: { name: "Acuitus" }, raw_imports: null },
     { deal_id: "imp-eddisons-1", source_url: "https://www.eddisons.com/property-search/commercial-property", import_sources: null, raw_imports: null },
+    { deal_id: "imp-allsop-1", source_url: "https://www.allsop.co.uk/investment-overview/property/ci00436", import_sources: { name: "Allsop" }, raw_imports: null },
   ];
 }
 
@@ -127,6 +129,7 @@ describe("useNationalScanStatus", () => {
       totalRightmoveDeals: 2,
       totalAcuitusDeals: 1,
       totalEddisonsDeals: 1,
+      totalAllsopDeals: 1,
       locationsCompletedInCurrentCycle: 4,
       lastSuccessfulScanDurationMs: 240000,
       lastScanInsertedCount: 7,
@@ -150,6 +153,7 @@ describe("useNationalScanStatus", () => {
         raw_imports: null,
       })),
       { deal_id: "imp-eddisons-page-2", source_url: "https://www.eddisons.com/property-search/page-2", import_sources: { name: "Eddisons" }, raw_imports: null },
+      { deal_id: "imp-allsop-page-2", source_url: "https://www.allsop.co.uk/investment-overview/property/ci00436", import_sources: null, raw_imports: null },
     ];
 
     const { result } = renderHook(() => useNationalScanStatus(), { wrapper });
@@ -158,6 +162,7 @@ describe("useNationalScanStatus", () => {
     expect(result.current.data).toMatchObject({
       totalRightmoveDeals: 1000,
       totalEddisonsDeals: 1,
+      totalAllsopDeals: 1,
     });
     expect(calls.tables.filter((table) => table === "deal_source_links")).toHaveLength(2);
   });

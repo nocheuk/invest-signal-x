@@ -126,6 +126,44 @@ describe("deal import runner", () => {
     ]);
   });
 
+  it("refreshes duplicate Allsop source URLs without creating another deal", async () => {
+    process.env.VITE_SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+    const mock = createImportSupabaseMock();
+    supabaseMocks.createClient.mockReturnValue(mock.client);
+    const rows = [
+      normalizeImportRow({
+        external_id: "CI00436",
+        source_url: "https://www.allsop.co.uk/investment-overview/rare-opportunity-in-wembley/ci00436",
+        image_url: "https://www.allsop.co.uk/api/image/allsop-image/703/527",
+        title: "Rare Opportunity to Acquire an Ultra Urban Industrial Sale and Leaseback",
+        location: "265 Water Road, Wembley HA0 1HX",
+        guide_price: "4500000",
+      }, 1),
+    ];
+
+    const result = await runDealImport({
+      rows,
+      sourceName: "Allsop",
+      sourceType: "auction_scraper",
+      dryRun: false,
+    });
+
+    expect(result).toMatchObject({ inserted: 0, existing: 1, skipped_duplicate: 1 });
+    expect(mock.calls.dealUpserts).toEqual([]);
+    expect(mock.calls.dealUpdates).toEqual([
+      expect.objectContaining({
+        title: "Rare Opportunity to Acquire an Ultra Urban Industrial Sale and Leaseback",
+        thumbnail: "https://www.allsop.co.uk/api/image/allsop-image/703/527",
+      }),
+    ]);
+    expect(mock.calls.linkUpdates[0]).toMatchObject({
+      deal_id: "existing-allsop-1",
+      raw_import_id: "raw-new-image",
+      source_url: "https://www.allsop.co.uk/investment-overview/rare-opportunity-in-wembley/ci00436",
+    });
+  });
+
   it("rejects unsafe guide prices before Supabase deal writes", async () => {
     process.env.VITE_SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
@@ -261,7 +299,10 @@ function createImportSupabaseMock() {
       if (table === "deals") {
         return {
           select: async () => ({
-            data: [{ id: "existing-deal-1", title: "Office Investment", location: "London W1J 7EE", guide_price: 5250000 }],
+            data: [
+              { id: "existing-deal-1", title: "Office Investment", location: "London W1J 7EE", guide_price: 5250000 },
+              { id: "existing-allsop-1", title: "Rare Opportunity to Acquire an Ultra Urban Industrial Sale and Leaseback", location: "265 Water Road, Wembley HA0 1HX", guide_price: 4500000 },
+            ],
             error: null,
           }),
           upsert: (payload: unknown) => {
@@ -302,7 +343,10 @@ function createImportSupabaseMock() {
             if (columns.includes("deal_id")) {
               return {
                 not: async () => ({
-                  data: [{ deal_id: "existing-deal-1", source_url: "https://www.acuitus.co.uk/property/5760/" }],
+                  data: [
+                    { deal_id: "existing-deal-1", source_url: "https://www.acuitus.co.uk/property/5760/" },
+                    { deal_id: "existing-allsop-1", source_url: "https://www.allsop.co.uk/investment-overview/rare-opportunity-in-wembley/ci00436" },
+                  ],
                   error: null,
                 }),
               };

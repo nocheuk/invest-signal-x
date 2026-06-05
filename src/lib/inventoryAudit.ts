@@ -1,6 +1,6 @@
 import type { Deal } from "@/lib/deals";
 import { countDealClassifications } from "@/lib/dealClassification";
-import { ACUITUS_SOURCE, EDDISONS_SOURCE, RIGHTMOVE_COMMERCIAL_SOURCE, sourceLabel } from "@/lib/dashboardFilters";
+import { ACUITUS_SOURCE, ALLSOP_SOURCE, EDDISONS_SOURCE, RIGHTMOVE_COMMERCIAL_SOURCE, sourceLabel } from "@/lib/dashboardFilters";
 import type { NationalScanStatus } from "@/hooks/useNationalScanStatus";
 
 export type InventoryAuditMetrics = {
@@ -9,6 +9,7 @@ export type InventoryAuditMetrics = {
   rightmoveDeals: number;
   acuitusDeals: number;
   eddisonsDeals: number;
+  allsopDeals: number;
   verifiedGreens: number;
   greenCandidates: number;
   amber: number;
@@ -38,6 +39,7 @@ export function buildInventoryAudit({
     rightmoveDeals: deals.filter((deal) => sourceLabel(deal) === RIGHTMOVE_COMMERCIAL_SOURCE).length,
     acuitusDeals: deals.filter((deal) => sourceLabel(deal) === ACUITUS_SOURCE).length,
     eddisonsDeals: deals.filter((deal) => sourceLabel(deal) === EDDISONS_SOURCE).length,
+    allsopDeals: deals.filter((deal) => sourceLabel(deal) === ALLSOP_SOURCE).length,
     verifiedGreens: classifications["verified-green"],
     greenCandidates: classifications["green-candidate"],
     amber: classifications.amber,
@@ -59,6 +61,7 @@ export function formatInventoryAuditReport(metrics: InventoryAuditMetrics) {
     `Rightmove deals: ${metrics.rightmoveDeals}`,
     `Acuitus deals: ${metrics.acuitusDeals}`,
     `Eddisons deals: ${metrics.eddisonsDeals}`,
+    `Allsop deals: ${metrics.allsopDeals}`,
     `Verified Greens: ${metrics.verifiedGreens}`,
     `Green Candidates: ${metrics.greenCandidates}`,
     `Amber: ${metrics.amber}`,
