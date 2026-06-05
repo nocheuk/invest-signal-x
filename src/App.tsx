@@ -13,8 +13,11 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
+import AllDeals from "./pages/AllDeals";
 import DealDetail from "./pages/DealDetail";
 import Watchlist from "./pages/Watchlist";
+import Alerts from "./pages/Alerts";
+import SourcesScans from "./pages/SourcesScans";
 import Pricing from "./pages/Pricing";
 import Settings from "./pages/Settings";
 import AdminImport from "./pages/AdminImport";
@@ -37,8 +40,12 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/deals" element={<ProtectedRoute><AllDeals /></ProtectedRoute>} />
                   <Route path="/deal/:id" element={<ProtectedRoute><DealDetail /></ProtectedRoute>} />
                   <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
+                  <Route path="/pipeline" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
+                  <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+                  <Route path="/sources" element={<ProtectedRoute><SourcesScans /></ProtectedRoute>} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                   <Route path="/admin/import" element={<ProtectedRoute><AdminRoute><AdminImport /></AdminRoute></ProtectedRoute>} />

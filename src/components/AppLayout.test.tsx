@@ -34,5 +34,10 @@ describe("AppLayout", () => {
     expect(screen.queryByText(/AI summaries/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /pricing/i })).not.toBeInTheDocument();
     expect(screen.getByText("Live sources ready")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /dashboard/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /all deals/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /pipeline/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /alerts/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /sources \/ scans/i }).length).toBeGreaterThan(0);
   });
 });
