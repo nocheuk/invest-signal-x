@@ -10,6 +10,7 @@ import { useStrategy, personalisedScore, matchReasons } from "@/lib/strategy";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
+import { formatAddedAgo } from "@/lib/freshness";
 import { cn } from "@/lib/utils";
 
 export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: "default" | "feature" }) {
@@ -27,6 +28,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
   const [imageAvailable, setImageAvailable] = useState(Boolean(deal.imageUrl));
   const tenantLabel = deal.tenant && deal.tenant !== "Unknown" ? deal.tenant : "Tenant not available";
+  const addedAgo = deal.isImported || deal.importSourceName ? formatAddedAgo(deal.postedAt) : "";
 
   useEffect(() => {
     setImageAvailable(Boolean(deal.imageUrl));
@@ -81,6 +83,7 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
             <span className="opacity-40">•</span>
             <span className="truncate">{sourceLabel}</span>
           </div>
+          {addedAgo && <div className="text-[11px] text-primary">{addedAgo}</div>}
           <h3 className="font-semibold text-[15px] leading-tight">{deal.title}</h3>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3" />{deal.location}

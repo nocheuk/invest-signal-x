@@ -17,6 +17,8 @@ export type NationalScanStatus = {
   totalAcuitusDeals: number;
   totalEddisonsDeals: number;
   locationsCompletedInCurrentCycle: number;
+  lastSuccessfulScanDurationMs: number;
+  lastScanInsertedCount: number;
 };
 
 export const nationalScanStatusQueryKey = ["national-scan-status"];
@@ -29,7 +31,7 @@ export function useNationalScanStatus() {
       const supabase = requireSupabase();
       const { data, error } = await supabase
         .from("national_scan_runs")
-        .select("id,source_name,location_query,started_at,finished_at,metadata")
+        .select("id,source_name,location_query,started_at,finished_at,metadata,inserted")
         .eq("status", "completed")
         .order("finished_at", { ascending: false })
         .limit(1);
@@ -58,6 +60,8 @@ export function useNationalScanStatus() {
         totalAcuitusDeals: sourceCounts.acuitus,
         totalEddisonsDeals: sourceCounts.eddisons,
         locationsCompletedInCurrentCycle: totalConfiguredLocations > 0 && nextIndex === 0 ? totalConfiguredLocations : nextIndex,
+        lastSuccessfulScanDurationMs: scanDurationMs(row.started_at, row.finished_at),
+        lastScanInsertedCount: Number(row.inserted ?? 0),
       };
     },
   });
@@ -137,6 +141,13 @@ function flattenSourcePayload(value: unknown): string {
   ].filter(Boolean).map(String).join(" ");
 }
 
+function scanDurationMs(startedAt: string | null | undefined, finishedAt: string | null | undefined) {
+  const started = startedAt ? new Date(startedAt).getTime() : 0;
+  const finished = finishedAt ? new Date(finishedAt).getTime() : 0;
+  if (!Number.isFinite(started) || !Number.isFinite(finished) || finished < started) return 0;
+  return finished - started;
+}
+
 export function formatNationalScanTime(value: string | null | undefined) {
   if (!value) return "Not available";
   const date = new Date(value);
@@ -146,4 +157,14 @@ export function formatNationalScanTime(value: string | null | undefined) {
     timeStyle: "short",
     timeZone: "Europe/London",
   }).format(date);
+}
+
+export function formatScanDuration(value: number | null | undefined) {
+  const ms = Math.max(0, Number(value) || 0);
+  if (!ms) return "Not available";
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return remainingSeconds ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
 }

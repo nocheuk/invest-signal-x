@@ -38,6 +38,8 @@ const nationalScanState = vi.hoisted(() => ({
     totalAcuitusDeals: 12,
     totalEddisonsDeals: 5,
     locationsCompletedInCurrentCycle: 4,
+    lastSuccessfulScanDurationMs: 240000,
+    lastScanInsertedCount: 7,
   },
   isLoading: false,
   isError: false,
@@ -212,6 +214,8 @@ describe("Dashboard live location search", () => {
       totalAcuitusDeals: 12,
       totalEddisonsDeals: 5,
       locationsCompletedInCurrentCycle: 4,
+      lastSuccessfulScanDurationMs: 240000,
+      lastScanInsertedCount: 7,
     };
     nationalScanState.isLoading = false;
     nationalScanState.isError = false;
@@ -281,6 +285,51 @@ describe("Dashboard live location search", () => {
     expect(screen.getByText("Watchlisted deals")).toBeInTheDocument();
     expect(screen.getByText("2 active opportunities")).toBeInTheDocument();
     expect(screen.queryByText(/need review/)).not.toBeInTheDocument();
+  });
+
+  it("shows freshness KPIs, filters by new deals, and orders recently added newest first", () => {
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    dealsState.deals = [
+      dashboardDeal({ id: "fresh-today", title: "Fresh Today Deal", postedAt: twoHoursAgo, sourceUrl: "https://rightmove.co.uk/fresh-today" }),
+      dashboardDeal({
+        id: "fresh-candidate",
+        title: "Fresh Candidate Deal",
+        postedAt: threeDaysAgo,
+        score: 74,
+        rating: "amber",
+        dataConfidenceScore: 78,
+        passingRent: 32000,
+        sourceUrl: "https://eddisons.com/fresh-candidate",
+        importSourceName: "Eddisons",
+      }),
+      dashboardDeal({ id: "older-deal", title: "Older Deal", postedAt: tenDaysAgo }),
+    ];
+
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <Dashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getAllByText("New Today").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: "Show 1 deals imported today" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 2 deals imported this week" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 1 new green candidate deals" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show 1 source listings imported today" })).toBeInTheDocument();
+    expect(screen.getByText("Recently Added")).toBeInTheDocument();
+    expect(container.textContent?.indexOf("Fresh Today Deal")).toBeLessThan(container.textContent?.indexOf("Fresh Candidate Deal") ?? 0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 deals imported today" }));
+
+    expect(screen.getAllByText("Fresh Today Deal").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Fresh Candidate Deal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Older Deal")).not.toBeInTheDocument();
+    expect(screen.getAllByText("New Today").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows an empty-location CTA and refreshes deals after import completes", async () => {
@@ -398,7 +447,7 @@ describe("Dashboard live location search", () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getByText("Rightmove Bournemouth Office")).toBeInTheDocument();
+    expect(screen.getAllByText("Rightmove Bournemouth Office").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Demo Tesco")).not.toBeInTheDocument();
     expect(screen.queryByText(/14,832/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Run AI sweep/i)).not.toBeInTheDocument();
@@ -517,20 +566,20 @@ describe("Dashboard live location search", () => {
     );
 
     expect(screen.getByRole("button", { name: "Show 1 verified green deals from current filters" })).toBeInTheDocument();
-    expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
-    expect(screen.getByText("Red Imported Deal")).toBeInTheDocument();
+    expect(screen.getAllByText("Green Imported Deal").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Red Imported Deal").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Seed Green Demo")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show 1 verified green deals from current filters" }));
 
-    expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
+    expect(screen.getAllByText("Green Imported Deal").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Red Imported Deal")).not.toBeInTheDocument();
     expect(screen.getAllByText("Verified Green").length).toBeGreaterThanOrEqual(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Clear green filter" }));
 
-    expect(screen.getByText("Green Imported Deal")).toBeInTheDocument();
-    expect(screen.getByText("Red Imported Deal")).toBeInTheDocument();
+    expect(screen.getAllByText("Green Imported Deal").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Red Imported Deal").length).toBeGreaterThanOrEqual(1);
   });
 
   it("counts and filters Green Candidates separately from Verified Green", () => {
@@ -577,7 +626,7 @@ describe("Dashboard live location search", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Show 1 green candidate deals from current filters" }));
 
-    expect(screen.getByText("Candidate Imported Deal")).toBeInTheDocument();
+    expect(screen.getAllByText("Candidate Imported Deal").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Verified Imported Deal")).not.toBeInTheDocument();
     expect(screen.queryByText("Red Imported Deal")).not.toBeInTheDocument();
     expect(screen.getAllByText("Green Candidates").length).toBeGreaterThanOrEqual(1);
@@ -617,14 +666,14 @@ describe("Dashboard live location search", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reviewing: 1" }));
 
-    expect(screen.getByText("Reviewing Pipeline Deal")).toBeInTheDocument();
+    expect(screen.getAllByText("Reviewing Pipeline Deal").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Offer Pipeline Deal")).not.toBeInTheDocument();
     expect(screen.queryByText("Unsaved Deal")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear pipeline filter" }));
 
-    expect(screen.getByText("Offer Pipeline Deal")).toBeInTheDocument();
-    expect(screen.getByText("Unsaved Deal")).toBeInTheDocument();
+    expect(screen.getAllByText("Offer Pipeline Deal").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Unsaved Deal").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows the latest real national scan status", () => {

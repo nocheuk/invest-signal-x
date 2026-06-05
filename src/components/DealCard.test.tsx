@@ -118,6 +118,13 @@ describe("DealCard", () => {
     expect(screen.getByRole("button", { name: "Save to Pipeline" })).toBeInTheDocument();
   });
 
+  it("shows when an imported deal was added", () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    renderCard(deal({ postedAt: twoHoursAgo }));
+
+    expect(screen.getByText("Added 2 hours ago")).toBeInTheDocument();
+  });
+
   it("saves to pipeline without toggling saved deals back off", () => {
     const { rerender } = renderCard(deal());
 

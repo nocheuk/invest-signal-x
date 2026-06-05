@@ -10,6 +10,7 @@ const rows = vi.hoisted(() => ({
     location_query: string;
     started_at: string;
     finished_at: string;
+    inserted: number;
     metadata: Record<string, unknown>;
   }>,
   sourceLinks: [
@@ -28,6 +29,7 @@ function resetRows() {
     location_query: "Bournemouth",
     started_at: "2026-05-28T04:59:00Z",
     finished_at: "2026-05-28T05:03:00Z",
+    inserted: 7,
     metadata: {
       locations_scanned: ["London", "Manchester", "Birmingham", "Leeds"],
       total_configured_locations: 160,
@@ -87,7 +89,7 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
-import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
+import { formatNationalScanTime, formatScanDuration, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -126,6 +128,8 @@ describe("useNationalScanStatus", () => {
       totalAcuitusDeals: 1,
       totalEddisonsDeals: 1,
       locationsCompletedInCurrentCycle: 4,
+      lastSuccessfulScanDurationMs: 240000,
+      lastScanInsertedCount: 7,
     });
   });
 
@@ -158,7 +162,9 @@ describe("useNationalScanStatus", () => {
     expect(calls.tables.filter((table) => table === "deal_source_links")).toHaveLength(2);
   });
 
-  it("formats scan times in UK time", () => {
+  it("formats scan times and durations", () => {
     expect(formatNationalScanTime("2026-05-28T05:03:00Z")).toContain("06:03");
+    expect(formatScanDuration(240000)).toBe("4m");
+    expect(formatScanDuration(245000)).toBe("4m 5s");
   });
 });
