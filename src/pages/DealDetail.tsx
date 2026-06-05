@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
+import { formatAreaValue, getAreaIntelligence } from "@/lib/areaIntelligence";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -28,7 +29,7 @@ const WEIGHTS = [
 export default function DealDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { deal, isLoading, isError } = useDeal(id);
+  const { deal, data: allDeals = [], isLoading, isError } = useDeal(id);
   const sourceLinks = useDealSourceLinks(deal?.id);
   const { isWatched, notes, setNote, getPipelineStatus, setStatus, saveToPipeline } = useWatchlist();
   const [memoStatus, setMemoStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -56,6 +57,7 @@ export default function DealDetail() {
   const note = notes[deal.id] || "";
   const pipelineStatus = getPipelineStatus(deal.id) ?? "Saved";
   const dealAnalysis = getDealAnalysis(deal);
+  const areaIntelligence = getAreaIntelligence(deal, allDeals);
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
   const handleDownloadMemo = async () => {
@@ -205,6 +207,32 @@ export default function DealDetail() {
             </div>
           </section>
         )}
+
+        <section className="ds-card p-6 space-y-4">
+          <div>
+            <h2 className="font-display text-2xl">Area Intelligence</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Local benchmarks are calculated only from imported DealSignal deals in the same city, postcode area or region.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <AreaIntelStat
+              label="Yield"
+              value={deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "Not available"}
+              benchmarkLabel={areaIntelligence.stats ? `${areaIntelligence.stats.area} average` : "Area average"}
+              benchmark={formatAreaValue(areaIntelligence.stats?.averageYield ?? null, "yield")}
+              sample={areaIntelligence.stats?.dealCount ?? 0}
+            />
+            <AreaIntelStat
+              label="£/sqft"
+              value={deal.pricePerSqft ? `£${deal.pricePerSqft}` : "Not available"}
+              benchmarkLabel={areaIntelligence.stats ? `${areaIntelligence.stats.area} average` : "Area average"}
+              benchmark={formatAreaValue(areaIntelligence.stats?.averagePricePerSqft ?? null, "price")}
+              sample={areaIntelligence.stats?.dealCount ?? 0}
+            />
+          </div>
+          <ReasonList title="Area insights" items={areaIntelligence.insights} fallback="Limited area data" tone="primary" />
+        </section>
 
         <section className="ds-card p-6 space-y-3">
           <h2 className="font-display text-2xl">Green classification</h2>
@@ -358,6 +386,24 @@ function UWCard({ icon: Icon, title, rows }: { icon: React.ComponentType<{ class
             <span className="font-mono tabular font-medium">{v}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AreaIntelStat({ label, value, benchmarkLabel, benchmark, sample }: { label: string; value: string; benchmarkLabel: string; benchmark: string; sample: number }) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-surface-2/40 p-4 space-y-3">
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="font-mono text-2xl font-semibold tabular mt-1">{value}</div>
+      </div>
+      <div className="flex items-end justify-between gap-3 border-t border-border/40 pt-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{benchmarkLabel}</div>
+          <div className="font-mono text-lg font-semibold tabular mt-0.5">{benchmark}</div>
+        </div>
+        <div className="text-[11px] text-muted-foreground">{sample ? `${sample} local deals` : "No local sample"}</div>
       </div>
     </div>
   );

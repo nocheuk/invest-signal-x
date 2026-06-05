@@ -11,9 +11,10 @@ import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { formatAddedAgo } from "@/lib/freshness";
+import { formatAreaDelta, type AreaIntelligence } from "@/lib/areaIntelligence";
 import { cn } from "@/lib/utils";
 
-export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: "default" | "feature" }) {
+export function DealCard({ deal, variant = "default", areaIntelligence }: { deal: Deal; variant?: "default" | "feature"; areaIntelligence?: AreaIntelligence }) {
   const { isWatched, getPipelineStatus, saveToPipeline } = useWatchlist();
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
@@ -108,6 +109,13 @@ export function DealCard({ deal, variant = "default" }: { deal: Deal; variant?: 
           <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} compact />
         </div>
 
+        {areaIntelligence?.stats && (
+          <div className="grid grid-cols-2 gap-2 rounded-md border border-border/50 bg-surface-2/40 p-2 text-[11px]">
+            <AreaMetric label="Yield vs area" value={formatAreaDelta(areaIntelligence.yieldDelta, "yield")} />
+            <AreaMetric label="£/sqft vs area" value={formatAreaDelta(areaIntelligence.pricePerSqftDelta, "price")} />
+          </div>
+        )}
+
         {cardReasons.length > 0 && (
           <ul className="space-y-1 pt-1">
             {cardReasons.map((r) => (
@@ -165,6 +173,15 @@ function Metric({ label, value }: { label: string; value: string }) {
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="font-mono text-sm font-semibold tabular">{value}</div>
+    </div>
+  );
+}
+
+function AreaMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="font-mono text-[11px] font-semibold tabular">{value}</div>
     </div>
   );
 }

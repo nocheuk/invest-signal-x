@@ -16,6 +16,7 @@ import { formatNationalScanTime, formatScanDuration, useNationalScanStatus } fro
 import { buildInventoryAudit, formatInventoryAuditReport } from "@/lib/inventoryAudit";
 import { buildDashboardKpis } from "@/lib/dashboardKpis";
 import { buildFreshnessMetrics, filterByFreshness, formatImportDate, type FreshnessFilter, sortNewestDeals } from "@/lib/freshness";
+import { getAreaIntelligence } from "@/lib/areaIntelligence";
 import { ClassificationBadge } from "@/components/RatingBadge";
 import { classifyDeal } from "@/lib/dealClassification";
 import { StrategyControl } from "@/components/StrategyControl";
@@ -97,6 +98,7 @@ export default function Dashboard() {
   }, [deals]);
   const needsReview = useMemo(() => filtered.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)), [filtered]);
   const recentlyAdded = useMemo(() => sortNewestDeals(filtered.filter((deal) => deal.isImported || deal.importSourceName)).slice(0, 5), [filtered]);
+  const areaIntelligenceByDealId = useMemo(() => new Map(deals.map((deal) => [deal.id, getAreaIntelligence(deal, deals)])), [deals]);
   const pipelineAnalytics = useMemo(() => ({
     totalSaved: ids.length,
     activeOpportunities: pipelineCounts.Reviewing + pipelineCounts["Viewing Booked"] + pipelineCounts["Offer Submitted"],
@@ -447,7 +449,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="grid md:grid-cols-3 gap-4">
-              {needsReview.slice(0, 3).map((d) => <DealCard key={d.id} deal={d} variant="feature" />)}
+              {needsReview.slice(0, 3).map((d) => <DealCard key={d.id} deal={d} variant="feature" areaIntelligence={areaIntelligenceByDealId.get(d.id)} />)}
             </div>
           </section>
         )}
@@ -461,7 +463,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid md:grid-cols-3 gap-4">
-            {best.map((d) => <DealCard key={d.id} deal={d} variant="feature" />)}
+            {best.map((d) => <DealCard key={d.id} deal={d} variant="feature" areaIntelligence={areaIntelligenceByDealId.get(d.id)} />)}
           </div>
         </section>
         )}
