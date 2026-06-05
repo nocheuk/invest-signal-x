@@ -50,11 +50,16 @@ export function ClassificationBadge({ classification, className, dot = true }: {
 }
 
 export function ScorePill({ score, rating, size = "md" }: { score: number; rating: Rating; size?: "sm" | "md" | "lg" }) {
-  const color = rating === "green" ? "from-signal-green to-emerald-400" : rating === "amber" ? "from-signal-amber to-yellow-400" : "from-signal-red to-rose-400";
+  const color = rating === "green" ? "hsl(var(--signal-green))" : rating === "amber" ? "hsl(var(--signal-amber))" : "hsl(var(--signal-red))";
   const sz = size === "sm" ? "h-9 w-9 text-xs" : size === "lg" ? "h-16 w-16 text-xl" : "h-12 w-12 text-base";
+  const safeScore = Math.max(0, Math.min(100, Math.round(score)));
   return (
-    <div className={cn("relative grid place-items-center rounded-full bg-gradient-to-br p-[1.5px]", color, sz)}>
-      <div className="grid h-full w-full place-items-center rounded-full bg-surface-2">
+    <div
+      className={cn("relative grid place-items-center rounded-full p-[2px] shadow-lg shadow-black/30 transition-transform group-hover:scale-105", sz)}
+      style={{ background: `conic-gradient(${color} ${safeScore * 3.6}deg, hsl(var(--border)) 0deg)` }}
+      aria-label={`DealSignal score ${safeScore}`}
+    >
+      <div className="grid h-full w-full place-items-center rounded-full bg-surface-2/95 ring-1 ring-white/5">
         <span className="font-mono font-semibold tabular text-foreground">{score}</span>
       </div>
     </div>
