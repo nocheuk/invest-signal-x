@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Filter, Search } from "lucide-react";
@@ -20,10 +20,12 @@ import { buildDashboardKpis } from "@/lib/dashboardKpis";
 import { buildFreshnessMetrics, filterByFreshness, formatImportDate, sortNewestDeals, type FreshnessFilter } from "@/lib/freshness";
 import { buildAreaIntelligenceIndex, EMPTY_AREA_INTELLIGENCE_INDEX, getAreaIntelligenceFromIndex } from "@/lib/areaIntelligence";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
+import { useProfile } from "@/hooks/useProfile";
+import { dashboardDefaultsFromPreferences, getInvestorPreferences } from "@/lib/onboarding";
 
 export default function AllDeals() {
   const { dealsQuery, deals } = useRealDeals();
+  const profile = useProfile();
   const { ids, pipelineItems, pipelineCounts } = useWatchlist();
   const { weights } = useStrategy();
   const [searchParams] = useSearchParams();
@@ -41,6 +43,20 @@ export default function AllDeals() {
   const [minYield, setMinYield] = useState(0);
   const [maxPrice, setMaxPrice] = useState(0);
   const now = useMemo(() => new Date(), []);
+  const onboardingDefaults = useMemo(() => dashboardDefaultsFromPreferences(getInvestorPreferences(profile.data)), [profile.data]);
+
+  useEffect(() => {
+    if (!searchParams.get("location") && onboardingDefaults.locationQuery) setLocationQuery(onboardingDefaults.locationQuery);
+    if (
+      !searchParams.get("asset") &&
+      onboardingDefaults.assetType &&
+      onboardingDefaults.assetType !== "All" &&
+      ASSET_TYPES.includes(onboardingDefaults.assetType as typeof ASSET_TYPES[number])
+    ) {
+      setAsset(onboardingDefaults.assetType);
+    }
+    if (onboardingDefaults.minYield) setMinYield(onboardingDefaults.minYield);
+  }, [onboardingDefaults.assetType, onboardingDefaults.locationQuery, onboardingDefaults.minYield, searchParams]);
 
   const sourceOptions = useMemo(() => {
     const options = buildSourceOptions(deals);
