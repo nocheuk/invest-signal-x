@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
 import { ArrowRight, CalendarDays, Clock3, RadioTower, Search, Sparkles, Target, TrendingUp } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
@@ -22,6 +22,7 @@ import { useRealDeals } from "@/hooks/useRealDeals";
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
 import { isAdminUser } from "@/lib/admin";
+import { dashboardDefaultsFromPreferences, getInvestorPreferences } from "@/lib/onboarding";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -43,10 +44,16 @@ function DashboardContent() {
   const locationImport = useLocationImport();
   const [searchParams] = useSearchParams();
   const [locationQuery, setLocationQuery] = useState("");
+  const [locationEdited, setLocationEdited] = useState(false);
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
   const search = searchParams.get("q") ?? "";
   const now = useMemo(() => new Date(), []);
   const firstName = (profile.data?.full_name || auth.user?.user_metadata?.full_name || auth.user?.email || "there").split(/\s|@/)[0];
+  const onboardingDefaults = useMemo(() => dashboardDefaultsFromPreferences(getInvestorPreferences(profile.data)), [profile.data]);
+
+  useEffect(() => {
+    if (!locationEdited && onboardingDefaults.locationQuery) setLocationQuery(onboardingDefaults.locationQuery);
+  }, [locationEdited, onboardingDefaults.locationQuery]);
 
   const visibleDeals = useMemo(() => {
     return filterAndSortDeals(deals, {
@@ -177,7 +184,10 @@ function DashboardContent() {
               <Input
                 aria-label="Location filter"
                 value={locationQuery}
-                onChange={(event) => setLocationQuery(event.target.value)}
+                onChange={(event) => {
+                  setLocationEdited(true);
+                  setLocationQuery(event.target.value);
+                }}
                 placeholder="Bournemouth, Poole, Southampton, BH1..."
                 className="h-11 bg-surface-2 pl-9"
               />

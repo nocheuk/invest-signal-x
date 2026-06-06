@@ -1,179 +1,301 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, ArrowRight, Bell, Building2, Check, Loader2, MapPin, Target } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ASSET_TYPES, REGIONS } from "@/lib/deals";
-import { ArrowLeft, ArrowRight, Check, Building2, Target, Bell } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/lib/auth";
+import { useStrategy } from "@/lib/strategy";
+import { useSavedAlerts } from "@/hooks/useSavedAlerts";
+import { useProfile } from "@/hooks/useProfile";
+import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
+import {
+  ALERT_PREFERENCES,
+  BUDGET_RANGES,
+  DEFAULT_ONBOARDING,
+  INVESTMENT_STRATEGIES,
+  INVESTOR_TYPES,
+  PREFERRED_ASSET_TYPES,
+  RISK_APPETITES,
+  acquisitionBriefSummary,
+  alertFromOnboarding,
+  alertPreferencesFromOnboarding,
+  buildProfilePreferences,
+  getInvestorPreferences,
+  parseLocations,
+  strategyFromOnboarding,
+  type InvestorOnboardingAnswers,
+} from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
-  { n: 1, title: "Who you are", icon: Building2 },
-  { n: 2, title: "What you want", icon: Target },
-  { n: 3, title: "How we alert you", icon: Bell },
+  { n: 1, title: "Investor", icon: Building2 },
+  { n: 2, title: "Strategy", icon: Target },
+  { n: 3, title: "Targets", icon: MapPin },
+  { n: 4, title: "Alerts", icon: Bell },
 ];
 
-export default function Onboarding() {
-  const [step, setStep] = useState(1);
-  const [role, setRole] = useState("Investor");
-  const [regions, setRegions] = useState<string[]>(["South East", "North West"]);
-  const [assets, setAssets] = useState<string[]>(["Industrial", "Convenience"]);
-  const [riskAppetite, setRiskAppetite] = useState("Balanced");
-  const [minYield, setMinYield] = useState(6);
-  const navigate = useNavigate();
+const LOCAL_KEY = "dealsignal:onboarding";
 
-  const toggle = (arr: string[], setter: (v: string[]) => void, val: string) =>
-    setter(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
+export default function Onboarding() {
+  const auth = useAuth();
+  const profile = useProfile();
+  const strategy = useStrategy();
+  const savedAlerts = useSavedAlerts();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const editMode = new URLSearchParams(location.search).get("edit") === "1";
+  const from = (location.state as { from?: string } | null)?.from || (editMode ? "/settings" : "/dashboard");
+  const existing = useMemo(() => getInvestorPreferences(profile.data), [profile.data]);
+  const [step, setStep] = useState(1);
+  const [answers, setAnswers] = useState<InvestorOnboardingAnswers>(DEFAULT_ONBOARDING);
+  const [locationsText, setLocationsText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!profile.data || hydrated) return;
+    setAnswers({
+      investorType: existing.investorType,
+      strategy: existing.strategy,
+      targetLocations: existing.targetLocations,
+      budgetRange: existing.budgetRange,
+      minYieldTarget: existing.minYieldTarget,
+      preferredAssetTypes: existing.preferredAssetTypes,
+      riskAppetite: existing.riskAppetite,
+      alertPreference: existing.alertPreference,
+      completedAt: existing.completedAt,
+      skippedAt: existing.skippedAt,
+    });
+    setLocationsText(existing.targetLocations.join(", "));
+    setHydrated(true);
+  }, [existing, hydrated, profile.data]);
+
+  const summary = acquisitionBriefSummary({ ...answers, targetLocations: parseLocations(locationsText) });
+  const progress = Math.round((step / STEPS.length) * 100);
+
+  const update = <K extends keyof InvestorOnboardingAnswers>(key: K, value: InvestorOnboardingAnswers[K]) => {
+    setAnswers((current) => ({ ...current, [key]: value }));
+  };
+
+  const toggleAsset = (asset: string) => {
+    setAnswers((current) => ({
+      ...current,
+      preferredAssetTypes: current.preferredAssetTypes.includes(asset)
+        ? current.preferredAssetTypes.filter((item) => item !== asset)
+        : [...current.preferredAssetTypes, asset],
+    }));
+  };
+
+  const save = async (mode: "completed" | "skipped") => {
+    setSaving(true);
+    setError(null);
+    const finalAnswers = {
+      ...answers,
+      targetLocations: parseLocations(locationsText),
+      preferredAssetTypes: answers.preferredAssetTypes.length ? answers.preferredAssetTypes : ["Retail"],
+    };
+
+    try {
+      if (!isSupabaseConfigured) {
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(buildProfilePreferences({}, finalAnswers, mode)));
+        navigate(from, { replace: true });
+        return;
+      }
+      if (!auth.user) throw new Error("Sign in to save onboarding.");
+
+      const nextPreferences = buildProfilePreferences(profile.data?.preferences, finalAnswers, mode);
+      const { error: updateError } = await requireSupabase()
+        .from("profiles")
+        .update({
+          preferences: nextPreferences,
+          alert_preferences: alertPreferencesFromOnboarding(finalAnswers),
+        })
+        .eq("id", auth.user.id);
+      if (updateError) throw updateError;
+
+      if (mode === "completed") {
+        await strategy.save(strategyFromOnboarding(finalAnswers));
+        const suggestedAlert = alertFromOnboarding(finalAnswers);
+        if (suggestedAlert) await savedAlerts.saveAlert(suggestedAlert);
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["profile", auth.user.id] });
+      navigate(from, { replace: true });
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save your onboarding answers.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="container h-16 flex items-center justify-between border-b border-border/40">
-        <Logo />
-        <button onClick={() => navigate("/dashboard")} className="text-xs text-muted-foreground hover:text-foreground">Skip for now</button>
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="border-b border-border/40 bg-background/80 backdrop-blur">
+        <div className="container h-16 flex items-center justify-between">
+          <Logo />
+          <button type="button" onClick={() => void save("skipped")} disabled={saving} className="text-xs text-muted-foreground hover:text-foreground">
+            Skip for now
+          </button>
+        </div>
       </header>
 
-      <div className="flex-1 container max-w-3xl py-12">
-        {/* Stepper */}
-        <div className="flex items-center justify-between mb-12">
-          {STEPS.map((s, i) => (
-            <div key={s.n} className="flex items-center flex-1">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "h-9 w-9 rounded-full grid place-items-center border transition-colors",
-                  step >= s.n ? "bg-primary border-primary text-primary-foreground" : "border-border text-muted-foreground"
-                )}>
-                  {step > s.n ? <Check className="h-4 w-4" /> : <s.icon className="h-4 w-4" />}
+      <main className="flex-1 container max-w-4xl py-8 md:py-12">
+        <div className="mb-8 space-y-4">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-primary font-medium">Investor Onboarding</div>
+            <h1 className="font-display text-4xl mt-1">{editMode ? "Edit your acquisition brief" : "Build your acquisition brief"}</h1>
+            <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+              A short setup flow so DealSignal can personalise dashboard defaults, alerts, and Your Strategy Score.
+            </p>
+          </div>
+          <div className="h-2 rounded-full bg-surface-2 overflow-hidden">
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {STEPS.map((item) => (
+              <button key={item.n} type="button" onClick={() => setStep(item.n)} className={cn(
+                "rounded-lg border px-2 py-2 text-left transition-colors",
+                step >= item.n ? "border-primary/40 bg-primary/10 text-primary" : "border-border/60 bg-surface-2 text-muted-foreground"
+              )}>
+                <div className="flex items-center gap-2">
+                  <item.icon className="h-3.5 w-3.5" />
+                  <span className="hidden text-xs font-medium sm:inline">{item.title}</span>
                 </div>
-                <div className="hidden sm:block">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Step {s.n}</div>
-                  <div className="text-sm font-medium">{s.title}</div>
-                </div>
-              </div>
-              {i < STEPS.length - 1 && <div className={cn("flex-1 h-px mx-4", step > s.n ? "bg-primary" : "bg-border")} />}
-            </div>
-          ))}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="ds-card-elevated p-8 lg:p-10 space-y-8">
+        <section className="ds-card-elevated p-5 md:p-8 space-y-8">
           {step === 1 && (
-            <>
-              <div>
-                <h2 className="font-display text-3xl">Tell us who you are.</h2>
-                <p className="text-muted-foreground mt-2 text-sm">We'll tailor the deal flow and underwriting style.</p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Your role</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {["Investor", "Developer", "Sourcer", "Agent"].map((r) => (
-                    <button key={r} onClick={() => setRole(r)} className={cn(
-                      "px-4 py-3 rounded-lg border text-sm transition-all",
-                      role === r ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-border/80"
-                    )}>{r}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="firm" className="text-xs">Firm or fund name (optional)</Label>
-                <Input id="firm" placeholder="e.g. Northbank Capital" className="bg-surface-2 border-border/60" />
-              </div>
-            </>
+            <StepShell title="What kind of investor are you?" desc="This helps tune language, deal emphasis, and future product defaults.">
+              <ChoiceGrid options={INVESTOR_TYPES} value={answers.investorType} onChange={(value) => update("investorType", value)} />
+            </StepShell>
           )}
 
           {step === 2 && (
-            <>
-              <div>
-                <h2 className="font-display text-3xl">What are you hunting for?</h2>
-                <p className="text-muted-foreground mt-2 text-sm">Pick at least one region and asset type. You can change these later.</p>
-              </div>
+            <StepShell title="What is your acquisition strategy?" desc="We use this to suggest a first strategy weighting profile.">
+              <ChoiceGrid options={INVESTMENT_STRATEGIES} value={answers.strategy} onChange={(value) => update("strategy", value)} />
               <div className="space-y-2">
-                <Label className="text-xs">Preferred regions</Label>
-                <div className="flex flex-wrap gap-2">
-                  {REGIONS.slice(1).map((r) => (
-                    <button key={r} onClick={() => toggle(regions, setRegions, r)} className={cn(
-                      "px-3 py-1.5 rounded-full border text-xs transition-all",
-                      regions.includes(r) ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
-                    )}>{r}</button>
-                  ))}
-                </div>
+                <Label className="text-xs">Risk appetite</Label>
+                <ChoiceGrid options={RISK_APPETITES} value={answers.riskAppetite} onChange={(value) => update("riskAppetite", value)} columns="sm:grid-cols-3" />
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Asset types</Label>
-                <div className="flex flex-wrap gap-2">
-                  {ASSET_TYPES.map((a) => (
-                    <button key={a} onClick={() => toggle(assets, setAssets, a)} className={cn(
-                      "px-3 py-1.5 rounded-full border text-xs transition-all",
-                      assets.includes(a) ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
-                    )}>{a}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs">Minimum target yield: <span className="font-mono text-primary">{minYield.toFixed(1)}%</span></Label>
-                  <input type="range" min={4} max={12} step={0.5} value={minYield} onChange={(e) => setMinYield(+e.target.value)} className="w-full accent-primary" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Risk appetite</Label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {["Conservative", "Balanced", "Opportunistic"].map((r) => (
-                      <button key={r} onClick={() => setRiskAppetite(r)} className={cn(
-                        "px-2 py-2 rounded-lg border text-xs transition-all",
-                        riskAppetite === r ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
-                      )}>{r}</button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </>
+            </StepShell>
           )}
 
           {step === 3 && (
-            <>
-              <div>
-                <h2 className="font-display text-3xl">Almost there.</h2>
-                <p className="text-muted-foreground mt-2 text-sm">When should we ping you about new green-rated deals?</p>
+            <StepShell title="Where and what should DealSignal prioritise?" desc="These become your default filters and seed your first alert.">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Target locations">
+                  <Input value={locationsText} onChange={(event) => setLocationsText(event.target.value)} placeholder="Bournemouth, Poole, Dorset" className="bg-surface-2" />
+                  <p className="text-[11px] text-muted-foreground">Separate cities, towns, counties, or postcode areas with commas.</p>
+                </Field>
+                <Field label="Budget range">
+                  <Select value={answers.budgetRange} onValueChange={(value) => update("budgetRange", value)}>
+                    <SelectTrigger className="bg-surface-2"><SelectValue /></SelectTrigger>
+                    <SelectContent>{BUDGET_RANGES.map((range) => <SelectItem key={range} value={range}>{range}</SelectItem>)}</SelectContent>
+                  </Select>
+                </Field>
+                <Field label={`Minimum yield target: ${answers.minYieldTarget}%`}>
+                  <input type="range" min={0} max={15} step={0.5} value={answers.minYieldTarget} onChange={(event) => update("minYieldTarget", Number(event.target.value))} className="w-full accent-primary" />
+                </Field>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Alert frequency</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {["Real-time", "Daily digest", "Weekly digest"].map((f) => (
-                    <button key={f} className="px-3 py-3 rounded-lg border border-border first:border-primary first:bg-primary/10 first:text-primary text-sm">
-                      {f}
+                <Label className="text-xs">Preferred asset types</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PREFERRED_ASSET_TYPES.map((asset) => (
+                    <button key={asset} type="button" onClick={() => toggleAsset(asset)} className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs transition-colors",
+                      answers.preferredAssetTypes.includes(asset) ? "border-primary/40 bg-primary/10 text-primary" : "border-border/60 text-muted-foreground hover:text-foreground"
+                    )}>
+                      {asset}
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="ds-card p-4 bg-primary/5 border-primary/20">
+            </StepShell>
+          )}
+
+          {step === 4 && (
+            <StepShell title="How should alerts start?" desc="You can edit or pause alerts later from the Alerts page.">
+              <ChoiceGrid options={ALERT_PREFERENCES} value={answers.alertPreference} onChange={(value) => update("alertPreference", value)} columns="sm:grid-cols-4" />
+              <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
                 <div className="flex items-start gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-primary/15 grid place-items-center text-primary shrink-0">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
                     <Check className="h-4 w-4" />
                   </div>
-                  <div className="text-sm">
-                    <div className="font-medium">You're set up</div>
-                    <div className="text-muted-foreground mt-1 text-xs">{role} · {regions.length} regions · {assets.length} asset types · min yield {minYield.toFixed(1)}% · {riskAppetite.toLowerCase()} risk.</div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Your acquisition brief</h3>
+                    <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      {summary.map((line) => <li key={line}>{line}</li>)}
+                    </ul>
                   </div>
                 </div>
               </div>
-            </>
+            </StepShell>
           )}
 
-          <div className="flex items-center justify-between pt-2">
-            <Button variant="ghost" size="sm" onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1} className="gap-1.5">
+          {error && <div className="rounded-md border border-signal-red/40 bg-signal-red/10 px-3 py-2 text-xs text-signal-red">{error}</div>}
+
+          <div className="flex items-center justify-between border-t border-border/60 pt-5">
+            <Button variant="ghost" size="sm" onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1 || saving} className="gap-1.5">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
-            {step < 3 ? (
-              <Button onClick={() => setStep(step + 1)} className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
+            {step < STEPS.length ? (
+              <Button onClick={() => setStep(step + 1)} disabled={saving} className="gap-1.5">
                 Continue <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={() => navigate("/dashboard")} className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
-                Open dashboard <ArrowRight className="h-4 w-4" />
+              <Button onClick={() => void save("completed")} disabled={saving} className="gap-1.5">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Save acquisition brief
               </Button>
             )}
           </div>
-        </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function StepShell({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-display text-3xl">{title}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
       </div>
+      {children}
+    </div>
+  );
+}
+
+function ChoiceGrid({ options, value, onChange, columns = "sm:grid-cols-2" }: { options: readonly string[]; value: string; onChange: (value: string) => void; columns?: string }) {
+  return (
+    <div className={cn("grid gap-2", columns)}>
+      {options.map((option) => (
+        <button key={option} type="button" onClick={() => onChange(option)} className={cn(
+          "rounded-lg border px-4 py-3 text-left text-sm transition-all",
+          value === option ? "border-primary bg-primary/10 text-primary" : "border-border/60 bg-surface-2/70 text-muted-foreground hover:text-foreground"
+        )}>
+          {option}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs">{label}</Label>
+      {children}
     </div>
   );
 }

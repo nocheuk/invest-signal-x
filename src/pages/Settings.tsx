@@ -6,10 +6,13 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { acquisitionBriefSummary, getInvestorPreferences } from "@/lib/onboarding";
 
 export default function Settings() {
   const auth = useAuth();
   const profile = useProfile();
+  const investorPreferences = getInvestorPreferences(profile.data);
+  const brief = acquisitionBriefSummary(investorPreferences);
 
   return (
     <AppLayout>
@@ -43,15 +46,37 @@ export default function Settings() {
           <div className="grid sm:grid-cols-2 gap-3">
             <WorkflowLink
               title="Saved alerts"
-              desc="Create, edit, pause and delete matching alerts from the dashboard filters."
-              to="/dashboard"
+              desc="Create, edit, pause and delete matching alerts from your target criteria."
+              to="/alerts"
             />
             <WorkflowLink
               title="Pipeline"
               desc="Save deals, update review status and keep private notes from deal cards or deal detail."
-              to="/dashboard"
+              to="/pipeline"
             />
           </div>
+        </Section>
+
+        <Section title="Your acquisition brief" desc="Used to personalise dashboard defaults, alerts and Your Strategy Score.">
+          {investorPreferences.onboardingCompleted ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border/60 bg-surface-2 p-4">
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {brief.map((line) => <li key={line}>{line}</li>)}
+                </ul>
+              </div>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/onboarding?edit=1">Edit acquisition brief</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border/60 bg-surface-2 p-4">
+              <p className="text-sm text-muted-foreground">Complete onboarding to set your acquisition brief.</p>
+              <Button asChild size="sm" className="mt-3">
+                <Link to="/onboarding">Start onboarding</Link>
+              </Button>
+            </div>
+          )}
         </Section>
 
         <Section title="Appearance" desc="Dark mode is the default. Your preference is saved on this device.">
@@ -103,7 +128,7 @@ function WorkflowLink({ title, desc, to }: { title: string; desc: string; to: st
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
       </div>
       <Button asChild size="sm" variant="outline">
-        <Link to={to}>Open dashboard</Link>
+        <Link to={to}>Open</Link>
       </Button>
     </div>
   );
