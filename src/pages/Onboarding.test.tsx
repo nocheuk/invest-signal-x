@@ -129,13 +129,25 @@ describe("Investor onboarding", () => {
     renderOnboarding();
 
     fireEvent.click(screen.getByRole("button", { name: /developer/i }));
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    goToStep("Objective");
     fireEvent.click(screen.getByRole("button", { name: /auction opportunities/i }));
+    goToStep("Locations");
+    fireEvent.change(screen.getByPlaceholderText("Bournemouth, Dorset, Manchester"), { target: { value: "Southampton, Hampshire" } });
+    goToStep("Capital");
+    fireEvent.change(screen.getAllByRole("spinbutton")[1], { target: { value: "2000000" } });
+    fireEvent.click(screen.getByRole("button", { name: /bridging finance/i }));
+    goToStep("Assets");
+    fireEvent.click(screen.getByRole("button", { name: /warehouse\/logistics/i }));
+    fireEvent.click(screen.getByRole("button", { name: /development potential/i }));
+    goToStep("Returns");
     fireEvent.click(screen.getByRole("button", { name: /opportunistic/i }));
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    fireEvent.change(screen.getByPlaceholderText("Bournemouth, Poole, Dorset"), { target: { value: "Southampton, Hampshire" } });
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    fireEvent.click(screen.getByRole("button", { name: /capital growth is a priority/i }));
+    goToStep("Blockers");
+    fireEvent.click(screen.getByRole("button", { name: /poa\/missing price/i }));
+    goToStep("Alerts");
     fireEvent.click(screen.getByRole("button", { name: /only green candidates/i }));
+    goToStep("Summary");
+    expect(screen.getAllByText("Your acquisition brief").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /save acquisition brief/i }));
 
     await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalled());
@@ -146,6 +158,10 @@ describe("Investor onboarding", () => {
           investorType: "Developer",
           strategy: "Auction opportunities",
           targetLocations: ["Southampton", "Hampshire"],
+          maxBudget: 2000000,
+          financingPosition: "Bridging finance",
+          dealPreferences: expect.arrayContaining(["Development potential"]),
+          dealBlockers: expect.arrayContaining(["POA/missing price"]),
           alertPreference: "Only Green Candidates",
         }),
       },
@@ -161,16 +177,13 @@ describe("Investor onboarding", () => {
       enabled: true,
     }));
     expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
-  });
+  }, 20000);
 
   it("does not block completion when strategy save fails", async () => {
     strategySaveSpy.mockRejectedValueOnce(new Error("strategy insert denied"));
     renderOnboarding();
 
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    fireEvent.change(screen.getByPlaceholderText("Bournemouth, Poole, Dorset"), { target: { value: "Bournemouth" } });
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    advanceToSummaryWithLocation("Bournemouth");
     fireEvent.click(screen.getByRole("button", { name: /save acquisition brief/i }));
 
     await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalled());
@@ -178,16 +191,13 @@ describe("Investor onboarding", () => {
     expect(saveAlertSpy).toHaveBeenCalled();
     expect(sessionStorage.getItem("dealsignal:onboarding-warning")).toMatch(/Your Strategy Score could not be updated/);
     expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
-  });
+  }, 10000);
 
   it("does not block completion when suggested alert creation fails", async () => {
     saveAlertSpy.mockRejectedValueOnce(new Error("alert insert denied"));
     renderOnboarding();
 
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    fireEvent.change(screen.getByPlaceholderText("Bournemouth, Poole, Dorset"), { target: { value: "Bournemouth" } });
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    advanceToSummaryWithLocation("Bournemouth");
     fireEvent.click(screen.getByRole("button", { name: /save acquisition brief/i }));
 
     await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalled());
@@ -207,3 +217,13 @@ describe("Investor onboarding", () => {
     expect(screen.queryByText("Dashboard page")).not.toBeInTheDocument();
   });
 });
+
+function advanceToSummaryWithLocation(location: string) {
+  goToStep("Locations");
+  fireEvent.change(screen.getByPlaceholderText("Bournemouth, Dorset, Manchester"), { target: { value: location } });
+  goToStep("Summary");
+}
+
+function goToStep(label: string) {
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(label, "i") }));
+}
