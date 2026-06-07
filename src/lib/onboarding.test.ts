@@ -25,11 +25,22 @@ describe("investor onboarding helpers", () => {
 
     const investorPreferences = getInvestorPreferences({ preferences });
     expect(investorPreferences.onboardingCompleted).toBe(true);
+    expect(preferences).toMatchObject({ onboarding_completed: true, onboarding_skipped: false });
     expect(investorPreferences.targetLocations).toEqual(["Bournemouth", "Poole"]);
     expect(dashboardDefaultsFromPreferences(investorPreferences)).toEqual({
       locationQuery: "Bournemouth",
       assetType: "Retail",
       minYield: 7,
+    });
+  });
+
+  it("marks skipped onboarding separately from completed onboarding", () => {
+    const preferences = buildProfilePreferences({}, DEFAULT_ONBOARDING, "skipped");
+
+    expect(preferences).toMatchObject({
+      onboarding_completed: true,
+      onboarding_skipped: true,
+      investor_onboarding: expect.objectContaining({ skippedAt: expect.any(String) }),
     });
   });
 

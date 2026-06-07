@@ -76,6 +76,7 @@ export function buildProfilePreferences(current: Json | null | undefined, answer
   return {
     ...preferences,
     onboarding_completed: true,
+    onboarding_skipped: mode === "skipped",
     investor_onboarding: {
       ...answers,
       targetLocations: cleanLocations(answers.targetLocations),

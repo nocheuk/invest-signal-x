@@ -46,6 +46,7 @@ function DashboardContent() {
   const [locationQuery, setLocationQuery] = useState("");
   const [locationEdited, setLocationEdited] = useState(false);
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
+  const [onboardingWarning, setOnboardingWarning] = useState<string | null>(null);
   const search = searchParams.get("q") ?? "";
   const now = useMemo(() => new Date(), []);
   const firstName = (profile.data?.full_name || auth.user?.user_metadata?.full_name || auth.user?.email || "there").split(/\s|@/)[0];
@@ -54,6 +55,13 @@ function DashboardContent() {
   useEffect(() => {
     if (!locationEdited && onboardingDefaults.locationQuery) setLocationQuery(onboardingDefaults.locationQuery);
   }, [locationEdited, onboardingDefaults.locationQuery]);
+
+  useEffect(() => {
+    const warning = sessionStorage.getItem("dealsignal:onboarding-warning");
+    if (!warning) return;
+    setOnboardingWarning(warning);
+    sessionStorage.removeItem("dealsignal:onboarding-warning");
+  }, []);
 
   const visibleDeals = useMemo(() => {
     return filterAndSortDeals(deals, {
@@ -128,6 +136,12 @@ function DashboardContent() {
             <Link to="/deals">Open all deals <ArrowRight className="h-4 w-4" /></Link>
           </Button>
         </header>
+
+        {onboardingWarning && (
+          <div className="rounded-lg border border-signal-amber/40 bg-signal-amber/10 px-4 py-3 text-sm text-muted-foreground">
+            {onboardingWarning}
+          </div>
+        )}
 
         <section className="ds-card-elevated overflow-hidden">
           <div className="grid gap-6 p-5 lg:grid-cols-[1.1fr_0.9fr]">

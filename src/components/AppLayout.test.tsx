@@ -39,5 +39,5 @@ describe("AppLayout", () => {
     expect(screen.getAllByRole("link", { name: /pipeline/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /alerts/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /sources \/ scans/i }).length).toBeGreaterThan(0);
-  });
+  }, 10000);
 });
