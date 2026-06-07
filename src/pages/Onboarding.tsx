@@ -12,6 +12,7 @@ import { useStrategy } from "@/lib/strategy";
 import { useSavedAlerts } from "@/hooks/useSavedAlerts";
 import { useProfile } from "@/hooks/useProfile";
 import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
+import { isAdminUser } from "@/lib/admin";
 import {
   ALERT_PREFERENCES,
   BUDGET_RANGES,
@@ -55,8 +56,11 @@ export default function Onboarding() {
   const [answers, setAnswers] = useState<InvestorOnboardingAnswers>(DEFAULT_ONBOARDING);
   const [locationsText, setLocationsText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const canShowDebug = import.meta.env.DEV || isAdminUser(auth.user);
 
   useEffect(() => {
     if (!profile.data || hydrated) return;
@@ -95,6 +99,8 @@ export default function Onboarding() {
   const save = async (mode: "completed" | "skipped") => {
     setSaving(true);
     setError(null);
+    setErrorDetail(null);
+    setWarning(null);
     const finalAnswers = {
       ...answers,
       targetLocations: parseLocations(locationsText),
@@ -110,25 +116,41 @@ export default function Onboarding() {
       if (!auth.user) throw new Error("Sign in to save onboarding.");
 
       const nextPreferences = buildProfilePreferences(profile.data?.preferences, finalAnswers, mode);
-      const { error: updateError } = await requireSupabase()
-        .from("profiles")
-        .update({
-          preferences: nextPreferences,
-          alert_preferences: alertPreferencesFromOnboarding(finalAnswers),
-        })
-        .eq("id", auth.user.id);
+      const profilePayload = {
+        id: auth.user.id,
+        full_name: profile.data?.full_name ?? auth.user.user_metadata?.full_name ?? auth.user.email?.split("@")[0] ?? null,
+        preferences: nextPreferences,
+        alert_preferences: alertPreferencesFromOnboarding(finalAnswers),
+      };
+      const { error: updateError } = await upsertProfile(profilePayload);
       if (updateError) throw updateError;
 
+      const sideEffectWarnings: string[] = [];
       if (mode === "completed") {
-        await strategy.save(strategyFromOnboarding(finalAnswers));
+        try {
+          await strategy.save(strategyFromOnboarding(finalAnswers));
+        } catch (strategyError) {
+          console.warn("Onboarding strategy save failed", strategyError);
+          sideEffectWarnings.push("Strategy preferences were saved to your profile, but Your Strategy Score could not be updated yet.");
+        }
         const suggestedAlert = alertFromOnboarding(finalAnswers);
-        if (suggestedAlert) await savedAlerts.saveAlert(suggestedAlert);
+        if (suggestedAlert) {
+          try {
+            await savedAlerts.saveAlert(suggestedAlert);
+          } catch (alertError) {
+            console.warn("Onboarding suggested alert save failed", alertError);
+            sideEffectWarnings.push("Your acquisition brief was saved, but the suggested alert could not be created.");
+          }
+        }
       }
 
       await queryClient.invalidateQueries({ queryKey: ["profile", auth.user.id] });
+      if (sideEffectWarnings.length) sessionStorage.setItem("dealsignal:onboarding-warning", sideEffectWarnings.join(" "));
       navigate(from, { replace: true });
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save your onboarding answers.");
+      const message = saveError instanceof Error ? saveError.message : "Could not save your onboarding answers.";
+      setError("Could not save your onboarding answers.");
+      setErrorDetail(message);
     } finally {
       setSaving(false);
     }
@@ -241,7 +263,13 @@ export default function Onboarding() {
             </StepShell>
           )}
 
-          {error && <div className="rounded-md border border-signal-red/40 bg-signal-red/10 px-3 py-2 text-xs text-signal-red">{error}</div>}
+          {warning && <div className="rounded-md border border-signal-amber/40 bg-signal-amber/10 px-3 py-2 text-xs text-muted-foreground">{warning}</div>}
+          {error && (
+            <div className="rounded-md border border-signal-red/40 bg-signal-red/10 px-3 py-2 text-xs text-signal-red">
+              {error}
+              {canShowDebug && errorDetail && <div className="mt-1 font-mono text-[11px] break-all">Detail: {errorDetail}</div>}
+            </div>
+          )}
 
           <div className="flex items-center justify-between border-t border-border/60 pt-5">
             <Button variant="ghost" size="sm" onClick={() => setStep(Math.max(1, step - 1))} disabled={step === 1 || saving} className="gap-1.5">
@@ -298,4 +326,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </div>
   );
+}
+
+async function upsertProfile(payload: {
+  id: string;
+  full_name: string | null;
+  preferences: unknown;
+  alert_preferences: unknown;
+}) {
+  const db = requireSupabase();
+  const result = await db.from("profiles").upsert(payload, { onConflict: "id" });
+  if (!isMissingAlertPreferencesColumn(result.error)) return result;
+
+  console.warn("profiles.alert_preferences is missing; saving onboarding preferences without alert preferences until the migration is applied.");
+  const { alert_preferences: _alertPreferences, ...fallbackPayload } = payload;
+  return db.from("profiles").upsert(fallbackPayload, { onConflict: "id" });
+}
+
+function isMissingAlertPreferencesColumn(error: { message?: string; code?: string } | null | undefined) {
+  if (!error) return false;
+  return error.code === "PGRST204" || /alert_preferences/i.test(error.message ?? "");
 }

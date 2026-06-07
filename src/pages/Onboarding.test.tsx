@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Onboarding from "@/pages/Onboarding";
 
 const profileUpdateSpy = vi.hoisted(() => vi.fn());
+const profileUpsertErrorState = vi.hoisted(() => ({ errors: [] as Array<Error & { code?: string }> }));
 const strategySaveSpy = vi.hoisted(() => vi.fn());
 const saveAlertSpy = vi.hoisted(() => vi.fn());
 
@@ -48,11 +49,9 @@ vi.mock("@/lib/supabase/client", () => ({
     from: (table: string) => {
       if (table !== "profiles") throw new Error(`Unexpected table ${table}`);
       return {
-        update: (payload: unknown) => {
+        upsert: (payload: unknown) => {
           profileUpdateSpy(payload);
-          return {
-            eq: () => ({ error: null }),
-          };
+          return { error: profileUpsertErrorState.errors.shift() ?? null };
         },
       };
     },
@@ -75,6 +74,8 @@ function renderOnboarding(initialPath = "/onboarding") {
 describe("Investor onboarding", () => {
   beforeEach(() => {
     profileUpdateSpy.mockClear();
+    profileUpsertErrorState.errors = [];
+    sessionStorage.clear();
     strategySaveSpy.mockReset();
     strategySaveSpy.mockResolvedValue(undefined);
     saveAlertSpy.mockReset();
@@ -90,11 +91,37 @@ describe("Investor onboarding", () => {
     expect(profileUpdateSpy.mock.calls[0][0]).toMatchObject({
       preferences: {
         onboarding_completed: true,
+        onboarding_skipped: true,
         investor_onboarding: expect.objectContaining({ skippedAt: expect.any(String) }),
       },
     });
     expect(strategySaveSpy).not.toHaveBeenCalled();
     expect(saveAlertSpy).not.toHaveBeenCalled();
+    expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+  });
+
+  it("handles a missing profile row by upserting onboarding completion", async () => {
+    renderOnboarding();
+
+    fireEvent.click(screen.getByRole("button", { name: /skip for now/i }));
+
+    await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalledWith(expect.objectContaining({
+      id: "user-1",
+      preferences: expect.objectContaining({ onboarding_completed: true }),
+    })));
+    expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+  });
+
+  it("retries profile save without alert preferences when the live column is missing", async () => {
+    const missingColumnError = Object.assign(new Error("column profiles.alert_preferences does not exist"), { code: "PGRST204" });
+    profileUpsertErrorState.errors = [missingColumnError];
+    renderOnboarding();
+
+    fireEvent.click(screen.getByRole("button", { name: /skip for now/i }));
+
+    await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalledTimes(2));
+    expect(profileUpdateSpy.mock.calls[0][0]).toHaveProperty("alert_preferences");
+    expect(profileUpdateSpy.mock.calls[1][0]).not.toHaveProperty("alert_preferences");
     expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
   });
 
@@ -134,5 +161,49 @@ describe("Investor onboarding", () => {
       enabled: true,
     }));
     expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+  });
+
+  it("does not block completion when strategy save fails", async () => {
+    strategySaveSpy.mockRejectedValueOnce(new Error("strategy insert denied"));
+    renderOnboarding();
+
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    fireEvent.change(screen.getByPlaceholderText("Bournemouth, Poole, Dorset"), { target: { value: "Bournemouth" } });
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save acquisition brief/i }));
+
+    await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalled());
+    expect(strategySaveSpy).toHaveBeenCalled();
+    expect(saveAlertSpy).toHaveBeenCalled();
+    expect(sessionStorage.getItem("dealsignal:onboarding-warning")).toMatch(/Your Strategy Score could not be updated/);
+    expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+  });
+
+  it("does not block completion when suggested alert creation fails", async () => {
+    saveAlertSpy.mockRejectedValueOnce(new Error("alert insert denied"));
+    renderOnboarding();
+
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    fireEvent.change(screen.getByPlaceholderText("Bournemouth, Poole, Dorset"), { target: { value: "Bournemouth" } });
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save acquisition brief/i }));
+
+    await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalled());
+    expect(saveAlertSpy).toHaveBeenCalled();
+    expect(sessionStorage.getItem("dealsignal:onboarding-warning")).toMatch(/suggested alert could not be created/);
+    expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+  });
+
+  it("surfaces the real profile save error in development", async () => {
+    profileUpsertErrorState.errors = [new Error("RLS denied profile update")];
+    renderOnboarding();
+
+    fireEvent.click(screen.getByRole("button", { name: /skip for now/i }));
+
+    expect(await screen.findByText("Could not save your onboarding answers.")).toBeInTheDocument();
+    expect(screen.getByText(/RLS denied profile update/)).toBeInTheDocument();
+    expect(screen.queryByText("Dashboard page")).not.toBeInTheDocument();
   });
 });
