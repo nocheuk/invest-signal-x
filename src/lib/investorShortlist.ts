@@ -57,7 +57,7 @@ function rankDeal(deal: Deal, areaIndex: AreaIntelligenceIndex, mode: ShortlistM
     ? clamp(50 + Math.abs(Math.min(areaIntelligence.pricePerSqftDelta, 0)) / 2)
     : 35;
   const areaYieldScore = areaIntelligence.yieldDelta !== null ? clamp(50 + areaIntelligence.yieldDelta * 10) : 35;
-  const candidateBonus = classification === "verified-green" ? 12 : classification === "green-candidate" ? 9 : classification === "amber" ? 3 : 0;
+  const candidateBonus = classification === "verified-green" ? 12 : classification === "green-candidate" ? 9 : classification === "requires-due-diligence" ? 3 : 0;
   const weights = weightsForMode(mode);
   const shortlistScore = Math.round(
     deal.score * weights.score +

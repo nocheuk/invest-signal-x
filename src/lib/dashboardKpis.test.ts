@@ -74,12 +74,14 @@ describe("buildDashboardKpis", () => {
       importSourceName: "Eddisons",
     }),
     deal({
-      id: "amber",
+      id: "due-diligence",
       score: 66,
       rating: "amber",
-      dataConfidenceScore: 72,
+      dataConfidenceScore: 85,
       guidePrice: 250_000,
-      netInitialYield: 0,
+      passingRent: 18_000,
+      netInitialYield: 7.2,
+      sourceUrl: "https://example.com/diligence",
     }),
     deal({
       id: "red",
@@ -114,14 +116,14 @@ describe("buildDashboardKpis", () => {
       withGuidePrice: 3,
       verifiedGreens: 1,
       greenCandidates: 1,
-      amber: 1,
-      red: 1,
-      yieldSampleSize: 2,
+      requiresDueDiligence: 1,
+      lowPriority: 1,
+      yieldSampleSize: 3,
       watchlistedDeals: 2,
       activeWatchlistDeals: 4,
       topScore: 84,
     });
-    expect(metrics.averageYield).toBeCloseTo(7.65);
+    expect(metrics.averageYield).toBeCloseTo(7.5);
   });
 
   it("uses the filtered deal scope for filtered KPIs but all deals for imported totals", () => {
@@ -143,7 +145,7 @@ describe("buildDashboardKpis", () => {
   it("returns zero yield and sample size when no visible deals have yield", () => {
     const metrics = buildDashboardKpis({
       allDeals,
-      filteredDeals: [allDeals[2], allDeals[3]],
+      filteredDeals: [deal({ id: "no-yield-1" }), deal({ id: "no-yield-2", score: 42 })],
       watchlistIds: [],
       pipelineCounts: {},
     });

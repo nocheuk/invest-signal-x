@@ -9,7 +9,7 @@ import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore, matchReasons } from "@/lib/strategy";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
-import { classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
+import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { formatAddedAgo } from "@/lib/freshness";
 import { formatAreaDelta, type AreaIntelligence } from "@/lib/areaIntelligence";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
   const riskSignals = analysis.riskSignals.slice(0, 2);
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
+  const diligenceLabel = classification === "requires-due-diligence" || classification === "low-priority" ? classificationLabel(classification) : deal.mainRiskFlag;
   const [imageAvailable, setImageAvailable] = useState(Boolean(deal.imageUrl));
   const tenantLabel = deal.tenant && deal.tenant !== "Unknown" ? deal.tenant : "Tenant not available";
   const addedAgo = deal.isImported || deal.importSourceName ? formatAddedAgo(deal.postedAt) : "";
@@ -146,7 +147,7 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
             <TrendingUp className="h-3 w-3" /> {tenantLabel.length > 22 ? tenantLabel.slice(0, 20) + "..." : tenantLabel}
           </div>
           <div className="flex items-center gap-1 text-[11px] text-signal-amber">
-            <AlertTriangle className="h-3 w-3" /> {deal.needsReview ? "Needs review" : deal.mainRiskFlag}
+            <AlertTriangle className="h-3 w-3" /> {diligenceLabel}
           </div>
         </div>
         <button

@@ -5,7 +5,7 @@ import { personalisedScore, type StrategyWeights } from "@/lib/strategy";
 export const IMPORTED_SOURCE_FILTER = "Imported";
 export const DEMO_SOURCE_FILTER = "Demo/Seed";
 export const ALL_REAL_DEALS_FILTER = "All real deals";
-export const NEEDS_REVIEW_FILTER = "Needs review";
+export const REQUIRES_DUE_DILIGENCE_FILTER = "Requires Due Diligence";
 export const ACUITUS_SOURCE = "Acuitus";
 export const EDDISONS_SOURCE = "Eddisons";
 export const ALLSOP_SOURCE = "Allsop";
@@ -49,8 +49,7 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
 
 function ratingMatches(deal: Deal, rating: DashboardFilters["rating"]) {
   if (rating === "all") return true;
-  if (rating === "green-candidate") return classifyDeal(deal) === "green-candidate";
-  if (rating === "verified-green") return classifyDeal(deal) === "verified-green";
+  if (rating === "green-candidate" || rating === "verified-green" || rating === "requires-due-diligence" || rating === "low-priority") return classifyDeal(deal) === rating;
   return deal.rating === rating;
 }
 
@@ -67,7 +66,7 @@ export function sourceMatches(deal: Deal, source: string) {
   if (source === "All") return true;
   if (source === ALL_REAL_DEALS_FILTER) return !isSeedDeal(deal);
   if (source === IMPORTED_SOURCE_FILTER) return Boolean(deal.isImported || deal.importSourceName);
-  if (source === NEEDS_REVIEW_FILTER) return Boolean(deal.needsReview);
+  if (source === REQUIRES_DUE_DILIGENCE_FILTER) return Boolean(deal.isImported || deal.importSourceName) && classifyDeal(deal) === "requires-due-diligence";
   if (source === DEMO_SOURCE_FILTER) return isSeedDeal(deal) || (!deal.isImported && !deal.importSourceName);
   return sourceLabel(deal) === source;
 }
@@ -90,7 +89,7 @@ export function buildSourceOptions(deals: Deal[]) {
     EDDISONS_SOURCE,
     ALLSOP_SOURCE,
     IMPORTED_SOURCE_FILTER,
-    NEEDS_REVIEW_FILTER,
+    REQUIRES_DUE_DILIGENCE_FILTER,
     DEMO_SOURCE_FILTER,
     ...dynamic,
   ])];

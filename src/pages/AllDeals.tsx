@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ASSET_TYPES, REGIONS, type Rating } from "@/lib/deals";
+import { classifyDeal, type DealClassification } from "@/lib/dealClassification";
 import { useStrategy } from "@/lib/strategy";
 import { useWatchlist, PIPELINE_STATUSES, type PipelineStatus } from "@/lib/watchlist";
 import { useRealDeals } from "@/hooks/useRealDeals";
@@ -33,7 +34,7 @@ export default function AllDeals() {
   const [region, setRegion] = useState("All UK");
   const [asset, setAsset] = useState("All");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
-  const [rating, setRating] = useState<"all" | Rating | "verified-green" | "green-candidate">((searchParams.get("classification") as "green-candidate" | "verified-green") ?? "all");
+  const [rating, setRating] = useState<"all" | Rating | DealClassification>((searchParams.get("classification") as DealClassification) ?? "all");
   const [confidence, setConfidence] = useState<"all" | "high" | "medium" | "low">("all");
   const [pipelineStatus, setPipelineStatus] = useState<"all" | PipelineStatus>("all");
   const [freshnessFilter, setFreshnessFilter] = useState<FreshnessFilter>((searchParams.get("freshness") as FreshnessFilter) ?? "all");
@@ -71,7 +72,7 @@ export default function AllDeals() {
   const kpis = useMemo(() => buildDashboardKpis({ allDeals: deals, filteredDeals: filtered, watchlistIds: ids, pipelineCounts }), [deals, filtered, ids, pipelineCounts]);
   const freshness = useMemo(() => buildFreshnessMetrics(filtered, now), [filtered, now]);
   const recentlyAdded = useMemo(() => sortNewestDeals(filtered.filter((deal) => deal.isImported || deal.importSourceName)).slice(0, 6), [filtered]);
-  const needsReview = useMemo(() => filtered.filter((deal) => deal.needsReview || (deal.isImported && deal.score <= 45)).slice(0, 6), [filtered]);
+  const dueDiligenceDeals = useMemo(() => filtered.filter((deal) => classifyDeal(deal) === "requires-due-diligence").slice(0, 6), [filtered]);
   const areaIndex = useMemo(() => {
     try {
       return buildAreaIntelligenceIndex(deals);
@@ -110,7 +111,7 @@ export default function AllDeals() {
             <FilterSelect label="Region" value={region} onValueChange={setRegion} options={REGIONS} />
             <FilterSelect label="Asset type" value={asset} onValueChange={setAsset} options={ASSET_TYPES} />
             <FilterSelect label="Source" value={source} onValueChange={setSource} options={sourceOptions} />
-            <FilterSelect label="Classification" value={rating} onValueChange={(value) => setRating(value as typeof rating)} options={["all", "verified-green", "green-candidate", "amber", "red"]} />
+            <FilterSelect label="Classification" value={rating} onValueChange={(value) => setRating(value as typeof rating)} options={["all", "verified-green", "green-candidate", "requires-due-diligence", "low-priority"]} />
             <FilterSelect label="Confidence" value={confidence} onValueChange={(value) => setConfidence(value as typeof confidence)} options={["all", "high", "medium", "low"]} />
             <FilterSelect label="Pipeline" value={pipelineStatus} onValueChange={(value) => setPipelineStatus(value as typeof pipelineStatus)} options={["all", ...PIPELINE_STATUSES]} />
             <FilterSelect label="Freshness" value={freshnessFilter} onValueChange={(value) => setFreshnessFilter(value as FreshnessFilter)} options={["all", "today", "week", "green-candidates-week", "sources-today"]} />
@@ -141,7 +142,7 @@ export default function AllDeals() {
 
         <section className="grid gap-6 xl:grid-cols-2">
           <FeatureList title="Recently Added" deals={recentlyAdded} empty="No recently added imported deals match these filters." areaIndex={areaIndex} />
-          <FeatureList title="Needs Review" deals={needsReview} empty="No needs-review deals match these filters." areaIndex={areaIndex} />
+          <FeatureList title="Requires Due Diligence" deals={dueDiligenceDeals} empty="No diligence-required deals match these filters." areaIndex={areaIndex} />
         </section>
 
         <section className="ds-card overflow-hidden">

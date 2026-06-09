@@ -71,7 +71,7 @@ describe("inventory audit", () => {
       deals: [
         deal({ id: "imp-rightmove", importSourceName: "Rightmove Commercial", score: 82, rating: "green", dataConfidenceScore: 86 }),
         deal({ id: "imp-acuitus", importSourceName: "Acuitus", score: 73, rating: "amber", dataConfidenceScore: 80, postedAt: "2026-06-03T09:00:00Z" }),
-        deal({ id: "imp-eddisons", importSourceName: "Eddisons", score: 65, rating: "amber", dataConfidenceScore: 70 }),
+        deal({ id: "imp-eddisons", importSourceName: "Eddisons", score: 65, rating: "amber", dataConfidenceScore: 85, sourceUrl: "https://example.com/eddisons" }),
         deal({ id: "imp-allsop", importSourceName: "Allsop", score: 72, rating: "amber", dataConfidenceScore: 78 }),
         deal({ id: "imp-red", importSourceName: "Rightmove Commercial", score: 40, rating: "red", dataConfidenceScore: 50, postedAt: "2026-05-20T09:00:00Z" }),
       ],
@@ -86,8 +86,8 @@ describe("inventory audit", () => {
       allsopDeals: 1,
       verifiedGreens: 1,
       greenCandidates: 2,
-      amber: 1,
-      red: 1,
+      requiresDueDiligence: 1,
+      lowPriority: 1,
       addedToday: 3,
       addedThisWeek: 4,
       locationsCompletedInCurrentCycle: 12,
@@ -105,8 +105,8 @@ describe("inventory audit", () => {
       allsopDeals: 1,
       verifiedGreens: 1,
       greenCandidates: 2,
-      amber: 5,
-      red: 2,
+      requiresDueDiligence: 5,
+      lowPriority: 2,
       addedToday: 3,
       addedThisWeek: 7,
       locationsCompletedInCurrentCycle: 12,
@@ -116,6 +116,8 @@ describe("inventory audit", () => {
     expect(report).toContain("Total deals: 10");
     expect(report).toContain("Eddisons deals: 2");
     expect(report).toContain("Allsop deals: 1");
+    expect(report).toContain("Requires Due Diligence: 5");
+    expect(report).toContain("Low Priority: 2");
     expect(report).toContain("Locations completed in current scan cycle: 12/160");
   });
 });

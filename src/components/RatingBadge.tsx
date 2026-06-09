@@ -22,22 +22,22 @@ export function RatingBadge({ rating, className, dot = true }: { rating: Rating;
 const classificationStyles: Record<DealClassification, string> = {
   "verified-green": "bg-signal-green-soft text-signal-green border-signal-green/30",
   "green-candidate": "bg-primary/10 text-primary border-primary/30",
-  amber: "bg-signal-amber-soft text-signal-amber border-signal-amber/30",
-  red: "bg-signal-red-soft text-signal-red border-signal-red/30",
+  "requires-due-diligence": "bg-signal-amber-soft text-signal-amber border-signal-amber/30",
+  "low-priority": "bg-signal-red-soft text-signal-red border-signal-red/30",
 };
 
 const classificationDots: Record<DealClassification, string> = {
   "verified-green": "bg-signal-green",
   "green-candidate": "bg-primary",
-  amber: "bg-signal-amber",
-  red: "bg-signal-red",
+  "requires-due-diligence": "bg-signal-amber",
+  "low-priority": "bg-signal-red",
 };
 
 const classificationLabels: Record<DealClassification, string> = {
   "verified-green": "Verified Green",
   "green-candidate": "Green Candidate",
-  amber: "Amber",
-  red: "Red",
+  "requires-due-diligence": "Requires Due Diligence",
+  "low-priority": "Low Priority",
 };
 
 export function ClassificationBadge({ classification, className, dot = true }: { classification: DealClassification; className?: string; dot?: boolean }) {

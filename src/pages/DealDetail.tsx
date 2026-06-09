@@ -15,7 +15,7 @@ import { ArrowLeft, Bookmark, MapPin, Building2, AlertTriangle, ShieldCheck, Tre
 import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
-import { classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
+import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { formatAreaDelta, formatAreaValue, getAreaIntelligence } from "@/lib/areaIntelligence";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 
@@ -275,9 +275,9 @@ export default function DealDetail() {
         </section>
 
         <section className="ds-card p-6 space-y-3">
-          <h2 className="font-display text-2xl">Green classification</h2>
+          <h2 className="font-display text-2xl">Diligence classification</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Verified Green is deliberately strict: score at least 78 and confidence at least 80. Green Candidate keeps that strict tier intact, but surfaces imported deals with score at least 72, confidence at least 75, a guide price, and either yield or passing rent available.
+            This deal is currently classified as {classificationLabel(classification)}. Verified Green remains deliberately strict: score at least 78 and confidence at least 80. Green Candidate keeps that strict tier intact, while Requires Due Diligence means the opportunity has usable acquisition data but still needs source documents, lease checks or comparable evidence. Low Priority is reserved for sparse or severe missing-data listings.
           </p>
           {classification === "green-candidate" && (
             <ul className="space-y-1.5">

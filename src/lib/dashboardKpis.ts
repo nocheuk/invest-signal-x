@@ -8,8 +8,8 @@ export type DashboardKpiMetrics = {
   withGuidePrice: number;
   verifiedGreens: number;
   greenCandidates: number;
-  amber: number;
-  red: number;
+  requiresDueDiligence: number;
+  lowPriority: number;
   averageYield: number;
   yieldSampleSize: number;
   topScore: number;
@@ -46,8 +46,8 @@ export function buildDashboardKpis({
     withGuidePrice: filteredDeals.filter((deal) => Number.isFinite(deal.guidePrice) && deal.guidePrice > 0).length,
     verifiedGreens: classifications["verified-green"],
     greenCandidates: classifications["green-candidate"],
-    amber: classifications.amber,
-    red: classifications.red,
+    requiresDueDiligence: classifications["requires-due-diligence"],
+    lowPriority: classifications["low-priority"],
     averageYield,
     yieldSampleSize: yieldSamples.length,
     topScore: topDeal?.score ?? 0,

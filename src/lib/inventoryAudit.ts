@@ -12,8 +12,8 @@ export type InventoryAuditMetrics = {
   allsopDeals: number;
   verifiedGreens: number;
   greenCandidates: number;
-  amber: number;
-  red: number;
+  requiresDueDiligence: number;
+  lowPriority: number;
   addedToday: number;
   addedThisWeek: number;
   locationsCompletedInCurrentCycle: number;
@@ -42,8 +42,8 @@ export function buildInventoryAudit({
     allsopDeals: deals.filter((deal) => sourceLabel(deal) === ALLSOP_SOURCE).length,
     verifiedGreens: classifications["verified-green"],
     greenCandidates: classifications["green-candidate"],
-    amber: classifications.amber,
-    red: classifications.red,
+    requiresDueDiligence: classifications["requires-due-diligence"],
+    lowPriority: classifications["low-priority"],
     addedToday: deals.filter((deal) => isOnOrAfter(deal.postedAt, startOfToday)).length,
     addedThisWeek: deals.filter((deal) => isOnOrAfter(deal.postedAt, startOfWeek)).length,
     locationsCompletedInCurrentCycle: scanStatus?.locationsCompletedInCurrentCycle ?? 0,
@@ -64,8 +64,8 @@ export function formatInventoryAuditReport(metrics: InventoryAuditMetrics) {
     `Allsop deals: ${metrics.allsopDeals}`,
     `Verified Greens: ${metrics.verifiedGreens}`,
     `Green Candidates: ${metrics.greenCandidates}`,
-    `Amber: ${metrics.amber}`,
-    `Red: ${metrics.red}`,
+    `Requires Due Diligence: ${metrics.requiresDueDiligence}`,
+    `Low Priority: ${metrics.lowPriority}`,
     `Added today: ${metrics.addedToday}`,
     `Added this week: ${metrics.addedThisWeek}`,
     `Locations completed in current scan cycle: ${metrics.locationsCompletedInCurrentCycle}/${metrics.totalConfiguredLocations || "unknown"}`,
