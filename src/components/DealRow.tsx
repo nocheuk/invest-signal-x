@@ -7,7 +7,7 @@ import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { useWatchlist } from "@/lib/watchlist";
 import { useStrategy, personalisedScore } from "@/lib/strategy";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
-import { classifyDeal } from "@/lib/dealClassification";
+import { classificationLabel, classifyDeal } from "@/lib/dealClassification";
 import { cn } from "@/lib/utils";
 
 export function DealRow({ deal }: { deal: Deal }) {
@@ -35,6 +35,7 @@ export function DealRow({ deal }: { deal: Deal }) {
           {deal.score}
         </div>
         {classification === "green-candidate" && <span className="hidden lg:inline-flex rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">Candidate</span>}
+        {classification === "low-priority" && <span className="hidden lg:inline-flex rounded-full border border-signal-red/30 bg-signal-red-soft px-2 py-0.5 text-[10px] uppercase tracking-wide text-signal-red">Low priority</span>}
         <div className="hidden sm:flex flex-col">
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Your</span>
           <span className="font-mono text-sm font-semibold tabular text-primary">{yourScore}</span>
@@ -47,7 +48,7 @@ export function DealRow({ deal }: { deal: Deal }) {
         <div className="text-[11px] text-muted-foreground truncate">{deal.location} · {deal.assetType} · {sourceLabel}</div>
         <div className="flex items-center gap-1.5 mt-1">
           <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} compact />
-          {deal.needsReview && <div className="text-[10px] uppercase tracking-wide text-signal-amber">Needs review</div>}
+          {classification === "requires-due-diligence" && <div className="text-[10px] uppercase tracking-wide text-signal-amber">{classificationLabel(classification)}</div>}
         </div>
       </div>
 

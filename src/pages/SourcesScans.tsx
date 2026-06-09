@@ -80,8 +80,8 @@ export default function SourcesScans() {
           <div className="grid gap-3 md:grid-cols-4">
             <Metric label="Verified Greens" value={inventory.verifiedGreens} />
             <Metric label="Green Candidates" value={inventory.greenCandidates} />
-            <Metric label="Amber" value={inventory.amber} />
-            <Metric label="Red" value={inventory.red} />
+            <Metric label="Requires Due Diligence" value={inventory.requiresDueDiligence} />
+            <Metric label="Low Priority" value={inventory.lowPriority} />
             <Metric label="Added today" value={inventory.addedToday} />
             <Metric label="Added this week" value={inventory.addedThisWeek} />
             <Metric label="Locations completed" value={`${inventory.locationsCompletedInCurrentCycle}/${inventory.totalConfiguredLocations}`} />

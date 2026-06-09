@@ -75,6 +75,14 @@ function dealFromScore(scored: ReturnType<typeof scoreImportedDeal>): Deal {
 }
 
 describe("Scoring V1", () => {
+  it("keeps normal diligence warnings without automatically marking needs review", () => {
+    const scored = scoreImportedDeal(scoringInput());
+
+    expect(scored.reasons.missingDataWarnings).toContain("No comparable evidence yet");
+    expect(scored.needsReview).toBe(false);
+    expect(scored.mainRiskFlag).not.toBe("Needs review");
+  });
+
   it("does not let a high-yield but low-confidence deal become green", () => {
     const scored = scoreImportedDeal(scoringInput({
       passingRent: 0,

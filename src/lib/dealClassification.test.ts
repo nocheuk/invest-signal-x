@@ -1,5 +1,5 @@
 import type { Deal } from "@/lib/deals";
-import { classifyDeal, countDealClassifications, greenCandidateReasons, isGreenCandidate } from "@/lib/dealClassification";
+import { classificationLabel, classifyDeal, countDealClassifications, greenCandidateReasons, isGreenCandidate, isLowPriority } from "@/lib/dealClassification";
 
 function deal(overrides: Partial<Deal> = {}): Deal {
   return {
@@ -59,21 +59,57 @@ describe("deal classification", () => {
   });
 
   it("requires price and yield or rent for green candidates", () => {
-    expect(classifyDeal(deal({ guidePrice: 0 }))).toBe("amber");
-    expect(classifyDeal(deal({ passingRent: 0, netInitialYield: 0, grossYield: 0 }))).toBe("amber");
+    expect(classifyDeal(deal({ guidePrice: 0 }))).toBe("low-priority");
+    expect(classifyDeal(deal({ passingRent: 0, netInitialYield: 0, grossYield: 0 }))).toBe("low-priority");
+  });
+
+  it("does not make normal missing comparable evidence low priority", () => {
+    const diligence = deal({
+      score: 68,
+      dataConfidenceScore: 85,
+      passingRent: 62100,
+      netInitialYield: 8.25,
+      sourceUrl: "https://example.com/listing",
+      scoreReasons: {
+        positiveDrivers: [],
+        negativeDrivers: [],
+        missingDataWarnings: ["No comparable evidence yet"],
+        verifyBeforeTrusting: [],
+      },
+    });
+
+    expect(isLowPriority(diligence)).toBe(false);
+    expect(classifyDeal(diligence)).toBe("requires-due-diligence");
+    expect(classificationLabel("requires-due-diligence")).toBe("Requires Due Diligence");
+  });
+
+  it("classifies severe sparse listings as low priority", () => {
+    const sparse = deal({
+      score: 39,
+      dataConfidenceScore: 38,
+      confidenceLevel: "low",
+      guidePrice: 0,
+      passingRent: 0,
+      netInitialYield: 0,
+      grossYield: 0,
+      sourceUrl: undefined,
+    });
+
+    expect(isLowPriority(sparse)).toBe(true);
+    expect(classifyDeal(sparse)).toBe("low-priority");
   });
 
   it("counts classifications", () => {
     expect(countDealClassifications([
       deal({ score: 82, dataConfidenceScore: 90, rating: "green" }),
       deal({ score: 73, dataConfidenceScore: 85, rating: "amber" }),
-      deal({ score: 65, dataConfidenceScore: 85, rating: "amber" }),
-      deal({ score: 42, dataConfidenceScore: 61, rating: "red" }),
+      deal({ score: 65, dataConfidenceScore: 85, rating: "amber", sourceUrl: "https://example.com/listing" }),
+      deal({ score: 42, dataConfidenceScore: 30, confidenceLevel: "low", rating: "red" }),
     ])).toEqual({
       "verified-green": 1,
       "green-candidate": 1,
-      amber: 1,
-      red: 1,
+      "requires-due-diligence": 1,
+      "low-priority": 1,
     });
   });
 });

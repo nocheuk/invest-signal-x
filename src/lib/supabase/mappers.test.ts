@@ -44,7 +44,7 @@ const baseRow: DealRow = {
 };
 
 describe("mapDealRow", () => {
-  it("maps imported Rightmove source metadata and marks sparse listings for review", () => {
+  it("maps imported Rightmove source metadata and marks sparse listings as severe review items", () => {
     const deal = mapDealRow(baseRow, {
       sourceUrl: "https://www.rightmove.co.uk/properties/123",
       imageUrl: "https://media.rightmove.co.uk/property.jpg",
@@ -58,7 +58,7 @@ describe("mapDealRow", () => {
       sourceUrl: "https://www.rightmove.co.uk/properties/123",
       imageUrl: "https://media.rightmove.co.uk/property.jpg",
       needsReview: true,
-      mainRiskFlag: "Needs review",
+      mainRiskFlag: "Income cannot be verified without passing rent",
       rating: "red",
       confidenceLevel: "medium",
     });

@@ -8,7 +8,7 @@ import {
   EDDISONS_SOURCE,
   filterAndSortDeals,
   IMPORTED_SOURCE_FILTER,
-  NEEDS_REVIEW_FILTER,
+  REQUIRES_DUE_DILIGENCE_FILTER,
   RIGHTMOVE_COMMERCIAL_SOURCE,
   sourceLabel,
 } from "@/lib/dashboardFilters";
@@ -79,12 +79,14 @@ const acuitus = deal({
   assetType: "Office",
   importSourceName: ACUITUS_SOURCE,
   isImported: true,
-  needsReview: true,
+  needsReview: false,
   dataConfidenceScore: 82,
   confidenceLevel: "high",
-  score: 39,
-  rating: "red",
-  netInitialYield: 0,
+  score: 65,
+  rating: "amber",
+  passingRent: 62000,
+  netInitialYield: 6.2,
+  sourceUrl: "https://example.com/acuitus",
 });
 
 const eddisons = deal({
@@ -217,7 +219,7 @@ describe("dashboard deal filters", () => {
     expect(result.map((item) => item.id)).toEqual(["imp-manchester", "imp-southampton"]);
   });
 
-  it("filters imported Acuitus and needs-review deals", () => {
+  it("filters imported Acuitus and requires-due-diligence deals", () => {
     const sourceResult = filterAndSortDeals([demo, imported, acuitus], {
       region: "All UK",
       asset: "All",
@@ -233,7 +235,7 @@ describe("dashboard deal filters", () => {
     const reviewResult = filterAndSortDeals([demo, imported, acuitus], {
       region: "All UK",
       asset: "All",
-      source: NEEDS_REVIEW_FILTER,
+      source: REQUIRES_DUE_DILIGENCE_FILTER,
       rating: "all",
       confidence: "all",
       minYield: 0,
@@ -244,7 +246,7 @@ describe("dashboard deal filters", () => {
     }, weights);
 
     expect(sourceResult.map((item) => item.id)).toEqual(["imp-acuitus"]);
-    expect(reviewResult.map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
+    expect(reviewResult.map((item) => item.id)).toEqual(["imp-acuitus"]);
   });
 
   it("normalizes and filters Eddisons source labels", () => {

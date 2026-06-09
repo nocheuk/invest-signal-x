@@ -172,7 +172,22 @@ export function scoreImportedDeal(input: DealScoringInput): ScoredDeal {
   );
   const cappedScore = applyConfidenceCap(rawScore, dataConfidenceScore);
   const confidenceLevel = confidenceLevelForScore(dataConfidenceScore);
-  const needsReview = confidenceLevel !== "high" || reasons.missingDataWarnings.length > 0;
+  const severeWarnings = reasons.missingDataWarnings.filter((warning) => warning !== "No comparable evidence yet");
+  const actionableFieldCount = [
+    guidePrice > 0,
+    Boolean(input.location && input.location !== "All UK"),
+    Boolean(input.assetType),
+    Boolean(input.sourceUrl),
+    sqft > 0 || pricePerSqft > 0,
+    passingRent > 0 || netInitialYield > 0 || grossYield > 0,
+    Boolean(input.tenant && input.tenant !== "Unknown"),
+    safeNumber(input.wault) > 0 || safeNumber(input.leaseLength) > 0,
+  ].filter(Boolean).length;
+  const needsReview =
+    confidenceLevel === "low" ||
+    severeWarnings.includes("Source URL missing") ||
+    (passingRent <= 0 && netInitialYield <= 0 && grossYield <= 0) ||
+    actionableFieldCount <= 3;
 
   return {
     dealSignalScore: cappedScore,
@@ -191,7 +206,7 @@ export function scoreImportedDeal(input: DealScoringInput): ScoredDeal {
       upside,
       riskExit: riskAndConfidence,
     },
-    mainRiskFlag: needsReview ? "Needs review" : firstOrFallback(reasons.negativeDrivers, "Underwriting data verified"),
+    mainRiskFlag: needsReview ? firstOrFallback(reasons.negativeDrivers, "Sparse listing data needs review") : firstOrFallback(reasons.negativeDrivers, "Requires due diligence"),
     reasons,
   };
 }
