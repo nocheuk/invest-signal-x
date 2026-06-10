@@ -127,6 +127,11 @@ export type Database = {
         Insert: { id?: string; deal_id: string; raw_import_id?: string | null; import_source_id?: string | null; source_url?: string | null; confidence?: number };
         Update: Partial<Database["public"]["Tables"]["deal_source_links"]["Insert"]>;
       };
+      deal_enrichments: {
+        Row: { id: string; deal_id: string; source_url: string | null; status: string; attempt_count: number; last_attempted_at: string | null; next_attempt_at: string | null; last_error: string | null; tenant_name: string | null; passing_rent: number | null; lease_length: number | null; wault: number | null; epc_rating: string | null; sqft: number | null; guide_price: number | null; auction_info: Json; vat_info: string | null; investment_summary: string | null; extracted_payload: Json; created_at: string; updated_at: string };
+        Insert: { id?: string; deal_id: string; source_url?: string | null; status?: string; attempt_count?: number; last_attempted_at?: string | null; next_attempt_at?: string | null; last_error?: string | null; tenant_name?: string | null; passing_rent?: number | null; lease_length?: number | null; wault?: number | null; epc_rating?: string | null; sqft?: number | null; guide_price?: number | null; auction_info?: Json; vat_info?: string | null; investment_summary?: string | null; extracted_payload?: Json };
+        Update: Partial<Database["public"]["Tables"]["deal_enrichments"]["Insert"]>;
+      };
       comparable_transactions: {
         Row: { id: string; deal_id: string | null; title: string; location: string | null; asset_type: string | null; price: number | null; yield_percent: number | null; transaction_date: string | null; evidence_url: string | null; metadata: Json; created_at: string; updated_at: string };
         Insert: { id?: string; deal_id?: string | null; title: string; location?: string | null; asset_type?: string | null; price?: number | null; yield_percent?: number | null; transaction_date?: string | null; evidence_url?: string | null; metadata?: Json };

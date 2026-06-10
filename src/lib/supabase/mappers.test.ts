@@ -64,4 +64,50 @@ describe("mapDealRow", () => {
     });
     expect(deal.scoreReasons?.missingDataWarnings).toContain("Passing rent missing");
   });
+
+  it("overlays enriched source-detail fields before rescoring imported deals", () => {
+    const deal = mapDealRow(baseRow, {
+      sourceUrl: "https://www.rightmove.co.uk/properties/123",
+      importSourceName: "Rightmove Commercial",
+      importSourceType: "custom_rightmove_commercial",
+      enrichment: {
+        id: "enrich-1",
+        deal_id: "imp-rightmove",
+        source_url: "https://www.rightmove.co.uk/properties/123",
+        status: "enriched",
+        attempt_count: 1,
+        last_attempted_at: "2026-06-10T08:00:00Z",
+        next_attempt_at: null,
+        last_error: null,
+        tenant_name: "National Retailer Ltd",
+        passing_rent: 85000,
+        lease_length: 8,
+        wault: 7,
+        epc_rating: "B",
+        sqft: 4000,
+        guide_price: 1000000,
+        auction_info: {},
+        vat_info: "VAT applicable",
+        investment_summary: "Investment let to National Retailer Ltd.",
+        extracted_payload: {},
+        created_at: "2026-06-10T08:00:00Z",
+        updated_at: "2026-06-10T08:00:00Z",
+      },
+    });
+
+    expect(deal).toMatchObject({
+      passingRent: 85000,
+      tenant: "National Retailer Ltd",
+      wault: 7,
+      leaseLength: 8,
+      sqft: 4000,
+      enrichment: {
+        status: "Enriched",
+        epcRating: "B",
+        vatInfo: "VAT applicable",
+      },
+    });
+    expect(deal.score).toBeGreaterThan(0);
+    expect(deal.scoreReasons?.missingDataWarnings).not.toContain("Passing rent missing");
+  });
 });

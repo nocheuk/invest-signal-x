@@ -259,7 +259,17 @@ Manual import tools under `/admin/import` remain admin-only.
 
 ### Scheduled National England Scan
 
-DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus, Eddisons, Allsop, Goadsby Commercial, Zoopla Commercial, Savills Commercial, SDL Property Auctions, Pugh Auctions, Bond Wolfe, Fisher German Commercial and Lambert Smith Hampton are included once per scheduled run from their main sale/listing pages where the source returns parsable server-side HTML.
+DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper.
+
+The scheduler is source-aware:
+
+- Rightmove Commercial runs every scan with the current 16-location batch.
+- High-value dynamic sources such as Allsop, Pugh Auctions, Savills Commercial and Eddisons are eligible at most every 12 hours.
+- SDL Property Auctions and Lambert Smith Hampton are eligible at most once per day.
+- Acuitus is treated as a static/low-change source and is eligible at most once per day.
+- Problematic or currently blocked sources such as Zoopla Commercial, Goadsby Commercial, Bond Wolfe and Fisher German Commercial back off for up to 7 days after anti-bot/403/parser-block failures.
+
+This keeps the Vercel Hobby daily scan safe while allowing a future Pro or external scheduler to run 4 times/day without hammering static or blocked sources.
 
 The queue lives in `scripts/lib/englandLocationQueue.mjs` and includes:
 
@@ -276,8 +286,12 @@ Each scan run stores coverage diagnostics in `national_scan_runs.metadata`:
 - next queue index
 - estimated full-cycle duration
 - scan cycle progress
+- source due/not-due decisions
+- skipped source cooldown/backoff reason
+- next eligible scan time
+- consecutive failure count
 
-On Vercel Hobby the cron is daily, so it can take multiple days to rotate through every city/town in the queue. With the current 160-location queue and a 16-location batch, one full cycle takes about 10 days. A future Pro plan can scan more often and/or use a larger safe batch size.
+On Vercel Hobby the cron is daily, so it can take multiple days to rotate through every city/town in the queue. With the current 160-location queue and a 16-location Rightmove batch, one full cycle takes about 10 days. A Pro/external scheduler can run the same endpoint 4 times/day; with source-aware scheduling that gives roughly a 2.5-day Rightmove location cycle while static and blocked sources remain protected by cooldowns.
 
 Rightmove, Eddisons, Allsop and the configured commercial source scrapers support pagination conservatively when the first search page exposes pagination links. The scrapers follow a small number of discovered search-result pages, keep requests serial, and deduplicate repeated source URLs before writing through the import pipeline.
 
@@ -336,6 +350,16 @@ Run a local live batch:
 npm run scan:national
 ```
 
+The national scan also runs a small bounded deal-enrichment batch after imports complete. Enrichment visits source detail pages server-side and attempts to extract tenant, passing rent, lease length, WAULT, EPC, floor area, guide price, auction/VAT information and investment summary text. Import completion does not depend on enrichment: failed enrichment records are marked for retry and the import batch still completes.
+
+Run enrichment manually:
+
+```bash
+npm run enrich:deals -- --limit 25
+```
+
+Enrichment writes to `deal_enrichments` rather than replacing raw import payloads. The frontend overlays enriched fields when loading deals, and the server updates the linked `deals` row with refreshed underwriting fields and score inputs where enrichment finds better data.
+
 Change the batch size locally:
 
 ```bash
@@ -352,6 +376,14 @@ Scan run records are stored in `national_scan_runs` with:
 - failed/skipped counts
 - started/finished timestamps
 - raw result metadata
+
+Deal enrichment records are stored in `deal_enrichments` with:
+
+- deal id and source URL
+- enrichment status: `pending`, `enriched`, `failed`
+- attempt count, last attempt and next retry time
+- extracted tenant, rent, lease, WAULT, EPC, size, guide price, auction/VAT and summary fields
+- raw extracted payload for audit/debugging
 
 ### Saved Alerts V1
 

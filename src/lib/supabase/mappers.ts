@@ -10,6 +10,7 @@ export type DealSourceMetadata = {
   importSourceName?: string | null;
   importSourceType?: string | null;
   imageUrl?: string | null;
+  enrichment?: Database["public"]["Tables"]["deal_enrichments"]["Row"] | null;
 };
 
 const defaultScoreBreakdown: Deal["scoreBreakdown"] = {
@@ -28,9 +29,10 @@ const defaultInsights: Deal["insights"] = {
 };
 
 export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}): Deal {
-  const guidePrice = safeNumber(row.guide_price);
-  const passingRent = safeNumber(row.passing_rent);
-  const sqft = safeNumber(row.sqft);
+  const enrichment = sourceMetadata.enrichment?.status === "enriched" ? sourceMetadata.enrichment : null;
+  const guidePrice = enrichedNumber(enrichment?.guide_price, row.guide_price);
+  const passingRent = enrichedNumber(enrichment?.passing_rent, row.passing_rent);
+  const sqft = enrichedNumber(enrichment?.sqft, row.sqft);
   const grossYield = safeNumber(row.gross_yield) || (guidePrice > 0 ? (passingRent / guidePrice) * 100 : 0);
   const netInitialYield = safeNumber(row.net_initial_yield) || Math.max(0, grossYield * 0.93);
   const pricePerSqft = safeNumber(row.price_per_sqft) || (sqft > 0 && guidePrice > 0 ? Math.round(guidePrice / sqft) : 0);
@@ -60,9 +62,9 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     grossYield,
     netInitialYield,
     reversionaryYield: safeNumber(row.reversionary_yield) || netInitialYield,
-    wault: safeNumber(row.wault),
-    leaseLength: safeNumber(row.lease_length),
-    tenant: row.tenant || "Unknown",
+    wault: enrichedNumber(enrichment?.wault, row.wault),
+    leaseLength: enrichedNumber(enrichment?.lease_length, row.lease_length),
+    tenant: enrichment?.tenant_name || row.tenant || "Unknown",
     pricePerSqft,
     planningUpsideScore: safeNumber(row.planning_upside_score),
     voidRiskScore: safeNumber(row.void_risk_score),
@@ -70,6 +72,9 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     postedAt: row.posted_at,
     descriptionText: [
       row.main_risk_flag,
+      enrichment?.investment_summary,
+      enrichment?.vat_info,
+      enrichment?.epc_rating ? `EPC ${enrichment.epc_rating}` : undefined,
       ...(row.red_flags ?? []),
       (row.insights as Deal["insights"] | null | undefined)?.mispricing,
       (row.insights as Deal["insights"] | null | undefined)?.askAgent,
@@ -103,9 +108,9 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     grossYield: importedScore?.grossYield ?? grossYield,
     netInitialYield: importedScore?.netInitialYield ?? netInitialYield,
     reversionaryYield: safeNumber(row.reversionary_yield) || netInitialYield,
-    wault: safeNumber(row.wault),
-    leaseLength: safeNumber(row.lease_length),
-    tenant: row.tenant || "Unknown",
+    wault: enrichedNumber(enrichment?.wault, row.wault),
+    leaseLength: enrichedNumber(enrichment?.lease_length, row.lease_length),
+    tenant: enrichment?.tenant_name || row.tenant || "Unknown",
     covenantStrength: row.covenant_strength as Deal["covenantStrength"],
     tenantHealthScore: safeNumber(row.tenant_health_score),
     rentSustainability: row.rent_sustainability as Deal["rentSustainability"],
@@ -125,6 +130,15 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     insights: (row.insights as Deal["insights"]) ?? defaultInsights,
     thumbnail: thumbnailImageUrl ? "from-zinc-500/30 to-slate-700/20" : row.thumbnail || "from-zinc-500/30 to-slate-700/20",
     postedAt: row.posted_at,
+    enrichment: sourceMetadata.enrichment ? {
+      status: enrichmentStatusLabel(sourceMetadata.enrichment.status),
+      epcRating: sourceMetadata.enrichment.epc_rating ?? undefined,
+      vatInfo: sourceMetadata.enrichment.vat_info ?? undefined,
+      auctionInfo: objectRecord(sourceMetadata.enrichment.auction_info),
+      investmentSummary: sourceMetadata.enrichment.investment_summary ?? undefined,
+      lastAttemptedAt: sourceMetadata.enrichment.last_attempted_at ?? undefined,
+      lastError: sourceMetadata.enrichment.last_error ?? undefined,
+    } : undefined,
   };
   return { ...mapped, analysis: buildDealAnalysis(mapped) };
 }
@@ -172,6 +186,10 @@ function safeNumber(value: number | null | undefined) {
   return Number.isFinite(value) ? Number(value) : 0;
 }
 
+function enrichedNumber(enriched: number | null | undefined, fallback: number | null | undefined) {
+  return safeNumber(enriched) || safeNumber(fallback);
+}
+
 function clampScore(value: number | null | undefined) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(Number(value))));
@@ -185,4 +203,14 @@ function ratingFromScore(score: number): Deal["rating"] {
 
 function isUrl(value: string | null | undefined) {
   return Boolean(value && /^https?:\/\//i.test(value));
+}
+
+function enrichmentStatusLabel(value: string): "Pending" | "Enriched" | "Failed" {
+  if (value === "enriched") return "Enriched";
+  if (value === "failed") return "Failed";
+  return "Pending";
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }

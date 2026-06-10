@@ -41,6 +41,15 @@ export interface Deal {
     riskSignals: string[];
     investmentSummary: string;
   };
+  enrichment?: {
+    status: "Pending" | "Enriched" | "Failed";
+    epcRating?: string;
+    vatInfo?: string;
+    auctionInfo?: Record<string, unknown>;
+    investmentSummary?: string;
+    lastAttemptedAt?: string;
+    lastError?: string;
+  };
   guidePrice: number; // £
   passingRent: number; // £ pa
   sqft: number;
