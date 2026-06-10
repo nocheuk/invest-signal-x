@@ -6,6 +6,7 @@ import { ALLSOP_COMMERCIAL_SEARCH_URL, ALLSOP_SOURCE_NAME } from "./allsopScrape
 import { SOURCE_CONFIGS } from "./commercialSourceScraper.mjs";
 import { EDDISONS_SALE_LISTINGS_URL, EDDISONS_SOURCE_NAME } from "./eddisonsScraper.mjs";
 import { runSavedAlertsForRecentDeals } from "./alerts.mjs";
+import { runDealEnrichment } from "./dealEnrichment.mjs";
 import {
   ACUITUS_LISTINGS_URL,
   ACUITUS_SOURCE_NAME,
@@ -14,6 +15,10 @@ import {
   runRightmoveLocationSearch,
 } from "./rightmoveLocationSearch.mjs";
 import { ENGLAND_NATIONAL_SCAN_LOCATIONS } from "./englandLocationQueue.mjs";
+import {
+  buildSourceSchedulePlan,
+  buildSourceScheduleState,
+} from "./sourceSchedule.mjs";
 
 export const NATIONAL_SCAN_TYPE = "england_national_scan";
 export const NATIONAL_SCAN_BATCH_SIZE = 16;
@@ -70,14 +75,25 @@ export async function runNationalScan({
   includeAllsop = true,
   includeExpandedSources = true,
   evaluateAlerts = true,
+  evaluateEnrichment = true,
+  enrichmentLimit = 20,
   adapters = defaultNationalAdapters(),
   now = new Date(),
+  sourceScanHistory,
+  forceSources = false,
 } = {}) {
   if (!supabase && !dryRun) throw new Error("Supabase service client is required for live national scans.");
 
   const lastNextIndex = dryRun ? 0 : await loadLastNextIndex({ supabase });
+  const scanHistory = sourceScanHistory ?? (dryRun ? [] : await loadRecentSourceScanRuns({ supabase }));
   const batch = selectNationalScanBatch({ lastNextIndex, batchSize, locations });
   const diagnostics = buildNationalScanDiagnostics({ batch, totalLocations: locations.length, batchSize, runsPerDay: 1 });
+  const sourcePlan = buildSourceSchedulePlan({
+    sources: enabledScheduledSourceNames({ includeAcuitus, includeEddisons, includeAllsop, includeExpandedSources }),
+    scanRuns: scanHistory,
+    now,
+    force: forceSources,
+  });
   const batchId = crypto.randomUUID();
   const results = [];
   const sharedMetadata = {
@@ -90,6 +106,7 @@ export async function runNationalScan({
     scan_batch_size: diagnostics.batchSize,
     estimated_full_cycle_days: diagnostics.estimatedFullCycleDays,
     scan_cycle_progress: diagnostics.scanCycleProgress,
+    source_schedule: sourcePlan,
   };
 
   for (const locationQuery of batch.locations) {
@@ -107,50 +124,67 @@ export async function runNationalScan({
   }
 
   if (includeAcuitus) {
-    const result = await runAndRecordScan({
-      supabase,
-      dryRun,
-      batchId,
-      scanType: NATIONAL_SCAN_TYPE,
-      locationQuery: "England",
-      sourceName: ACUITUS_SOURCE_NAME,
-      metadata: { ...sharedMetadata, national_source: true },
-      run: () => adapters.acuitus({ dryRun }),
-    });
-    results.push(result);
+    const schedule = scheduleForSource(sourcePlan, ACUITUS_SOURCE_NAME);
+    if (!schedule.due) results.push(skippedScheduledSource({ sourceName: ACUITUS_SOURCE_NAME, schedule }));
+    else {
+      const result = await runAndRecordScan({
+        supabase,
+        dryRun,
+        batchId,
+        scanType: NATIONAL_SCAN_TYPE,
+        locationQuery: "England",
+        sourceName: ACUITUS_SOURCE_NAME,
+        metadata: { ...sharedMetadata, national_source: true, source_schedule_state: schedule },
+        run: () => adapters.acuitus({ dryRun }),
+      });
+      results.push(result);
+    }
   }
 
   if (includeEddisons) {
-    const result = await runAndRecordScan({
-      supabase,
-      dryRun,
-      batchId,
-      scanType: NATIONAL_SCAN_TYPE,
-      locationQuery: "England",
-      sourceName: EDDISONS_SOURCE_NAME,
-      metadata: { ...sharedMetadata, national_source: true },
-      run: () => adapters.eddisons({ dryRun }),
-    });
-    results.push(result);
+    const schedule = scheduleForSource(sourcePlan, EDDISONS_SOURCE_NAME);
+    if (!schedule.due) results.push(skippedScheduledSource({ sourceName: EDDISONS_SOURCE_NAME, schedule }));
+    else {
+      const result = await runAndRecordScan({
+        supabase,
+        dryRun,
+        batchId,
+        scanType: NATIONAL_SCAN_TYPE,
+        locationQuery: "England",
+        sourceName: EDDISONS_SOURCE_NAME,
+        metadata: { ...sharedMetadata, national_source: true, source_schedule_state: schedule },
+        run: () => adapters.eddisons({ dryRun }),
+      });
+      results.push(result);
+    }
   }
 
   if (includeAllsop) {
-    const result = await runAndRecordScan({
-      supabase,
-      dryRun,
-      batchId,
-      scanType: NATIONAL_SCAN_TYPE,
-      locationQuery: "England",
-      sourceName: ALLSOP_SOURCE_NAME,
-      metadata: { ...sharedMetadata, national_source: true },
-      run: () => adapters.allsop({ dryRun }),
-    });
-    results.push(result);
+    const schedule = scheduleForSource(sourcePlan, ALLSOP_SOURCE_NAME);
+    if (!schedule.due) results.push(skippedScheduledSource({ sourceName: ALLSOP_SOURCE_NAME, schedule }));
+    else {
+      const result = await runAndRecordScan({
+        supabase,
+        dryRun,
+        batchId,
+        scanType: NATIONAL_SCAN_TYPE,
+        locationQuery: "England",
+        sourceName: ALLSOP_SOURCE_NAME,
+        metadata: { ...sharedMetadata, national_source: true, source_schedule_state: schedule },
+        run: () => adapters.allsop({ dryRun }),
+      });
+      results.push(result);
+    }
   }
 
   if (includeExpandedSources) {
     for (const sourceKey of EXPANDED_NATIONAL_SOURCE_KEYS) {
       const config = SOURCE_CONFIGS[sourceKey];
+      const schedule = scheduleForSource(sourcePlan, config.sourceName);
+      if (!schedule.due) {
+        results.push(skippedScheduledSource({ sourceName: config.sourceName, schedule }));
+        continue;
+      }
       const result = await runAndRecordScan({
         supabase,
         dryRun,
@@ -158,12 +192,16 @@ export async function runNationalScan({
         scanType: NATIONAL_SCAN_TYPE,
         locationQuery: "England",
         sourceName: config.sourceName,
-        metadata: { ...sharedMetadata, national_source: true },
+        metadata: { ...sharedMetadata, national_source: true, source_schedule_state: schedule },
         run: () => adapters[sourceKey]({ dryRun }),
       });
       results.push(result);
     }
   }
+
+  const enrichmentResult = !dryRun && evaluateEnrichment
+    ? await runEnrichmentSafely({ supabase, limit: enrichmentLimit, now })
+    : null;
 
   const alertResult = !dryRun && evaluateAlerts
     ? await runSavedAlertsForRecentDeals({ supabase, since: now, now: new Date() })
@@ -177,8 +215,11 @@ export async function runNationalScan({
     startIndex: batch.startIndex,
     nextIndex: batch.nextIndex,
     diagnostics,
+    sourceSchedule: sourcePlan,
+    skippedSources: results.filter((result) => result.status === "skipped"),
     sources: results,
     totals: aggregateNationalResults(results),
+    enrichment: enrichmentResult,
     alerts: alertResult,
   };
 }
@@ -269,8 +310,10 @@ async function runAndRecordScan({ supabase, dryRun, batchId, scanType, locationQ
 
   try {
     const result = normalizeNationalSourceResult(await run());
-    if (!dryRun) await finishNationalScanRun({ supabase, rowId, status: "completed", result });
-    return { id: rowId, locationQuery, sourceName, status: "completed", ...result };
+    const status = sourceResultShouldFail(result) ? "failed" : "completed";
+    const errorMessage = status === "failed" ? result.error || `${sourceName} returned no usable results.` : null;
+    if (!dryRun) await finishNationalScanRun({ supabase, rowId, status, result, errorMessage });
+    return { id: rowId, locationQuery, sourceName, status, ...result, error: errorMessage };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const result = normalizeNationalSourceResult({ source: sourceName, failed: 1, error: message });
@@ -309,6 +352,23 @@ async function loadLastNextIndex({ supabase }) {
   return Number(data?.[0]?.metadata?.next_index ?? 0) || 0;
 }
 
+async function loadRecentSourceScanRuns({ supabase }) {
+  const { data, error } = await supabase
+    .from("national_scan_runs")
+    .select("source_name,status,started_at,finished_at,error_message,result")
+    .order("started_at", { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    sourceName: String(row.source_name ?? ""),
+    status: String(row.status ?? ""),
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    errorMessage: row.error_message,
+    result: row.result,
+  }));
+}
+
 function normalizeNationalSourceResult(result = {}) {
   return {
     source: result.source ?? result.sourceName ?? "",
@@ -323,6 +383,7 @@ function normalizeNationalSourceResult(result = {}) {
     skippedPoa: Number(result.skipped_poa ?? result.skippedPoa ?? 0),
     failedMissingPrice: Number(result.failed_missing_price ?? result.failedMissingPrice ?? 0),
     processed: Number(result.processed ?? 0),
+    error: result.error ?? null,
   };
 }
 
@@ -348,4 +409,64 @@ function normalizeIndex(value, length) {
 
 function sum(values, key) {
   return values.reduce((total, value) => total + (Number(value?.[key]) || 0), 0);
+}
+
+function sourceResultShouldFail(result) {
+  return Boolean(result.error && result.failed > 0 && result.inserted === 0 && result.existing === 0 && result.processed === 0);
+}
+
+function enabledScheduledSourceNames({ includeAcuitus, includeEddisons, includeAllsop, includeExpandedSources }) {
+  const names = [RIGHTMOVE_COMMERCIAL_SOURCE_NAME];
+  if (includeAcuitus) names.push(ACUITUS_SOURCE_NAME);
+  if (includeEddisons) names.push(EDDISONS_SOURCE_NAME);
+  if (includeAllsop) names.push(ALLSOP_SOURCE_NAME);
+  if (includeExpandedSources) {
+    for (const key of EXPANDED_NATIONAL_SOURCE_KEYS) names.push(SOURCE_CONFIGS[key].sourceName);
+  }
+  return names;
+}
+
+function scheduleForSource(sourcePlan, sourceName) {
+  return sourcePlan.find((item) => item.sourceName === sourceName) ??
+    buildSourceScheduleState({ sourceName, scanRuns: [], now: new Date() });
+}
+
+function skippedScheduledSource({ sourceName, schedule }) {
+  return {
+    id: null,
+    locationQuery: "England",
+    sourceName,
+    source: sourceName,
+    status: "skipped",
+    total: 0,
+    unique: 0,
+    inserted: 0,
+    existing: 0,
+    failed: 0,
+    skippedDuplicate: 0,
+    skippedRentOnly: 0,
+    skippedPoa: 0,
+    failedMissingPrice: 0,
+    processed: 0,
+    error: null,
+    schedule,
+    skippedReason: schedule.blocked ? "blocked_backoff" : "cooldown",
+    nextEligibleAt: schedule.nextEligibleAt,
+  };
+}
+
+async function runEnrichmentSafely({ supabase, limit, now }) {
+  try {
+    return await runDealEnrichment({ supabase, limit, now });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      total: 0,
+      enriched: 0,
+      failed: 0,
+      skipped: 0,
+      queueSize: 0,
+      error: message,
+    };
+  }
 }

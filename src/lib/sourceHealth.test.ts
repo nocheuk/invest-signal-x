@@ -23,6 +23,8 @@ describe("source health", () => {
 
     expect(rows.find((row) => row.source === "Rightmove Commercial")).toMatchObject({
       status: "Healthy",
+      isDue: true,
+      cooldownReason: "Runs every scan",
       totalImportedDeals: 2,
       newDealsToday: 1,
       inventoryContributionPct: 66.7,
@@ -36,6 +38,10 @@ describe("source health", () => {
     });
     expect(rows.find((row) => row.source === "Zoopla Commercial")).toMatchObject({
       status: "Blocked",
+      isDue: false,
+      scheduleGroup: "problematic",
+      consecutiveFailures: 1,
+      cooldownReason: "Blocked backoff",
       warningReasons: expect.arrayContaining(["Anti-bot or access block detected"]),
     });
     expect(rows.find((row) => row.source === "Pugh Auctions")).toMatchObject({

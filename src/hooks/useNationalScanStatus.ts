@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { mapDealRow } from "@/lib/supabase/mappers";
+import { buildEnrichmentImpactReport, type EnrichmentImpactReport, type EnrichmentImpactRow } from "@/lib/enrichmentImpact";
 import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
 import {
   ACUITUS_SOURCE,
@@ -41,9 +43,20 @@ export type NationalScanStatus = {
   totalLshDeals: number;
   sourceDealCounts: Record<string, number>;
   sourceScanRuns: SourceScanRun[];
+  enrichmentMetrics: EnrichmentMetrics;
+  enrichmentImpact: EnrichmentImpactReport;
   locationsCompletedInCurrentCycle: number;
   lastSuccessfulScanDurationMs: number;
   lastScanInsertedCount: number;
+};
+
+export type EnrichmentMetrics = {
+  total: number;
+  enriched: number;
+  failed: number;
+  pending: number;
+  queueSize: number;
+  successRate: number;
 };
 
 export type SourceScanRun = {
@@ -78,6 +91,8 @@ const SOURCE_MATCHERS = [
   { key: "lsh", label: LSH_SOURCE, patterns: ["lambert smith hampton", "lsh"] },
 ] as const;
 const EMPTY_SOURCE_COUNTS = Object.fromEntries(SOURCE_MATCHERS.map((source) => [source.key, 0])) as SourceCountMap;
+const EMPTY_ENRICHMENT_METRICS: EnrichmentMetrics = { total: 0, enriched: 0, failed: 0, pending: 0, queueSize: 0, successRate: 0 };
+const EMPTY_ENRICHMENT_IMPACT = buildEnrichmentImpactReport([]);
 
 type SourceCountMap = Record<(typeof SOURCE_MATCHERS)[number]["key"], number>;
 
@@ -116,6 +131,18 @@ export function useNationalScanStatus() {
         [],
         "recent source scan runs"
       );
+      const enrichmentMetrics = await withTimeout(
+        loadEnrichmentMetrics(supabase, Object.values(sourceCounts).reduce((total, count) => total + count, 0)),
+        6000,
+        EMPTY_ENRICHMENT_METRICS,
+        "deal enrichment metrics"
+      );
+      const enrichmentImpact = await withTimeout(
+        loadEnrichmentImpact(supabase),
+        8000,
+        EMPTY_ENRICHMENT_IMPACT,
+        "deal enrichment impact"
+      );
       const totalConfiguredLocations = Number(metadata.total_configured_locations ?? 0);
       const nextIndex = Number(metadata.next_index ?? 0);
       return {
@@ -144,12 +171,156 @@ export function useNationalScanStatus() {
         totalLshDeals: sourceCounts.lsh,
         sourceDealCounts: Object.fromEntries(SOURCE_MATCHERS.map((source) => [source.label, sourceCounts[source.key]])),
         sourceScanRuns,
+        enrichmentMetrics,
+        enrichmentImpact,
         locationsCompletedInCurrentCycle: totalConfiguredLocations > 0 && nextIndex === 0 ? totalConfiguredLocations : nextIndex,
         lastSuccessfulScanDurationMs: scanDurationMs(row.started_at, row.finished_at),
         lastScanInsertedCount: Number(row.inserted ?? 0),
       };
     },
   });
+}
+
+async function loadEnrichmentImpact(supabase: ReturnType<typeof requireSupabase>): Promise<EnrichmentImpactReport> {
+  const enrichments = await loadAllRows<{
+    id: string;
+    deal_id: string;
+    source_url: string | null;
+    status: string;
+    tenant_name: string | null;
+    passing_rent: number | null;
+    lease_length: number | null;
+    wault: number | null;
+    epc_rating: string | null;
+    sqft: number | null;
+    guide_price: number | null;
+    auction_info: Record<string, unknown> | null;
+    vat_info: string | null;
+    investment_summary: string | null;
+  }>(supabase, "deal_enrichments", "id,deal_id,source_url,status,tenant_name,passing_rent,lease_length,wault,epc_rating,sqft,guide_price,auction_info,vat_info,investment_summary");
+  if (enrichments.length === 0) return EMPTY_ENRICHMENT_IMPACT;
+
+  const dealIds = [...new Set(enrichments.map((row) => row.deal_id).filter(Boolean))];
+  const [dealRows, sourceLinks] = await Promise.all([
+    loadRowsByDealId(supabase, "deals", "*", "id", dealIds),
+    loadRowsByDealId(supabase, "deal_source_links", "deal_id,source_url,import_sources(name,source_type),raw_imports(normalized_payload)", "deal_id", dealIds),
+  ]);
+  const dealsById = new Map(dealRows.map((row) => [String(row.id), row]));
+  const linksByDealId = new Map<string, unknown>();
+  for (const link of sourceLinks) {
+    if (!linksByDealId.has(String(link.deal_id))) linksByDealId.set(String(link.deal_id), link);
+  }
+
+  const rows: EnrichmentImpactRow[] = [];
+  for (const enrichment of enrichments) {
+    const dealRow = dealsById.get(enrichment.deal_id);
+    if (!dealRow) continue;
+    const link = linksByDealId.get(enrichment.deal_id) as Record<string, unknown> | undefined;
+    const importSource = (Array.isArray(link?.import_sources) ? link?.import_sources[0] : link?.import_sources) as Record<string, unknown> | undefined;
+    const rawImport = (Array.isArray(link?.raw_imports) ? link?.raw_imports[0] : link?.raw_imports) as Record<string, unknown> | undefined;
+    rows.push({
+      deal: mapDealRow(dealRow as Parameters<typeof mapDealRow>[0], {
+        sourceUrl: String(link?.source_url ?? enrichment.source_url ?? ""),
+        importSourceName: typeof importSource?.name === "string" ? importSource.name : undefined,
+        importSourceType: typeof importSource?.source_type === "string" ? importSource.source_type : undefined,
+        enrichment: {
+          id: enrichment.id,
+          deal_id: enrichment.deal_id,
+          source_url: enrichment.source_url,
+          status: enrichment.status,
+          attempt_count: 0,
+          last_attempted_at: null,
+          next_attempt_at: null,
+          last_error: null,
+          tenant_name: enrichment.tenant_name,
+          passing_rent: enrichment.passing_rent,
+          lease_length: enrichment.lease_length,
+          wault: enrichment.wault,
+          epc_rating: enrichment.epc_rating,
+          sqft: enrichment.sqft,
+          guide_price: enrichment.guide_price,
+          auction_info: enrichment.auction_info ?? {},
+          vat_info: enrichment.vat_info,
+          investment_summary: enrichment.investment_summary,
+          extracted_payload: {},
+          created_at: "",
+          updated_at: "",
+        },
+      }),
+      sourceName: typeof importSource?.name === "string" ? importSource.name : "",
+      normalizedPayload: rawImport?.normalized_payload as Record<string, unknown> | undefined,
+      enrichment: {
+        status: enrichment.status,
+        tenantName: enrichment.tenant_name,
+        passingRent: enrichment.passing_rent,
+        leaseLength: enrichment.lease_length,
+        wault: enrichment.wault,
+        epcRating: enrichment.epc_rating,
+        sqft: enrichment.sqft,
+        guidePrice: enrichment.guide_price,
+        auctionInfo: enrichment.auction_info,
+        vatInfo: enrichment.vat_info,
+        investmentSummary: enrichment.investment_summary,
+      },
+    });
+  }
+  return buildEnrichmentImpactReport(rows);
+}
+
+async function loadAllRows<T>(supabase: ReturnType<typeof requireSupabase>, table: string, select: string): Promise<T[]> {
+  const rows: T[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(select)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...((data ?? []) as T[]));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
+}
+
+async function loadRowsByDealId<T extends Record<string, unknown>>(supabase: ReturnType<typeof requireSupabase>, table: string, select: string, column: string, dealIds: string[]): Promise<T[]> {
+  const rows: T[] = [];
+  const chunkSize = 150;
+  for (let index = 0; index < dealIds.length; index += chunkSize) {
+    const chunk = dealIds.slice(index, index + chunkSize);
+    const { data, error } = await supabase
+      .from(table)
+      .select(select)
+      .in(column, chunk);
+    if (error) throw error;
+    rows.push(...((data ?? []) as T[]));
+  }
+  return rows;
+}
+
+async function loadEnrichmentMetrics(supabase: ReturnType<typeof requireSupabase>, estimatedImportedCandidates = 0): Promise<EnrichmentMetrics> {
+  const { data, error } = await supabase
+    .from("deal_enrichments")
+    .select("status,next_attempt_at");
+  if (error) throw error;
+  const now = Date.now();
+  const total = data?.length ?? 0;
+  const enriched = (data ?? []).filter((row) => row.status === "enriched").length;
+  const failed = (data ?? []).filter((row) => row.status === "failed").length;
+  const pending = (data ?? []).filter((row) => row.status === "pending").length;
+  const dueRetryRows = (data ?? []).filter((row) => {
+    if (row.status === "enriched") return false;
+    const nextMs = row.next_attempt_at ? new Date(row.next_attempt_at).getTime() : 0;
+    return !Number.isFinite(nextMs) || nextMs <= now;
+  }).length;
+  const neverAttemptedEstimate = Math.max(0, estimatedImportedCandidates - enriched - failed - pending);
+  return {
+    total,
+    enriched,
+    failed,
+    pending,
+    queueSize: Math.max(dueRetryRows, neverAttemptedEstimate + dueRetryRows),
+    successRate: total > 0 ? Math.round((enriched / total) * 1000) / 10 : 0,
+  };
 }
 
 async function loadRecentSourceScanRuns(supabase: ReturnType<typeof requireSupabase>): Promise<SourceScanRun[]> {

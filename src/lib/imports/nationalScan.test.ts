@@ -155,6 +155,7 @@ describe("national scan scheduler", () => {
       includeAllsop: false,
       includeExpandedSources: false,
       evaluateAlerts: false,
+      evaluateEnrichment: false,
       adapters: {
         rightmove: async ({ locationQuery }: { locationQuery: string }) => ({
           source: "Rightmove Commercial",
@@ -227,6 +228,107 @@ describe("national scan scheduler", () => {
     });
 
     expect(calls).toEqual(EXPANDED_NATIONAL_SOURCE_KEYS);
+  });
+
+  it("runs Rightmove every scan and skips non-due static sources", async () => {
+    const calls: string[] = [];
+    const result = await runNationalScan({
+      dryRun: true,
+      now: new Date("2026-06-10T12:00:00Z"),
+      batchSize: 1,
+      locations: ["London"],
+      includeEddisons: false,
+      includeAllsop: false,
+      includeExpandedSources: false,
+      sourceScanHistory: [
+        {
+          sourceName: "Rightmove Commercial",
+          status: "completed",
+          startedAt: "2026-06-10T11:00:00Z",
+          finishedAt: "2026-06-10T11:05:00Z",
+          errorMessage: null,
+        },
+        {
+          sourceName: "Acuitus",
+          status: "completed",
+          startedAt: "2026-06-10T06:00:00Z",
+          finishedAt: "2026-06-10T06:04:00Z",
+          errorMessage: null,
+        },
+      ],
+      adapters: {
+        rightmove: async ({ locationQuery }: { locationQuery: string }) => {
+          calls.push(`rightmove:${locationQuery}`);
+          return { source: "Rightmove Commercial", inserted: 1, existing: 0, failed: 0, processed: 1 };
+        },
+        acuitus: async () => {
+          calls.push("acuitus");
+          return { source: "Acuitus", inserted: 1, existing: 0, failed: 0, processed: 1 };
+        },
+      },
+    });
+
+    expect(calls).toEqual(["rightmove:London"]);
+    expect(result.skippedSources).toEqual([
+      expect.objectContaining({
+        sourceName: "Acuitus",
+        status: "skipped",
+        skippedReason: "cooldown",
+      }),
+    ]);
+  });
+
+  it("backs off blocked/problematic sources without blocking due dynamic sources", async () => {
+    const calls: string[] = [];
+    const result = await runNationalScan({
+      dryRun: true,
+      now: new Date("2026-06-10T12:00:00Z"),
+      batchSize: 1,
+      locations: ["London"],
+      includeAcuitus: false,
+      includeEddisons: false,
+      includeAllsop: false,
+      includeExpandedSources: true,
+      sourceScanHistory: [
+        {
+          sourceName: "Zoopla Commercial",
+          status: "failed",
+          startedAt: "2026-06-09T12:00:00Z",
+          finishedAt: "2026-06-09T12:01:00Z",
+          errorMessage: "Fetch failed: 403 Forbidden",
+        },
+        {
+          sourceName: "Pugh Auctions",
+          status: "completed",
+          startedAt: "2026-06-09T22:00:00Z",
+          finishedAt: "2026-06-09T22:10:00Z",
+          errorMessage: null,
+        },
+      ],
+      adapters: {
+        rightmove: async () => ({ source: "Rightmove Commercial", inserted: 0, existing: 0, failed: 0 }),
+        goadsby: async () => ({ source: "Goadsby Commercial", inserted: 0, existing: 0, failed: 0 }),
+        zoopla: async () => {
+          calls.push("zoopla");
+          return { source: "Zoopla Commercial", inserted: 0, existing: 0, failed: 0 };
+        },
+        savills: async () => ({ source: "Savills Commercial", inserted: 0, existing: 0, failed: 0 }),
+        sdl: async () => ({ source: "SDL Property Auctions", inserted: 0, existing: 0, failed: 0 }),
+        pugh: async () => {
+          calls.push("pugh");
+          return { source: "Pugh Auctions", inserted: 1, existing: 0, failed: 0, processed: 1 };
+        },
+        bondWolfe: async () => ({ source: "Bond Wolfe", inserted: 0, existing: 0, failed: 0 }),
+        fisherGerman: async () => ({ source: "Fisher German Commercial", inserted: 0, existing: 0, failed: 0 }),
+        lsh: async () => ({ source: "Lambert Smith Hampton", inserted: 0, existing: 0, failed: 0 }),
+      },
+    });
+
+    expect(calls).toEqual(["pugh"]);
+    expect(result.skippedSources).toContainEqual(expect.objectContaining({
+      sourceName: "Zoopla Commercial",
+      skippedReason: "blocked_backoff",
+    }));
   });
 });
 

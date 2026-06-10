@@ -50,8 +50,23 @@ const rows = vi.hoisted(() => ({
       source_type: "apify_rightmove_commercial",
     },
   }],
+  enrichments: [{
+    deal_id: "imp-live",
+    status: "enriched",
+    tenant_name: "Enriched Tenant Ltd",
+    passing_rent: 90000,
+    lease_length: 7,
+    wault: 6,
+    epc_rating: "B",
+    guide_price: null,
+    sqft: null,
+    vat_info: "VAT applicable",
+    auction_info: {},
+    investment_summary: "Enriched source summary.",
+  }],
   linkErrorForChunks: [] as number[],
   linkChunkCalls: [] as string[][],
+  enrichmentChunkCalls: [] as string[][],
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -62,6 +77,16 @@ vi.mock("@/lib/supabase/client", () => ({
         return {
           select: () => ({
             order: async () => ({ data: rows.deals, error: null }),
+          }),
+        };
+      }
+      if (table === "deal_enrichments") {
+        return {
+          select: () => ({
+            in: async (_column: string, values: string[]) => {
+              rows.enrichmentChunkCalls.push(values);
+              return { data: rows.enrichments.filter((row) => values.includes(row.deal_id)), error: null };
+            },
           }),
         };
       }
@@ -91,6 +116,7 @@ function wrapper({ children }: { children: ReactNode }) {
 describe("useDeals", () => {
   beforeEach(() => {
     rows.linkChunkCalls = [];
+    rows.enrichmentChunkCalls = [];
     rows.linkErrorForChunks = [];
   });
 
@@ -103,7 +129,13 @@ describe("useDeals", () => {
       title: "Live deal",
       assetType: "Industrial",
       netInitialYield: 7.5,
+      passingRent: 90000,
+      tenant: "Enriched Tenant Ltd",
       importSourceName: "Rightmove Commercial Bournemouth",
+      enrichment: {
+        status: "Enriched",
+        epcRating: "B",
+      },
       isImported: true,
       sourceUrl: "https://www.rightmove.co.uk/properties/123",
     });
@@ -123,12 +155,14 @@ describe("useDeals", () => {
         source_type: "custom_rightmove_commercial",
       },
     }));
+    rows.enrichments = [];
     rows.linkErrorForChunks = [1];
 
     const { result } = renderHook(() => useDeals(), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(rows.linkChunkCalls).toHaveLength(2);
+    expect(rows.enrichmentChunkCalls).toHaveLength(2);
     expect(rows.linkChunkCalls[0]).toHaveLength(150);
     expect(result.current.data).toHaveLength(151);
     expect(result.current.data?.[0]).toMatchObject({ importSourceName: "Rightmove Commercial" });

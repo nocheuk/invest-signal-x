@@ -39,13 +39,31 @@ async function loadDealSourceMetadata(dealIds: string[]) {
   const supabase = requireSupabase();
   for (let index = 0; index < dealIds.length; index += SOURCE_METADATA_CHUNK_SIZE) {
     const chunk = dealIds.slice(index, index + SOURCE_METADATA_CHUNK_SIZE);
-    const result = await withMetadataTimeout(
-      supabase
-        .from("deal_source_links")
-        .select("deal_id,source_url,import_sources(name,source_type),raw_imports(normalized_payload)")
-        .in("deal_id", chunk),
-      6000
-    );
+    const [sourceResult, enrichmentResult] = await Promise.all([
+      withMetadataTimeout(
+        supabase
+          .from("deal_source_links")
+          .select("deal_id,source_url,import_sources(name,source_type),raw_imports(normalized_payload)")
+          .in("deal_id", chunk),
+        6000
+      ),
+      withMetadataTimeout(
+        supabase
+          .from("deal_enrichments")
+          .select("*")
+          .in("deal_id", chunk),
+        6000
+      ),
+    ]);
+
+    const enrichments = new Map<string, unknown>();
+    if (enrichmentResult && !enrichmentResult.error) {
+      for (const row of enrichmentResult.data ?? []) enrichments.set(row.deal_id, row);
+    } else if (enrichmentResult?.error) {
+      console.warn("Could not load deal enrichment metadata", enrichmentResult.error.message);
+    }
+
+    const result = sourceResult;
     if (!result) continue;
     const { data, error } = result;
 
@@ -63,6 +81,7 @@ async function loadDealSourceMetadata(dealIds: string[]) {
         importSourceName: importSource?.name,
         importSourceType: importSource?.source_type,
         imageUrl: extractImageUrl(rawImport?.normalized_payload),
+        enrichment: enrichments.get(link.deal_id) as DealSourceMetadata["enrichment"],
       });
     }
   }

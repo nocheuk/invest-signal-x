@@ -294,6 +294,7 @@ function NationalScanSummary({ isLoading, isError, data }: { isLoading: boolean;
           <p><span className="text-muted-foreground">Last national scan:</span> {formatNationalScanTime(data.finishedAt)}</p>
           <p><span className="text-muted-foreground">Next scheduled scan:</span> daily at 6am UK time</p>
           <p><span className="text-muted-foreground">Sources:</span> Rightmove Commercial + Acuitus + Eddisons + Allsop</p>
+          <p><span className="text-muted-foreground">Deals improved by enrichment:</span> {(data.enrichmentImpact?.dealsImproved ?? 0).toLocaleString()}</p>
           {data.locationsScanned.length > 0 && <p className="text-xs text-muted-foreground">Last run locations: {data.locationsScanned.join(", ")}</p>}
         </div>
       ) : (

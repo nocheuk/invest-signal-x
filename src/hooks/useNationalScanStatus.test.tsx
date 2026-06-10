@@ -28,6 +28,12 @@ const rows = vi.hoisted(() => ({
     { deal_id: "imp-allsop-1", source_url: "https://www.allsop.co.uk/investment-overview/property/ci00436", import_sources: { name: "Allsop" }, raw_imports: null },
   ],
   dealCount: 42,
+  enrichments: [
+    { id: "enrich-1", deal_id: "imp-allsop-1", source_url: "https://www.allsop.co.uk/investment-overview/property/ci00436", status: "enriched", next_attempt_at: null, tenant_name: "Tenant Ltd", passing_rent: 85000, lease_length: 6, wault: 5, epc_rating: "B", sqft: 4000, guide_price: 1000000, auction_info: {}, vat_info: "VAT applicable", investment_summary: "Investment summary" },
+    { id: "enrich-2", deal_id: "imp-rightmove-1", source_url: "https://www.rightmove.co.uk/commercial-property-for-sale/property-1.html", status: "failed", next_attempt_at: "2026-01-01T00:00:00Z", tenant_name: null, passing_rent: null, lease_length: null, wault: null, epc_rating: null, sqft: null, guide_price: null, auction_info: {}, vat_info: null, investment_summary: null },
+    { id: "enrich-3", deal_id: "imp-acuitus-1", source_url: "https://www.acuitus.co.uk/property", status: "pending", next_attempt_at: "2026-01-01T00:00:00Z", tenant_name: null, passing_rent: null, lease_length: null, wault: null, epc_rating: null, sqft: null, guide_price: null, auction_info: {}, vat_info: null, investment_summary: null },
+  ],
+  deals: [] as Array<Record<string, unknown>>,
   sourceLinksError: null as string | null,
   dealCountError: null as string | null,
 }));
@@ -56,6 +62,16 @@ function resetRows() {
         error_message: null,
   }];
   rows.dealCount = 42;
+  rows.enrichments = [
+    { id: "enrich-1", deal_id: "imp-allsop-1", source_url: "https://www.allsop.co.uk/investment-overview/property/ci00436", status: "enriched", next_attempt_at: null, tenant_name: "Tenant Ltd", passing_rent: 85000, lease_length: 6, wault: 5, epc_rating: "B", sqft: 4000, guide_price: 1000000, auction_info: {}, vat_info: "VAT applicable", investment_summary: "Investment summary" },
+    { id: "enrich-2", deal_id: "imp-rightmove-1", source_url: "https://www.rightmove.co.uk/commercial-property-for-sale/property-1.html", status: "failed", next_attempt_at: "2026-01-01T00:00:00Z", tenant_name: null, passing_rent: null, lease_length: null, wault: null, epc_rating: null, sqft: null, guide_price: null, auction_info: {}, vat_info: null, investment_summary: null },
+    { id: "enrich-3", deal_id: "imp-acuitus-1", source_url: "https://www.acuitus.co.uk/property", status: "pending", next_attempt_at: "2026-01-01T00:00:00Z", tenant_name: null, passing_rent: null, lease_length: null, wault: null, epc_rating: null, sqft: null, guide_price: null, auction_info: {}, vat_info: null, investment_summary: null },
+  ];
+  rows.deals = [
+    dealRow({ id: "imp-allsop-1", importSourceName: "Allsop", score: 74, dataConfidenceScore: 78, passingRent: 85000, tenant: "Tenant Ltd", wault: 5, leaseLength: 6, sqft: 4000, netInitialYield: 8.5 }),
+    dealRow({ id: "imp-rightmove-1", importSourceName: "Rightmove Commercial" }),
+    dealRow({ id: "imp-acuitus-1", importSourceName: "Acuitus" }),
+  ];
   rows.sourceLinksError = null;
   rows.dealCountError = null;
   rows.sourceLinks = [
@@ -65,6 +81,71 @@ function resetRows() {
     { deal_id: "imp-eddisons-1", source_url: "https://www.eddisons.com/property-search/commercial-property", import_sources: null, raw_imports: null },
     { deal_id: "imp-allsop-1", source_url: "https://www.allsop.co.uk/investment-overview/property/ci00436", import_sources: { name: "Allsop" }, raw_imports: null },
   ];
+}
+
+function dealRow({
+  id,
+  importSourceName,
+  score = 45,
+  dataConfidenceScore = 40,
+  passingRent = 0,
+  tenant = "Unknown",
+  wault = 0,
+  leaseLength = 0,
+  sqft = 0,
+  netInitialYield = 0,
+}: {
+  id: string;
+  importSourceName: string;
+  score?: number;
+  dataConfidenceScore?: number;
+  passingRent?: number;
+  tenant?: string;
+  wault?: number;
+  leaseLength?: number;
+  sqft?: number;
+  netInitialYield?: number;
+}) {
+  return {
+    id,
+    title: `${importSourceName} deal`,
+    location: "Bournemouth BH1",
+    region: "Dorset",
+    asset_type: "Retail",
+    source: "Auction",
+    guide_price: 1000000,
+    passing_rent: passingRent,
+    sqft,
+    gross_yield: passingRent > 0 ? 8.5 : 0,
+    net_initial_yield: netInitialYield,
+    reversionary_yield: netInitialYield,
+    wault,
+    lease_length: leaseLength,
+    tenant,
+    covenant_strength: "Moderate",
+    tenant_health_score: 60,
+    rent_sustainability: "Market rent",
+    rent_review: "None",
+    price_per_sqft: sqft > 0 ? 250 : 0,
+    planning_upside_score: 40,
+    void_risk_score: 40,
+    exit_yield_sensitivity: "Moderate",
+    cashflow_after_debt: 0,
+    return_on_equity: 0,
+    auction_guide_risk: null,
+    red_flags: [],
+    main_risk_flag: "Imported",
+    score,
+    rating: score >= 78 ? "green" : score >= 60 ? "amber" : "red",
+    score_breakdown: { incomeQuality: 70, tenantSecurity: 60, marketPricing: 70, upside: 40, riskExit: 60 },
+    insights: { mispricing: "", couldGoWrong: "", askAgent: "", negotiation: "" },
+    thumbnail: "",
+    posted_at: "2026-06-10T08:00:00Z",
+    created_at: "2026-06-10T08:00:00Z",
+    updated_at: "2026-06-10T08:00:00Z",
+    import_source_name: importSourceName,
+    data_confidence_score: dataConfidenceScore,
+  };
 }
 
 const calls = vi.hoisted(() => ({
@@ -80,7 +161,12 @@ vi.mock("@/lib/supabase/client", () => ({
       calls.tables.push(table);
       if (table === "deals") {
         return {
-          select: async () => ({ count: rows.dealCount, error: rows.dealCountError ? { message: rows.dealCountError } : null }),
+          select: (_columns?: string, options?: { head?: boolean }) => {
+            if (options?.head) return Promise.resolve({ count: rows.dealCount, error: rows.dealCountError ? { message: rows.dealCountError } : null });
+            return {
+              in: async (_column: string, values: string[]) => ({ data: rows.deals.filter((deal) => values.includes(String(deal.id))), error: null }),
+            };
+          },
         };
       }
       if (table === "deal_source_links") {
@@ -90,6 +176,19 @@ vi.mock("@/lib/supabase/client", () => ({
               data: rows.sourceLinksError ? null : rows.sourceLinks.slice(from, to + 1),
               error: rows.sourceLinksError ? { message: rows.sourceLinksError } : null,
             }),
+            in: async (_column: string, values: string[]) => ({
+              data: rows.sourceLinks.filter((link) => values.includes(link.deal_id)),
+              error: null,
+            }),
+          }),
+        };
+      }
+      if (table === "deal_enrichments") {
+        const result = { data: rows.enrichments, error: null };
+        return {
+          select: () => ({
+            range: async (from: number, to: number) => ({ data: rows.enrichments.slice(from, to + 1), error: null }),
+            then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
           }),
         };
       }
@@ -141,7 +240,16 @@ describe("useNationalScanStatus", () => {
       status: "completed",
     });
     expect(calls.orderColumns).toEqual(["finished_at", "started_at"]);
-    expect(calls.tables).toEqual(["national_scan_runs", "deal_source_links", "deals", "national_scan_runs"]);
+    expect(calls.tables).toEqual([
+      "national_scan_runs",
+      "deal_source_links",
+      "deals",
+      "national_scan_runs",
+      "deal_enrichments",
+      "deal_enrichments",
+      "deals",
+      "deal_source_links",
+    ]);
     expect(result.current.data).toMatchObject({
       id: "scan-1",
       sourceName: "Rightmove Commercial",
@@ -160,6 +268,23 @@ describe("useNationalScanStatus", () => {
       locationsCompletedInCurrentCycle: 4,
       lastSuccessfulScanDurationMs: 240000,
       lastScanInsertedCount: 7,
+      enrichmentMetrics: {
+        total: 3,
+        enriched: 1,
+        failed: 1,
+        pending: 1,
+        queueSize: 4,
+        successRate: 33.3,
+      },
+      enrichmentImpact: {
+        totalEnriched: 1,
+        tenantFound: 1,
+        rentFound: 1,
+        leaseFound: 1,
+        waultFound: 1,
+        epcFound: 1,
+        areaFound: 1,
+      },
       sourceScanRuns: [
         expect.objectContaining({
           sourceName: "Rightmove Commercial",
@@ -199,7 +324,7 @@ describe("useNationalScanStatus", () => {
       totalEddisonsDeals: 1,
       totalAllsopDeals: 1,
     });
-    expect(calls.tables.filter((table) => table === "deal_source_links")).toHaveLength(2);
+    expect(calls.tables.filter((table) => table === "deal_source_links")).toHaveLength(3);
   });
 
   it("returns the scan row with safe count fallbacks when dashboard count queries fail", async () => {
