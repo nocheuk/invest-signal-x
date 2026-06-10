@@ -47,6 +47,34 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
   return result;
 }
 
+export function buildFilterDebugSteps(deals: Deal[], filters: DashboardFilters) {
+  const query = normalize(filters.search);
+  const locationQuery = normalize(filters.locationQuery);
+  const steps: Array<{ label: string; count: number }> = [{ label: "before filters", count: deals.length }];
+  let result = deals;
+
+  result = result.filter((deal) => filters.region === "All UK" || deal.region === filters.region);
+  steps.push({ label: "after region", count: result.length });
+  result = result.filter((deal) => filters.asset === "All" || deal.assetType === filters.asset);
+  steps.push({ label: "after asset", count: result.length });
+  result = result.filter((deal) => sourceMatches(deal, filters.source));
+  steps.push({ label: "after source", count: result.length });
+  result = result.filter((deal) => ratingMatches(deal, filters.rating));
+  steps.push({ label: "after classification", count: result.length });
+  result = result.filter((deal) => filters.confidence === "all" || deal.confidenceLevel === filters.confidence);
+  steps.push({ label: "after confidence", count: result.length });
+  result = result.filter((deal) => deal.netInitialYield >= filters.minYield);
+  steps.push({ label: "after min yield", count: result.length });
+  result = result.filter((deal) => !filters.maxPrice || deal.guidePrice <= filters.maxPrice);
+  steps.push({ label: "after max price", count: result.length });
+  result = result.filter((deal) => !query || searchableText(deal).includes(query));
+  steps.push({ label: "after search", count: result.length });
+  result = result.filter((deal) => !locationQuery || locationSearchableText(deal).includes(locationQuery));
+  steps.push({ label: "after location", count: result.length });
+
+  return steps;
+}
+
 function ratingMatches(deal: Deal, rating: DashboardFilters["rating"]) {
   if (rating === "all") return true;
   if (rating === "green-candidate" || rating === "verified-green" || rating === "requires-due-diligence" || rating === "low-priority") return classifyDeal(deal) === rating;

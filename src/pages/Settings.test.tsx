@@ -47,6 +47,6 @@ describe("Settings acquisition brief", () => {
 
     expect(screen.getByText("Your acquisition brief")).toBeInTheDocument();
     expect(screen.getByText(/Target locations: Bournemouth/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /edit acquisition brief/i })).toHaveAttribute("href", "/onboarding?edit=1");
+    expect(screen.getByRole("link", { name: /edit acquisition brief/i })).toHaveAttribute("href", "/onboarding?edit=1&returnTo=%2Fsettings");
   });
 });

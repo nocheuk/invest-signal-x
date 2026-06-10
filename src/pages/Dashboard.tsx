@@ -110,6 +110,10 @@ function DashboardContent() {
   const canRunLiveLocationSearch = Boolean(auth.user && auth.session?.access_token);
   const canShowDebug = import.meta.env.DEV || isAdminUser(auth.user);
   const locationImportErrorDetail = locationImport.error instanceof LocationImportError ? locationImport.error.detail : undefined;
+  const dashboardSearchParams = useMemo(() => ({
+    q: search,
+    location: locationQuery.trim(),
+  }), [locationQuery, search]);
 
   const runLiveLocationSearch = async () => {
     if (!locationQuery.trim()) return;
@@ -181,10 +185,10 @@ function DashboardContent() {
         </section>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <Kpi label="Top Opportunities" value={kpis.verifiedGreens.toLocaleString()} sub="Strict score and confidence" icon={Sparkles} accent="text-signal-green" to="/deals?classification=verified-green" />
-          <Kpi label="Strong Opportunities" value={kpis.greenCandidates.toLocaleString()} sub={`${kpis.verifiedGreens} top opportunities`} icon={Target} accent="text-primary" to="/deals?classification=green-candidate" />
-          <Kpi label="New Today" value={freshness.newToday.toLocaleString()} sub={`${freshness.newSourcesToday} source listings`} icon={CalendarDays} accent="text-signal-green" to="/deals?freshness=today" />
-          <Kpi label="New This Week" value={freshness.newThisWeek.toLocaleString()} sub={`${freshness.newGreenCandidates} new strong opportunities`} icon={Clock3} accent="text-signal-amber" to="/deals?freshness=week" />
+          <Kpi label="Top Opportunities" value={kpis.verifiedGreens.toLocaleString()} sub="Strict score and confidence" icon={Sparkles} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "verified-green" })} />
+          <Kpi label="Strong Opportunities" value={kpis.greenCandidates.toLocaleString()} sub={`${kpis.verifiedGreens} top opportunities`} icon={Target} accent="text-primary" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "green-candidate" })} />
+          <Kpi label="New Today" value={freshness.newToday.toLocaleString()} sub={`${freshness.newSourcesToday} source listings`} icon={CalendarDays} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, freshness: "today" })} />
+          <Kpi label="New This Week" value={freshness.newThisWeek.toLocaleString()} sub={`${freshness.newGreenCandidates} new strong opportunities`} icon={Clock3} accent="text-signal-amber" to={dashboardDealsRoute({ ...dashboardSearchParams, freshness: "week" })} />
           <Kpi label="Filtered Deals" value={visibleDeals.length.toLocaleString()} sub={`${kpis.importedDeals.toLocaleString()} imported in database`} icon={TrendingUp} accent="text-foreground" to="/deals" />
         </section>
 
@@ -252,7 +256,7 @@ function DashboardContent() {
               <h2 className="font-display text-2xl">High-potential imported opportunities</h2>
             </div>
             <Button asChild variant="outline" size="sm" className="gap-2">
-              <Link to="/deals?classification=green-candidate">View all <ArrowRight className="h-3.5 w-3.5" /></Link>
+              <Link to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "green-candidate" })}>View all <ArrowRight className="h-3.5 w-3.5" /></Link>
             </Button>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -313,7 +317,7 @@ function HeroMetric({ label, value }: { label: string; value: number }) {
 
 function Kpi({ label, value, sub, icon: Icon, accent, to }: { label: string; value: string; sub: string; icon: ComponentType<{ className?: string }>; accent: string; to: string }) {
   return (
-    <Link to={to} className="ds-glass p-4 space-y-3 text-left transition-all duration-300 hover:border-primary/40 hover:-translate-y-0.5">
+    <Link to={to} onClick={() => logDealFilterDebug("dashboard-kpi-click", { label, to, searchParams: to.split("?")[1] ?? "" })} className="ds-glass p-4 space-y-3 text-left transition-all duration-300 hover:border-primary/40 hover:-translate-y-0.5">
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</span>
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -322,6 +326,25 @@ function Kpi({ label, value, sub, icon: Icon, accent, to }: { label: string; val
       <div className="text-[11px] text-muted-foreground">{sub}</div>
     </Link>
   );
+}
+
+function dashboardDealsRoute(params: { classification?: string; freshness?: string; q?: string; location?: string }) {
+  const searchParams = new URLSearchParams();
+  if (params.classification) searchParams.set("classification", params.classification);
+  if (params.freshness) searchParams.set("freshness", params.freshness);
+  if (params.q?.trim()) searchParams.set("q", params.q.trim());
+  if (params.location?.trim()) searchParams.set("location", params.location.trim());
+  const query = searchParams.toString();
+  return query ? `/deals?${query}` : "/deals";
+}
+
+function logDealFilterDebug(event: string, payload: Record<string, unknown>) {
+  if (!shouldLogDealFilterDebug()) return;
+  console.debug(`[DealSignal filters] ${event}`, payload);
+}
+
+function shouldLogDealFilterDebug() {
+  return (import.meta.env.DEV && import.meta.env.MODE !== "test") || localStorage.getItem("dealsignal:debug-filters") === "1";
 }
 
 function uniqueDeal(deal: { id: string }, index: number, array: { id: string }[]) {

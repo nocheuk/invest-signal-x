@@ -278,6 +278,7 @@ describe("Dashboard focused overview", () => {
     ];
 
     const { unmount } = renderDashboardWithDealsRoute();
+    fireEvent.change(screen.getByLabelText("Location filter"), { target: { value: "Bournemouth" } });
     fireEvent.click(linkByHref("/deals?classification=verified-green"));
     await waitFor(() => expect(screen.getByText("Deal workbench")).toBeInTheDocument());
     expect(within(screen.getAllByTestId("deal-row")[0]).getByText("Top Opportunity Deal")).toBeInTheDocument();
@@ -286,6 +287,7 @@ describe("Dashboard focused overview", () => {
     unmount();
 
     renderDashboardWithDealsRoute();
+    fireEvent.change(screen.getByLabelText("Location filter"), { target: { value: "Bournemouth" } });
     fireEvent.click(linkByHref("/deals?classification=green-candidate"));
     await waitFor(() => expect(screen.getByText("Deal workbench")).toBeInTheDocument());
     expect(within(screen.getAllByTestId("deal-row")[0]).getByText("Strong Opportunity Deal")).toBeInTheDocument();
@@ -323,7 +325,7 @@ describe("Dashboard focused overview", () => {
 });
 
 function linkByHref(href: string) {
-  const link = screen.getAllByRole("link").find((item) => item.getAttribute("href") === href);
+  const link = screen.getAllByRole("link").find((item) => item.getAttribute("href") === href || item.getAttribute("href") === `${href}&location=Bournemouth`);
   if (!link) throw new Error(`Missing link ${href}`);
   return link;
 }
