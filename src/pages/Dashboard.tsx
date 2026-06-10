@@ -1,29 +1,31 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import type { ComponentType } from "react";
-import { ArrowRight, CalendarDays, Clock3, RadioTower, Search, Sparkles, Target, TrendingUp } from "lucide-react";
+import type { ComponentType, ReactNode } from "react";
+import { AlertTriangle, ArrowRight, Check, Clock3, RadioTower, Search, Sparkles, Target, TrendingUp } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
-import { DealCard } from "@/components/DealCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ClassificationBadge } from "@/components/RatingBadge";
+import { ClassificationBadge, ScorePill } from "@/components/RatingBadge";
+import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { buildDashboardKpis } from "@/lib/dashboardKpis";
-import { ALL_REAL_DEALS_FILTER, filterAndSortDeals } from "@/lib/dashboardFilters";
-import { classifyDeal } from "@/lib/dealClassification";
-import { buildFreshnessMetrics } from "@/lib/freshness";
-import { EMPTY_AREA_INTELLIGENCE_INDEX, buildAreaIntelligenceIndex, getAreaIntelligenceFromIndex } from "@/lib/areaIntelligence";
-import { top10ThisWeek, top25Opportunities } from "@/lib/investorShortlist";
+import { ALL_REAL_DEALS_FILTER, filterAndSortDeals, sourceLabel } from "@/lib/dashboardFilters";
+import { classifyDeal, classificationLabel } from "@/lib/dealClassification";
+import { buildFreshnessMetrics, formatAddedAgo, isNewThisWeek } from "@/lib/freshness";
+import { EMPTY_AREA_INTELLIGENCE_INDEX, buildAreaIntelligenceIndex } from "@/lib/areaIntelligence";
+import { top10ThisWeek, top25Opportunities, type RankedOpportunity } from "@/lib/investorShortlist";
 import { useAuth } from "@/lib/auth";
-import { useStrategy } from "@/lib/strategy";
+import { matchReasons, personalisedScore, useStrategy } from "@/lib/strategy";
 import { useWatchlist } from "@/lib/watchlist";
 import { useProfile } from "@/hooks/useProfile";
 import { useRealDeals } from "@/hooks/useRealDeals";
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
 import { isAdminUser } from "@/lib/admin";
-import { dashboardDefaultsFromPreferences, getInvestorPreferences } from "@/lib/onboarding";
+import { dashboardDefaultsFromPreferences, getInvestorPreferences, type InvestorPreferences } from "@/lib/onboarding";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { getDealAnalysis } from "@/lib/dealAnalysis";
+import { formatGBP, formatPct, type Deal } from "@/lib/deals";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -50,7 +52,8 @@ function DashboardContent() {
   const search = searchParams.get("q") ?? "";
   const now = useMemo(() => new Date(), []);
   const firstName = (profile.data?.full_name || auth.user?.user_metadata?.full_name || auth.user?.email || "there").split(/\s|@/)[0];
-  const onboardingDefaults = useMemo(() => dashboardDefaultsFromPreferences(getInvestorPreferences(profile.data)), [profile.data]);
+  const investorPreferences = useMemo(() => getInvestorPreferences(profile.data), [profile.data]);
+  const onboardingDefaults = useMemo(() => dashboardDefaultsFromPreferences(investorPreferences), [investorPreferences]);
 
   useEffect(() => {
     if (!locationEdited && onboardingDefaults.locationQuery) setLocationQuery(onboardingDefaults.locationQuery);
@@ -98,14 +101,17 @@ function DashboardContent() {
   const shortlist = useMemo(() => {
     try {
       const week = top10ThisWeek(visibleDeals, deals, now, "balanced", areaIndex);
-      return (week.length ? week : top25Opportunities(visibleDeals, deals, "balanced", areaIndex).slice(0, 10)).slice(0, 3);
+      return (week.length ? week : top25Opportunities(visibleDeals, deals, "balanced", areaIndex).slice(0, 10)).slice(0, 5);
     } catch (error) {
       console.error("Could not build dashboard shortlist", error);
       return [];
     }
   }, [areaIndex, deals, now, visibleDeals]);
   const greenCandidates = useMemo(() => visibleDeals.filter((deal) => classifyDeal(deal) === "green-candidate"), [visibleDeals]);
-  const heroDeals = shortlist.map((item) => item.deal).concat(greenCandidates).filter(uniqueDeal).slice(0, 3);
+  const analystDeals = useMemo(() => visibleDeals.filter((deal) => classifyDeal(deal) !== "low-priority"), [visibleDeals]);
+  const bestOpportunities = useMemo(() => mergeRankedDeals(shortlist, greenCandidates, analystDeals, areaIndex, deals).slice(0, 5), [analystDeals, areaIndex, deals, greenCandidates, shortlist]);
+  const acquisitionBriefMatches = useMemo(() => rankAgainstAcquisitionBrief(analystDeals, investorPreferences, weights).slice(0, 5), [analystDeals, investorPreferences, weights]);
+  const newThisWeekDeals = useMemo(() => analystDeals.filter((deal) => isNewThisWeek(deal, now)).sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime()).slice(0, 5), [analystDeals, now]);
   const showLocationSearchCta = isSupabaseConfigured && locationQuery.trim().length > 0 && visibleDeals.length < 3;
   const canRunLiveLocationSearch = Boolean(auth.user && auth.session?.access_token);
   const canShowDebug = import.meta.env.DEV || isAdminUser(auth.user);
@@ -128,68 +134,68 @@ function DashboardContent() {
   return (
     <AppLayout>
       <div className="container max-w-7xl py-8 space-y-8">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-xs uppercase tracking-widest text-primary font-medium">DealSignal dashboard</div>
-            <h1 className="font-display text-4xl md:text-5xl mt-1">Morning, {firstName}.</h1>
-            <p className="text-muted-foreground mt-2 max-w-2xl">
-              Your highest-signal commercial property opportunities, newest additions, and scan health in one place.
-            </p>
-          </div>
-          <Button asChild variant="outline" className="gap-2">
-            <Link to="/deals">Open all deals <ArrowRight className="h-4 w-4" /></Link>
-          </Button>
-        </header>
-
         {onboardingWarning && (
           <div className="rounded-lg border border-signal-amber/40 bg-signal-amber/10 px-4 py-3 text-sm text-muted-foreground">
             {onboardingWarning}
           </div>
         )}
 
-        <section className="ds-card-elevated overflow-hidden">
-          <div className="grid gap-6 p-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="ds-card-elevated overflow-hidden p-5 md:p-6">
+          <div className="grid gap-6 lg:grid-cols-[1fr_0.95fr] lg:items-end">
             <div>
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-xs uppercase tracking-widest text-primary font-medium">Top Opportunities This Week</span>
-              </div>
-              <h2 className="font-display text-3xl mt-3">Start with the deals worth opening first.</h2>
-              <p className="text-sm text-muted-foreground mt-2">
-                Ranked from live imported data using score, confidence, yield, freshness, and area intelligence.
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Morning, {firstName}</div>
+              <h1 className="mt-2 font-display text-4xl md:text-5xl">DealSignal Analyst Brief</h1>
+              <p className="mt-3 max-w-3xl text-base text-muted-foreground">
+                Today DealSignal analysed {kpis.totalDatabaseDeals.toLocaleString()} opportunities across England.
               </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <HeroMetric label="Strong Opportunities" value={kpis.greenCandidates} />
-                <HeroMetric label="New Today" value={freshness.newToday} />
-                <HeroMetric label="New This Week" value={freshness.newThisWeek} />
-              </div>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                Based on your acquisition brief, these are the {bestOpportunities.length} opportunities most worth your attention.
+              </p>
             </div>
-            <div className="grid gap-3">
-              {heroDeals.length > 0 ? heroDeals.map((deal) => (
-                <Link key={deal.id} to={`/deal/${deal.id}`} className="rounded-lg border border-border/60 bg-surface-2/70 p-3 transition-colors hover:border-primary/40">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold">{deal.title}</div>
-                      <div className="mt-1 truncate text-xs text-muted-foreground">{deal.location}</div>
-                    </div>
-                    <ClassificationBadge classification={classifyDeal(deal)} />
-                  </div>
-                </Link>
-              )) : (
-                <div className="rounded-lg border border-dashed border-border/70 p-6 text-sm text-muted-foreground">
-                  {dealsQuery.isLoading ? "Loading top opportunities..." : "No top opportunities yet. Imports will populate this section."}
-                </div>
-              )}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
+              <BriefStat label="Total analysed" value={kpis.totalDatabaseDeals.toLocaleString()} />
+              <BriefStat label="Top Opportunities" value={kpis.verifiedGreens.toLocaleString()} tone="green" />
+              <BriefStat label="Strong Opportunities" value={kpis.greenCandidates.toLocaleString()} tone="primary" />
+              <BriefStat label="New this week" value={freshness.newThisWeek.toLocaleString()} />
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <Kpi label="Top Opportunities" value={kpis.verifiedGreens.toLocaleString()} sub="Strict score and confidence" icon={Sparkles} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "verified-green" })} />
-          <Kpi label="Strong Opportunities" value={kpis.greenCandidates.toLocaleString()} sub={`${kpis.verifiedGreens} top opportunities`} icon={Target} accent="text-primary" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "green-candidate" })} />
-          <Kpi label="New Today" value={freshness.newToday.toLocaleString()} sub={`${freshness.newSourcesToday} source listings`} icon={CalendarDays} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, freshness: "today" })} />
-          <Kpi label="New This Week" value={freshness.newThisWeek.toLocaleString()} sub={`${freshness.newGreenCandidates} new strong opportunities`} icon={Clock3} accent="text-signal-amber" to={dashboardDealsRoute({ ...dashboardSearchParams, freshness: "week" })} />
-          <Kpi label="Filtered Deals" value={visibleDeals.length.toLocaleString()} sub={`${kpis.importedDeals.toLocaleString()} imported in database`} icon={TrendingUp} accent="text-foreground" to="/deals" />
+        <section className="space-y-4">
+          <SectionHeader
+            eyebrow="Today's Best Opportunities"
+            title={`Today, DealSignal found ${bestOpportunities.length} ${bestOpportunities.length === 1 ? "opportunity" : "opportunities"} worth your attention.`}
+            description="Ranked from live imported data using score, confidence, yield, source freshness, area value, and your current strategy."
+            action={<Button asChild variant="outline" size="sm" className="gap-2"><Link to="/deals?sort=score">Browse ranked list <ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
+          />
+          {kpis.verifiedGreens === 0 && (
+            <div className="rounded-lg border border-signal-amber/30 bg-signal-amber/10 px-4 py-3 text-sm text-muted-foreground">
+              No Top Opportunities currently match your acquisition brief. Showing the strongest available opportunities instead.
+            </div>
+          )}
+          <div className="grid gap-4 xl:grid-cols-2">
+            {bestOpportunities.length > 0 ? bestOpportunities.map((item) => (
+              <AnalystOpportunityCard key={item.deal.id} item={item} investorPreferences={investorPreferences} weights={weights} />
+            )) : (
+              <EmptyPanel loading={dealsQuery.isLoading} message="No analyst-ranked opportunities yet. Imports will populate this section as scans complete." />
+            )}
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <SectionHeader
+            eyebrow="Matches Your Acquisition Brief"
+            title="Acquisition Brief Match"
+            description={`These opportunities most closely match your locations, budget, asset types, yield targets, and investment strategy. ${briefDescription(investorPreferences)}`}
+            action={<Button asChild variant="outline" size="sm" className="gap-2"><Link to="/onboarding?edit=1&returnTo=%2Fdashboard">Edit brief <ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
+          />
+          <div className="grid gap-3">
+            {acquisitionBriefMatches.length > 0 ? acquisitionBriefMatches.map((match) => (
+              <BriefMatchRow key={match.deal.id} match={match} />
+            )) : (
+              <EmptyPanel loading={dealsQuery.isLoading} message="No deals match your acquisition brief in the current dashboard view." />
+            )}
+          </div>
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
@@ -249,25 +255,40 @@ function DashboardContent() {
           <NationalScanSummary isLoading={nationalScanStatus.isLoading} isError={nationalScanStatus.isError} data={nationalScanStatus.data} />
         </section>
 
-        <section>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Strong Opportunities</div>
-              <h2 className="font-display text-2xl">High-potential imported opportunities</h2>
-            </div>
-            <Button asChild variant="outline" size="sm" className="gap-2">
-              <Link to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "green-candidate" })}>View all <ArrowRight className="h-3.5 w-3.5" /></Link>
-            </Button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {greenCandidates.slice(0, 3).map((deal) => (
-              <DealCard key={deal.id} deal={deal} areaIntelligence={getAreaIntelligenceFromIndex(deal, areaIndex)} />
-            ))}
-            {greenCandidates.length === 0 && (
-              <div className="ds-card p-8 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
-                No Strong Opportunities in the current dashboard view yet.
-              </div>
+        <section className="space-y-4">
+          <SectionHeader
+            eyebrow="New This Week"
+            title="Fresh opportunities from the latest imports."
+            description={`${freshness.newThisWeek.toLocaleString()} deals were imported in the last 7 days, including ${freshness.newGreenCandidates.toLocaleString()} Strong Opportunities.`}
+            action={<Button asChild variant="outline" size="sm" className="gap-2"><Link to={dashboardDealsRoute({ ...dashboardSearchParams, freshness: "week" })}>View this week <ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
+          />
+          <div className="grid gap-3">
+            {newThisWeekDeals.length > 0 ? newThisWeekDeals.map((deal) => (
+              <NewDealRow key={deal.id} deal={deal} />
+            )) : (
+              <EmptyPanel loading={dealsQuery.isLoading} message="No new deals in the current dashboard view this week." />
             )}
+          </div>
+        </section>
+
+        <section className="ds-card p-5">
+          <div className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Browse All Opportunities</div>
+              <h2 className="font-display text-2xl mt-1">Open the full deal workbench when you need database-style browsing.</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                The dashboard stays focused on acquisition decisions. Full filters, source browsing, Requires Due Diligence, and lower-priority inventory live in All Deals.
+              </p>
+              <Button asChild className="mt-4 gap-2">
+                <Link to={dashboardDealsRoute(dashboardSearchParams)}>Browse all opportunities <ArrowRight className="h-4 w-4" /></Link>
+              </Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Kpi label="Top Opportunities" value={kpis.verifiedGreens.toLocaleString()} sub="Strict score and confidence" icon={Sparkles} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "verified-green" })} />
+              <Kpi label="Strong Opportunities" value={kpis.greenCandidates.toLocaleString()} sub={`${kpis.verifiedGreens} top opportunities`} icon={Target} accent="text-primary" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "green-candidate" })} />
+              <Kpi label="New Today" value={freshness.newToday.toLocaleString()} sub={`${freshness.newSourcesToday} source listings`} icon={Clock3} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, freshness: "today" })} />
+              <Kpi label="Filtered Deals" value={visibleDeals.length.toLocaleString()} sub={`${kpis.importedDeals.toLocaleString()} imported`} icon={TrendingUp} accent="text-foreground" to={dashboardDealsRoute(dashboardSearchParams)} />
+            </div>
           </div>
         </section>
       </div>
@@ -307,11 +328,183 @@ function NationalScanSummary({ isLoading, isError, data }: { isLoading: boolean;
   );
 }
 
-function HeroMetric({ label, value }: { label: string; value: number }) {
+function BriefStat({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "green" | "primary" }) {
   return (
-    <div className="ds-glass min-w-24 px-3 py-2">
-      <div className="font-mono text-xl font-semibold tabular text-foreground">{value.toLocaleString()}</div>
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+    <div className="ds-glass px-3 py-3">
+      <div className={cn("font-mono text-2xl font-semibold tabular", tone === "green" && "text-signal-green", tone === "primary" && "text-primary")}>{value}</div>
+      <div className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function SectionHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <div className="text-xs uppercase tracking-widest text-primary font-medium">{eyebrow}</div>
+        <h2 className="font-display text-2xl md:text-3xl mt-1">{title}</h2>
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{description}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function AnalystOpportunityCard({ item, investorPreferences, weights }: { item: RankedOpportunity; investorPreferences: InvestorPreferences; weights: ReturnType<typeof useStrategy>["weights"] }) {
+  const deal = item.deal;
+  const analysis = getDealAnalysis(deal);
+  const classification = classifyDeal(deal);
+  const strategyScore = personalisedScore(deal, weights);
+  const briefSignals = acquisitionBriefSignals(deal, investorPreferences);
+  const why = uniqueStrings([
+    ...item.reasons,
+    ...analysis.opportunitySignals,
+    ...briefSignals.positive,
+  ]).slice(0, 4);
+  const risks = uniqueStrings([
+    ...analysis.riskSignals,
+    ...(deal.scoreReasons?.missingDataWarnings ?? []),
+    ...briefSignals.risks,
+  ]).slice(0, 3);
+  const visibleYield = deal.netInitialYield || deal.grossYield;
+  const strategyMatch = Math.max(0, Math.min(100, strategyScore));
+
+  return (
+    <Link to={`/deal/${deal.id}`} className="ds-card-elevated block p-5 transition-all hover:-translate-y-0.5 hover:border-primary/40">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <ClassificationBadge classification={classification} />
+            <span className="text-xs text-muted-foreground">{sourceLabel(deal)}</span>
+          </div>
+          <h3 className="mt-2 line-clamp-2 font-display text-xl">{deal.title}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{deal.location}</p>
+        </div>
+        <ScorePill score={deal.score} rating={deal.rating} />
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        <Metric label="Opportunity" value={classificationLabel(classification)} emphasis={classification === "verified-green" || classification === "green-candidate"} />
+        <Metric label="Guide price" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"} />
+        <Metric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "Not available"} emphasis={Boolean(visibleYield)} />
+        <Metric label="Location" value={deal.location} />
+        <Metric label="Source" value={sourceLabel(deal)} />
+        <Metric label="Confidence" value={`${deal.dataConfidenceScore ?? 0}%`} emphasis={(deal.dataConfidenceScore ?? 0) >= 75} />
+        <Metric label="Strategy match" value={`${strategyMatch}%`} emphasis={strategyMatch >= 72} />
+      </div>
+
+      <ScoreExplanation deal={deal} strategyScore={strategyMatch} />
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <SignalList title="Why DealSignal likes this" items={why} tone="positive" />
+        <SignalList title="Key Risks" items={risks} tone="risk" />
+      </div>
+    </Link>
+  );
+}
+
+function ScoreExplanation({ deal, strategyScore }: { deal: Deal; strategyScore: number }) {
+  const positive = [
+    { label: "Yield", value: Math.round((deal.scoreBreakdown.incomeQuality ?? 0) * 0.22) },
+    { label: "Area Value", value: Math.round((deal.scoreBreakdown.marketPricing ?? 0) * 0.18) },
+    { label: "Confidence", value: Math.round((deal.dataConfidenceScore ?? 0) * 0.12) },
+    { label: "Strategy Match", value: Math.round(strategyScore * 0.1) },
+  ].filter((item) => item.value > 0);
+  const negative = [
+    { label: "Missing Lease", value: !deal.leaseLength && !deal.wault ? -6 : 0 },
+    { label: "Missing Tenant", value: !deal.tenant || deal.tenant === "Unknown" ? -4 : 0 },
+    { label: "Low Confidence", value: (deal.dataConfidenceScore ?? 0) < 60 ? -8 : 0 },
+  ].filter((item) => item.value < 0);
+
+  return (
+    <div className="mt-4 rounded-lg border border-border/60 bg-surface-2/60 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Score Explanation</div>
+        <div className="font-mono text-sm font-semibold tabular">Score: {deal.score}</div>
+      </div>
+      <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">Contributors</div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        {positive.map((item) => <span key={item.label} className="text-signal-green">+{item.value} {item.label}</span>)}
+        {negative.map((item) => <span key={item.label} className="text-signal-amber">{item.value} {item.label}</span>)}
+      </div>
+    </div>
+  );
+}
+
+function SignalList({ title, items, tone }: { title: string; items: string[]; tone: "positive" | "risk" }) {
+  const Icon = tone === "positive" ? Check : AlertTriangle;
+  return (
+    <div>
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
+      <ul className="mt-2 space-y-1.5">
+        {(items.length ? items : [tone === "positive" ? "No strong positive signal recorded yet." : "No major risk signal recorded yet."]).map((item) => (
+          <li key={item} className="flex items-start gap-2 text-xs text-muted-foreground">
+            <Icon className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", tone === "positive" ? "text-signal-green" : "text-signal-amber")} />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function BriefMatchRow({ match }: { match: BriefMatch }) {
+  const deal = match.deal;
+  return (
+    <Link to={`/deal/${deal.id}`} className="rounded-lg border border-border/60 bg-surface/70 p-4 transition-colors hover:border-primary/40">
+      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <ClassificationBadge classification={classifyDeal(deal)} />
+            <span className="text-xs text-muted-foreground">{sourceLabel(deal)}</span>
+          </div>
+          <h3 className="mt-2 truncate font-semibold">{deal.title}</h3>
+          <p className="text-xs text-muted-foreground">{deal.location}</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+            {match.reasons.map((reason) => <span key={reason} className="rounded-full border border-primary/30 bg-primary/5 px-2 py-1 text-primary">{reason}</span>)}
+            {match.risks.map((reason) => <span key={reason} className="rounded-full border border-signal-amber/30 bg-signal-amber/10 px-2 py-1 text-signal-amber">{reason}</span>)}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 md:justify-end">
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Match</div>
+            <div className="font-mono text-xl font-semibold text-primary">{match.matchScore}%</div>
+          </div>
+          <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} compact />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function NewDealRow({ deal }: { deal: Deal }) {
+  const visibleYield = deal.netInitialYield || deal.grossYield;
+  return (
+    <Link to={`/deal/${deal.id}`} className="rounded-lg border border-border/60 bg-surface/70 p-4 transition-colors hover:border-primary/40">
+      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-primary">{formatAddedAgo(deal.postedAt)}</span>
+            <span className="text-xs text-muted-foreground">{sourceLabel(deal)}</span>
+            <ClassificationBadge classification={classifyDeal(deal)} />
+          </div>
+          <h3 className="mt-2 truncate font-semibold">{deal.title}</h3>
+          <p className="text-xs text-muted-foreground">{deal.location}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-right">
+          <Metric label="Score" value={String(deal.score)} emphasis={deal.score >= 72} />
+          <Metric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "N/A"} emphasis={Boolean(visibleYield)} />
+          <Metric label="Guide" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "N/A"} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function EmptyPanel({ loading, message }: { loading: boolean; message: string }) {
+  return (
+    <div className="ds-card p-8 text-sm text-muted-foreground">
+      {loading ? "Loading opportunities..." : message}
     </div>
   );
 }
@@ -326,6 +519,15 @@ function Kpi({ label, value, sub, icon: Icon, accent, to }: { label: string; val
       <div className={cn("font-mono text-3xl font-semibold leading-none tabular md:text-[2rem]", accent)}>{value}</div>
       <div className="text-[11px] text-muted-foreground">{sub}</div>
     </Link>
+  );
+}
+
+function Metric({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
+  return (
+    <div className="min-w-0 rounded-md border border-border/50 bg-background/50 px-2.5 py-2">
+      <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={cn("truncate font-mono text-sm font-semibold tabular", emphasis && "text-signal-green")}>{value}</div>
+    </div>
   );
 }
 
@@ -350,6 +552,94 @@ function shouldLogDealFilterDebug() {
 
 function uniqueDeal(deal: { id: string }, index: number, array: { id: string }[]) {
   return array.findIndex((item) => item.id === deal.id) === index;
+}
+
+function mergeRankedDeals(shortlist: RankedOpportunity[], candidates: Deal[], visibleDeals: Deal[], areaIndex: typeof EMPTY_AREA_INTELLIGENCE_INDEX, allDeals: Deal[]) {
+  const highLevelShortlist = shortlist.filter((item) => classifyDeal(item.deal) !== "low-priority");
+  const candidateItems = candidates.map((deal) => {
+    const existing = highLevelShortlist.find((item) => item.deal.id === deal.id);
+    if (existing) return existing;
+    return top25Opportunities([deal], allDeals, "balanced", areaIndex)[0];
+  }).filter(Boolean) as RankedOpportunity[];
+  const fallback = highLevelShortlist.length || candidateItems.length ? [] : top25Opportunities(visibleDeals, allDeals, "balanced", areaIndex).slice(0, 5);
+  return [...highLevelShortlist, ...candidateItems, ...fallback]
+    .filter((item) => classifyDeal(item.deal) !== "low-priority")
+    .filter((item, index, array) => uniqueDeal(item.deal, index, array.map((entry) => entry.deal)))
+    .sort((a, b) => b.shortlistScore - a.shortlistScore || b.deal.score - a.deal.score);
+}
+
+type BriefMatch = {
+  deal: Deal;
+  matchScore: number;
+  reasons: string[];
+  risks: string[];
+};
+
+function rankAgainstAcquisitionBrief(deals: Deal[], preferences: InvestorPreferences, weights: ReturnType<typeof useStrategy>["weights"]): BriefMatch[] {
+  return deals
+    .map((deal) => {
+      const signals = acquisitionBriefSignals(deal, preferences);
+      const score = Math.round(personalisedScore(deal, weights) * 0.45 + deal.score * 0.25 + signals.score * 0.3);
+      return {
+        deal,
+        matchScore: Math.max(0, Math.min(100, score)),
+        reasons: uniqueStrings([...signals.positive, ...matchReasons(deal, weights)]).slice(0, 4),
+        risks: uniqueStrings(signals.risks).slice(0, 3),
+      };
+    })
+    .filter((match) => match.matchScore >= 45)
+    .sort((a, b) => b.matchScore - a.matchScore || b.deal.score - a.deal.score);
+}
+
+function acquisitionBriefSignals(deal: Deal, preferences: InvestorPreferences) {
+  const positive: string[] = [];
+  const risks: string[] = [];
+  let score = 35;
+  const locationText = `${deal.location} ${deal.region} ${deal.title}`.toLowerCase();
+  const matchingLocation = preferences.targetLocations.find((location) => locationText.includes(location.toLowerCase()));
+  if (matchingLocation) {
+    positive.push(`Matches target location: ${matchingLocation}`);
+    score += 18;
+  } else if (preferences.targetLocations.length) {
+    risks.push("Outside your target locations");
+  }
+  if (deal.guidePrice > 0 && preferences.maxBudget > 0 && deal.guidePrice <= preferences.maxBudget && deal.guidePrice >= Math.max(0, preferences.minBudget)) {
+    positive.push("Within your budget range");
+    score += 14;
+  } else if (deal.guidePrice > preferences.maxBudget && preferences.maxBudget > 0) {
+    risks.push("Above your stated maximum budget");
+  }
+  if (preferences.preferredAssetTypes.some((asset) => deal.assetType.toLowerCase().includes(asset.toLowerCase()) || asset.toLowerCase().includes(deal.assetType.toLowerCase()))) {
+    positive.push(`Preferred asset type: ${deal.assetType}`);
+    score += 14;
+  }
+  const visibleYield = deal.netInitialYield || deal.grossYield;
+  if (!preferences.yieldNotImportant && visibleYield >= preferences.minYieldTarget && preferences.minYieldTarget > 0) {
+    positive.push(`Meets ${preferences.minYieldTarget}% yield target`);
+    score += 14;
+  }
+  if (classifyDeal(deal) === "green-candidate" || classifyDeal(deal) === "verified-green") {
+    positive.push(`${classificationLabel(classifyDeal(deal))} classification`);
+    score += 12;
+  }
+  if ((deal.dataConfidenceScore ?? 0) >= 75) {
+    positive.push("High confidence data");
+    score += 8;
+  }
+  if (!deal.tenant || deal.tenant === "Unknown") risks.push("Tenant information unavailable");
+  if (!deal.leaseLength && !deal.wault) risks.push("Lease information unavailable");
+  return { score: Math.max(0, Math.min(100, score)), positive, risks };
+}
+
+function briefDescription(preferences: InvestorPreferences) {
+  const locations = preferences.targetLocations.length ? preferences.targetLocations.join(", ") : "England-wide";
+  const assets = preferences.preferredAssetTypes.length ? preferences.preferredAssetTypes.slice(0, 3).join(", ") : "all asset types";
+  const yieldTarget = preferences.yieldNotImportant ? "yield not prioritised" : `${preferences.minYieldTarget}%+ yield`;
+  return `${preferences.strategy}; ${locations}; ${assets}; ${yieldTarget}; budget up to ${formatGBP(preferences.maxBudget)}.`;
+}
+
+function uniqueStrings(items: string[]) {
+  return [...new Set(items.filter(Boolean))];
 }
 
 function DashboardFallback() {

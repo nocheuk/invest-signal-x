@@ -233,7 +233,19 @@ describe("Dashboard focused overview", () => {
 
     renderDashboard();
 
-    expect(screen.getByText("Top Opportunities This Week")).toBeInTheDocument();
+    expect(screen.getByText("DealSignal Analyst Brief")).toBeInTheDocument();
+    expect(screen.getByText(/Today DealSignal analysed/)).toBeInTheDocument();
+    expect(screen.getByText("Total analysed")).toBeInTheDocument();
+    expect(screen.getByText("Today's Best Opportunities")).toBeInTheDocument();
+    expect(screen.getByText(/Today, DealSignal found/)).toBeInTheDocument();
+    expect(screen.getByText("Matches Your Acquisition Brief")).toBeInTheDocument();
+    expect(screen.getByText("Acquisition Brief Match")).toBeInTheDocument();
+    expect(screen.getByText("New This Week")).toBeInTheDocument();
+    expect(screen.getByText("Browse All Opportunities")).toBeInTheDocument();
+    expect(screen.getAllByText("Score Explanation").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Contributors").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Why DealSignal likes this").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Key Risks").length).toBeGreaterThanOrEqual(1);
     const links = screen.getAllByRole("link");
     expect(links.some((link) => link.getAttribute("href") === "/deals?classification=verified-green")).toBe(true);
     expect(links.some((link) => link.getAttribute("href") === "/deals?classification=green-candidate")).toBe(true);
@@ -242,6 +254,7 @@ describe("Dashboard focused overview", () => {
     expect(screen.getAllByText("New This Week").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Quick location search")).toBeInTheDocument();
     expect(screen.getByText("Last scan status")).toBeInTheDocument();
+    expect(screen.queryByText("Low Priority")).not.toBeInTheDocument();
     expect(screen.queryByText("All live opportunities")).not.toBeInTheDocument();
     expect(screen.queryByText("My Alerts")).not.toBeInTheDocument();
     expect(screen.queryByText("Inventory audit")).not.toBeInTheDocument();
