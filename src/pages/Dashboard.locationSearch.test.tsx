@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type React from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Deal } from "@/lib/deals";
+import AllDeals from "@/pages/AllDeals";
 import Dashboard from "@/pages/Dashboard";
 
 const dealsState = vi.hoisted(() => ({
@@ -50,6 +51,10 @@ vi.mock("@/components/DealCard", () => ({
   DealCard: ({ deal }: { deal: { title: string } }) => <div>{deal.title}</div>,
 }));
 
+vi.mock("@/components/DealRow", () => ({
+  DealRow: ({ deal }: { deal: { title: string } }) => <div data-testid="deal-row">{deal.title}</div>,
+}));
+
 vi.mock("@/hooks/useDeals", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/useDeals")>("@/hooks/useDeals");
   return {
@@ -58,9 +63,18 @@ vi.mock("@/hooks/useDeals", async () => {
   };
 });
 
+vi.mock("@/hooks/useRealDeals", () => ({
+  useRealDeals: () => ({
+    deals: dealsState.deals,
+    dealsQuery: { isError: false, isLoading: false },
+  }),
+}));
+
 vi.mock("@/lib/watchlist", () => ({
+  PIPELINE_STATUSES: ["Saved", "Reviewing", "Viewing Booked", "Offer Submitted", "Passed", "Purchased"],
   useWatchlist: () => ({
     ids: [],
+    pipelineItems: {},
     pipelineCounts: {
       Saved: 0,
       Reviewing: 0,
@@ -119,6 +133,19 @@ function renderDashboard() {
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <Dashboard />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+function renderDashboardWithDealsRoute() {
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/deals" element={<AllDeals />} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -243,6 +270,29 @@ describe("Dashboard focused overview", () => {
     expect(await screen.findByText(/Added 2 new deals/)).toBeInTheDocument();
   });
 
+  it("clicks opportunity KPIs into matching deal results", async () => {
+    dealsState.deals = [
+      dashboardDeal({ id: "top", title: "Top Opportunity Deal", score: 82, rating: "green", dataConfidenceScore: 86, confidenceLevel: "high" }),
+      dashboardDeal({ id: "strong", title: "Strong Opportunity Deal", score: 73, rating: "amber", dataConfidenceScore: 85, confidenceLevel: "high" }),
+      dashboardDeal({ id: "low", title: "Low Priority Deal", score: 30, rating: "red", dataConfidenceScore: 25, confidenceLevel: "low", guidePrice: 0 }),
+    ];
+
+    const { unmount } = renderDashboardWithDealsRoute();
+    fireEvent.click(linkByHref("/deals?classification=verified-green"));
+    await waitFor(() => expect(screen.getByText("Deal workbench")).toBeInTheDocument());
+    expect(within(screen.getAllByTestId("deal-row")[0]).getByText("Top Opportunity Deal")).toBeInTheDocument();
+    expect(screen.queryByText("Strong Opportunity Deal")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("deal-row")).toHaveLength(1);
+    unmount();
+
+    renderDashboardWithDealsRoute();
+    fireEvent.click(linkByHref("/deals?classification=green-candidate"));
+    await waitFor(() => expect(screen.getByText("Deal workbench")).toBeInTheDocument());
+    expect(within(screen.getAllByTestId("deal-row")[0]).getByText("Strong Opportunity Deal")).toBeInTheDocument();
+    expect(screen.queryByText("Top Opportunity Deal")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("deal-row")).toHaveLength(1);
+  });
+
   it("shows real national scan status and no-run state", () => {
     renderDashboard();
 
@@ -271,3 +321,9 @@ describe("Dashboard focused overview", () => {
     expect(screen.getAllByText("Live Deal Still Visible").length).toBeGreaterThanOrEqual(1);
   });
 });
+
+function linkByHref(href: string) {
+  const link = screen.getAllByRole("link").find((item) => item.getAttribute("href") === href);
+  if (!link) throw new Error(`Missing link ${href}`);
+  return link;
+}

@@ -6,6 +6,18 @@ import type { Deal } from "@/lib/deals";
 import AllDeals from "@/pages/AllDeals";
 
 const dealsState: { deals: Deal[] } = { deals: [] };
+const profileState = vi.hoisted(() => ({
+  data: {
+    preferences: {
+      onboarding_completed: true,
+      investor_onboarding: {
+        targetLocations: ["Manchester"],
+        preferredAssetTypes: ["Office"],
+        minYieldTarget: 12,
+      },
+    },
+  },
+}));
 
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -23,10 +35,6 @@ vi.mock("@/components/StrategyControl", () => ({
   StrategyControl: () => <button type="button">Strategy</button>,
 }));
 
-vi.mock("@/components/StrategyOptimiserModal", () => ({
-  StrategyOptimiserModal: () => null,
-}));
-
 vi.mock("@/hooks/useRealDeals", () => ({
   useRealDeals: () => ({
     deals: dealsState.deals,
@@ -35,7 +43,7 @@ vi.mock("@/hooks/useRealDeals", () => ({
 }));
 
 vi.mock("@/hooks/useProfile", () => ({
-  useProfile: () => ({ data: { preferences: { onboarding_completed: true } } }),
+  useProfile: () => ({ data: profileState.data }),
 }));
 
 vi.mock("@/lib/watchlist", async () => {
@@ -112,6 +120,16 @@ function renderAllDeals(path: string) {
 
 describe("AllDeals classification filters", () => {
   beforeEach(() => {
+    profileState.data = {
+      preferences: {
+        onboarding_completed: true,
+        investor_onboarding: {
+          targetLocations: ["Manchester"],
+          preferredAssetTypes: ["Office"],
+          minYieldTarget: 12,
+        },
+      },
+    };
     dealsState.deals = [
       deal({ id: "top", title: "Top Opportunity Deal", score: 82, rating: "green", dataConfidenceScore: 86 }),
       deal({ id: "strong", title: "Strong Opportunity Deal", score: 73, rating: "amber", dataConfidenceScore: 85 }),
@@ -133,5 +151,13 @@ describe("AllDeals classification filters", () => {
     expect(rows).toHaveLength(1);
     expect(within(rows[0]).getByText(expectedTitle)).toBeInTheDocument();
     expect(within(screen.getByTestId("metric-filtered-deals")).getByText("1")).toBeInTheDocument();
+  });
+
+  it("uses acquisition brief defaults only when the URL has no explicit filter", () => {
+    renderAllDeals("/deals");
+
+    expect(screen.queryByText("Top Opportunity Deal")).not.toBeInTheDocument();
+    expect(screen.queryByText("Strong Opportunity Deal")).not.toBeInTheDocument();
+    expect(screen.getByText("No deals found in this location.")).toBeInTheDocument();
   });
 });

@@ -6,7 +6,6 @@ import { AppLayout } from "@/components/AppLayout";
 import { DealCard } from "@/components/DealCard";
 import { DealRow } from "@/components/DealRow";
 import { StrategyControl } from "@/components/StrategyControl";
-import { StrategyOptimiserModal } from "@/components/StrategyOptimiserModal";
 import { Hint } from "@/components/Hint";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -30,7 +29,6 @@ export default function AllDeals() {
   const { ids, pipelineItems, pipelineCounts } = useWatchlist();
   const { weights } = useStrategy();
   const [searchParams] = useSearchParams();
-  const [strategyOpen, setStrategyOpen] = useState(false);
   const [region, setRegion] = useState("All UK");
   const [asset, setAsset] = useState("All");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
@@ -45,26 +43,28 @@ export default function AllDeals() {
   const [maxPrice, setMaxPrice] = useState(0);
   const now = useMemo(() => new Date(), []);
   const onboardingDefaults = useMemo(() => dashboardDefaultsFromPreferences(getInvestorPreferences(profile.data)), [profile.data]);
+  const hasExplicitFilters = useMemo(() => hasExplicitDealFilter(searchParams), [searchParams]);
 
   useEffect(() => {
-    if (!searchParams.get("location") && onboardingDefaults.locationQuery) setLocationQuery(onboardingDefaults.locationQuery);
-    if (
-      !searchParams.get("asset") &&
-      onboardingDefaults.assetType &&
-      onboardingDefaults.assetType !== "All" &&
-      ASSET_TYPES.includes(onboardingDefaults.assetType as typeof ASSET_TYPES[number])
-    ) {
-      setAsset(onboardingDefaults.assetType);
-    }
-    if (onboardingDefaults.minYield) setMinYield(onboardingDefaults.minYield);
-  }, [onboardingDefaults.assetType, onboardingDefaults.locationQuery, onboardingDefaults.minYield, searchParams]);
+    const assetParam = searchParams.get("asset");
+    const minYieldParam = parseNumericParam(searchParams.get("minYield"));
+    const maxPriceParam = parseNumericParam(searchParams.get("maxPrice"));
+    const defaultAsset = !hasExplicitFilters && isValidAsset(onboardingDefaults.assetType) ? onboardingDefaults.assetType : "All";
+    const defaultMinYield = !hasExplicitFilters ? onboardingDefaults.minYield || 0 : 0;
 
-  useEffect(() => {
     setRating(parseClassificationParam(searchParams.get("classification")));
     setFreshnessFilter(parseFreshnessParam(searchParams.get("freshness")));
-    setLocationQuery(searchParams.get("location") ?? onboardingDefaults.locationQuery ?? "");
+    setLocationQuery(searchParams.get("location") ?? (!hasExplicitFilters ? onboardingDefaults.locationQuery ?? "" : ""));
     setSearch(searchParams.get("q") ?? "");
-  }, [onboardingDefaults.locationQuery, searchParams]);
+    setRegion(searchParams.get("region") ?? "All UK");
+    setAsset(assetParam && isValidAsset(assetParam) ? assetParam : defaultAsset);
+    setSource(searchParams.get("source") ?? (isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All"));
+    setConfidence(parseConfidenceParam(searchParams.get("confidence")));
+    setPipelineStatus(parsePipelineParam(searchParams.get("pipeline")));
+    setSort(parseSortParam(searchParams.get("sort")));
+    setMinYield(minYieldParam ?? defaultMinYield);
+    setMaxPrice(maxPriceParam ?? 0);
+  }, [hasExplicitFilters, onboardingDefaults.assetType, onboardingDefaults.locationQuery, onboardingDefaults.minYield, searchParams]);
 
   const sourceOptions = useMemo(() => {
     const options = buildSourceOptions(deals);
@@ -97,7 +97,7 @@ export default function AllDeals() {
             <h1 className="font-display text-4xl mt-1">Deal workbench</h1>
             <p className="text-sm text-muted-foreground mt-2">Search, filter, sort, and review the full imported opportunity set.</p>
           </div>
-          <StrategyControl onOptimise={() => setStrategyOpen(true)} />
+          <StrategyControl />
         </header>
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -170,7 +170,6 @@ export default function AllDeals() {
           )}
         </section>
       </div>
-      <StrategyOptimiserModal open={strategyOpen} onOpenChange={setStrategyOpen} />
     </AppLayout>
   );
 }
@@ -264,6 +263,48 @@ function parseClassificationParam(value: string | null): "all" | Rating | DealCl
 function parseFreshnessParam(value: string | null): FreshnessFilter {
   if (value === "today" || value === "week" || value === "green-candidates-week" || value === "sources-today") return value;
   return "all";
+}
+
+function hasExplicitDealFilter(searchParams: URLSearchParams) {
+  return [
+    "classification",
+    "freshness",
+    "location",
+    "q",
+    "region",
+    "asset",
+    "source",
+    "confidence",
+    "pipeline",
+    "sort",
+    "minYield",
+    "maxPrice",
+  ].some((key) => searchParams.has(key));
+}
+
+function isValidAsset(value: string | undefined): value is typeof ASSET_TYPES[number] {
+  return Boolean(value && value !== "All" && ASSET_TYPES.includes(value as typeof ASSET_TYPES[number]));
+}
+
+function parseNumericParam(value: string | null) {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseConfidenceParam(value: string | null): "all" | "high" | "medium" | "low" {
+  if (value === "high" || value === "medium" || value === "low") return value;
+  return "all";
+}
+
+function parsePipelineParam(value: string | null): "all" | PipelineStatus {
+  if (PIPELINE_STATUSES.includes(value as PipelineStatus)) return value as PipelineStatus;
+  return "all";
+}
+
+function parseSortParam(value: string | null): "score" | "yield" | "price" | "confidence" | "newest" {
+  if (value === "yield" || value === "price" || value === "confidence" || value === "newest") return value;
+  return "score";
 }
 
 function filterChipLabel(value: "all" | Rating | DealClassification) {
