@@ -259,7 +259,7 @@ Manual import tools under `/admin/import` remain admin-only.
 
 ### Scheduled National England Scan
 
-DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus, Eddisons and Allsop are included once per scheduled run from their main sale/listing pages.
+DealSignal can run a conservative daily national scan via Vercel Cron. It does not scrape a single giant England page. Instead, each run takes the next small batch from a larger England city and commercial-town queue and scans those locations with the custom Rightmove Commercial scraper. Acuitus, Eddisons, Allsop, Goadsby Commercial, Zoopla Commercial, Savills Commercial, SDL Property Auctions, Pugh Auctions, Bond Wolfe, Fisher German Commercial and Lambert Smith Hampton are included once per scheduled run from their main sale/listing pages where the source returns parsable server-side HTML.
 
 The queue lives in `scripts/lib/englandLocationQueue.mjs` and includes:
 
@@ -279,7 +279,7 @@ Each scan run stores coverage diagnostics in `national_scan_runs.metadata`:
 
 On Vercel Hobby the cron is daily, so it can take multiple days to rotate through every city/town in the queue. With the current 160-location queue and a 16-location batch, one full cycle takes about 10 days. A future Pro plan can scan more often and/or use a larger safe batch size.
 
-Rightmove, Eddisons and Allsop pagination are supported conservatively when the first search page exposes pagination links. The scrapers follow a small number of discovered search-result pages, keep requests serial, and deduplicate repeated source URLs before writing through the import pipeline.
+Rightmove, Eddisons, Allsop and the configured commercial source scrapers support pagination conservatively when the first search page exposes pagination links. The scrapers follow a small number of discovered search-result pages, keep requests serial, and deduplicate repeated source URLs before writing through the import pipeline.
 
 Vercel Cron is configured in `vercel.json`:
 
@@ -440,6 +440,48 @@ npm run scrape:allsop
 ```
 
 Limitations: Allsop lot numbers are imported when the source payload exposes them. Some current search rows expose investment references instead of auction lot numbers; those are still deduped by source URL/reference and need legal-pack verification before underwriting.
+
+### Expanded Commercial Sources
+
+Dedicated server-side scraper commands exist for the expanded source queue:
+
+```bash
+npm run scrape:goadsby -- --dry-run
+npm run scrape:zoopla -- --dry-run
+npm run scrape:savills -- --dry-run
+npm run scrape:sdl -- --dry-run
+npm run scrape:pugh -- --dry-run
+npm run scrape:bond-wolfe -- --dry-run
+npm run scrape:fisher-german -- --dry-run
+npm run scrape:lsh -- --dry-run
+```
+
+Run any source live by removing `--dry-run`:
+
+```bash
+npm run scrape:savills
+```
+
+Each command accepts:
+
+```bash
+--url "https://source-search-url.example"
+--source-name "Visible Source Name"
+--max-pages 2
+--dry-run
+```
+
+These scrapers reuse the same `raw_imports`, `deals` and `deal_source_links` import pipeline. They import acquisition opportunities only, skip rent-only and POA rows where detectable, dedupe by source URL/external ID/title keys, and refresh existing duplicate deals without touching user watchlists or notes.
+
+Current source notes:
+
+- Goadsby Commercial: client-rendered/guarded pages may not expose listing rows to a server-side fetch. The scraper exits with a parse/blocking diagnostic when that happens.
+- Zoopla Commercial: Cloudflare can block server-side requests. The scraper is guarded and reports the block instead of writing partial data.
+- Savills Commercial: parses sale search result cards and follows exposed pagination.
+- SDL Property Auctions and Pugh Auctions: both are BTG/Eddisons-family auction pages; the scrapers only import rows with concrete guide prices.
+- Bond Wolfe: parses the order-of-sale listing rows. Lots without a visible guide price fail validation until a detail-page enrichment pass is added.
+- Fisher German Commercial: parses commercial sale cards with visible price and floor area.
+- Lambert Smith Hampton: parses public property cards; rent-only rows are skipped and mixed sale/rent rows require a visible guide price.
 
 Live imports require:
 

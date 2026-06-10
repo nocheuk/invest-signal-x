@@ -1,6 +1,6 @@
 import type { Deal } from "@/lib/deals";
 import { countDealClassifications } from "@/lib/dealClassification";
-import { ACUITUS_SOURCE, ALLSOP_SOURCE, EDDISONS_SOURCE, RIGHTMOVE_COMMERCIAL_SOURCE, sourceLabel } from "@/lib/dashboardFilters";
+import { ACUITUS_SOURCE, ALLSOP_SOURCE, EDDISONS_SOURCE, IMPORT_SOURCE_OPTIONS, RIGHTMOVE_COMMERCIAL_SOURCE, sourceLabel } from "@/lib/dashboardFilters";
 import type { NationalScanStatus } from "@/hooks/useNationalScanStatus";
 
 export type InventoryAuditMetrics = {
@@ -10,6 +10,7 @@ export type InventoryAuditMetrics = {
   acuitusDeals: number;
   eddisonsDeals: number;
   allsopDeals: number;
+  sourceCounts: Record<string, number>;
   verifiedGreens: number;
   greenCandidates: number;
   requiresDueDiligence: number;
@@ -33,13 +34,18 @@ export function buildInventoryAudit({
   const startOfToday = startOfLocalDay(now);
   const startOfWeek = startOfLocalWeek(now);
 
+  const sourceCounts = Object.fromEntries(
+    IMPORT_SOURCE_OPTIONS.map((source) => [source, deals.filter((deal) => sourceLabel(deal) === source).length])
+  );
+
   return {
     totalDeals: deals.length,
     totalImportedDeals: deals.filter(isImportedDeal).length,
-    rightmoveDeals: deals.filter((deal) => sourceLabel(deal) === RIGHTMOVE_COMMERCIAL_SOURCE).length,
-    acuitusDeals: deals.filter((deal) => sourceLabel(deal) === ACUITUS_SOURCE).length,
-    eddisonsDeals: deals.filter((deal) => sourceLabel(deal) === EDDISONS_SOURCE).length,
-    allsopDeals: deals.filter((deal) => sourceLabel(deal) === ALLSOP_SOURCE).length,
+    rightmoveDeals: sourceCounts[RIGHTMOVE_COMMERCIAL_SOURCE] ?? 0,
+    acuitusDeals: sourceCounts[ACUITUS_SOURCE] ?? 0,
+    eddisonsDeals: sourceCounts[EDDISONS_SOURCE] ?? 0,
+    allsopDeals: sourceCounts[ALLSOP_SOURCE] ?? 0,
+    sourceCounts,
     verifiedGreens: classifications["verified-green"],
     greenCandidates: classifications["green-candidate"],
     requiresDueDiligence: classifications["requires-due-diligence"],
@@ -62,6 +68,9 @@ export function formatInventoryAuditReport(metrics: InventoryAuditMetrics) {
     `Acuitus deals: ${metrics.acuitusDeals}`,
     `Eddisons deals: ${metrics.eddisonsDeals}`,
     `Allsop deals: ${metrics.allsopDeals}`,
+    ...Object.entries(metrics.sourceCounts ?? {})
+      .filter(([source]) => ![RIGHTMOVE_COMMERCIAL_SOURCE, ACUITUS_SOURCE, EDDISONS_SOURCE, ALLSOP_SOURCE].includes(source))
+      .map(([source, count]) => `${source} deals: ${count}`),
     `Top Opportunities: ${metrics.verifiedGreens}`,
     `Strong Opportunities: ${metrics.greenCandidates}`,
     `Requires Due Diligence: ${metrics.requiresDueDiligence}`,
