@@ -169,12 +169,22 @@
     letter-spacing: -0.01em;
   }
   .font-mono {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-feature-settings: 'tnum', 'zero' 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'tnum' 1, 'zero' 0;
     font-variant-numeric: tabular-nums;
   }
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .font-mono,
+  .numeric-clean {
+    font-family: 'Inter', system-ui, sans-serif !important;
+    font-feature-settings: 'tnum' 1, 'zero' 0 !important;
+    font-variant-numeric: tabular-nums;
+    font-synthesis: none;
   }
 }
 
