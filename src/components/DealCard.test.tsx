@@ -189,7 +189,7 @@ describe("DealCard", () => {
     expect(screen.getByText("-£47/sqft vs local avg")).toBeInTheDocument();
   });
 
-  it("shows a Green Candidate badge and qualification reason", () => {
+  it("shows a Strong Opportunity badge and qualification reason", () => {
     renderCard(deal({
       score: 73,
       rating: "amber",
@@ -201,7 +201,7 @@ describe("DealCard", () => {
       netInitialYield: 8.25,
     }));
 
-    expect(screen.getByText("Green Candidate")).toBeInTheDocument();
-    expect(screen.getByText(/Green Candidate: Score 73 is above/)).toBeInTheDocument();
+    expect(screen.getByText("Strong Opportunity")).toBeInTheDocument();
+    expect(screen.getByText(/Strong Opportunity: Score 73 is above/)).toBeInTheDocument();
   });
 });

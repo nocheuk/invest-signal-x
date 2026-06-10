@@ -162,6 +162,10 @@ export default function Onboarding() {
       };
       const { error: updateError } = await upsertProfile(profilePayload);
       if (updateError) throw updateError;
+      queryClient.setQueryData(["profile", auth.user.id], (current: typeof profile.data | undefined) => ({
+        ...(current ?? {}),
+        ...profilePayload,
+      }));
 
       const sideEffectWarnings: string[] = [];
       if (mode === "completed") {

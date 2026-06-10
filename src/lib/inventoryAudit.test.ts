@@ -116,6 +116,8 @@ describe("inventory audit", () => {
     expect(report).toContain("Total deals: 10");
     expect(report).toContain("Eddisons deals: 2");
     expect(report).toContain("Allsop deals: 1");
+    expect(report).toContain("Top Opportunities: 1");
+    expect(report).toContain("Strong Opportunities: 2");
     expect(report).toContain("Requires Due Diligence: 5");
     expect(report).toContain("Low Priority: 2");
     expect(report).toContain("Locations completed in current scan cycle: 12/160");

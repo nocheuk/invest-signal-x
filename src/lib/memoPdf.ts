@@ -2,6 +2,7 @@ import type { Deal } from "@/lib/deals";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { sourceLabel } from "@/lib/dashboardFilters";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
+import { classificationLabel, classifyDeal } from "@/lib/dealClassification";
 
 type JsPdfDocument = {
   setProperties: (properties: Record<string, string>) => void;
@@ -55,6 +56,7 @@ export function buildMemoSections(deal: Deal) {
       ["Floor area", deal.sqft > 0 ? `${deal.sqft.toLocaleString()} sq ft` : "Not available"],
       ["Price per sqft", deal.pricePerSqft > 0 ? `${formatGBP(deal.pricePerSqft)} / sq ft` : "Not available"],
       ["DealSignal Score", `${deal.score}/100`],
+      ["Opportunity label", classificationLabel(classifyDeal(deal))],
       ["Data Confidence", deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100 (${deal.confidenceLevel ?? "unknown"})` : "Not available"],
     ],
     investmentSummary: analysis.investmentSummary,

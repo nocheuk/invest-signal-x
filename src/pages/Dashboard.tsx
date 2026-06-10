@@ -155,7 +155,7 @@ function DashboardContent() {
                 Ranked from live imported data using score, confidence, yield, freshness, and area intelligence.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
-                <HeroMetric label="Green Candidates" value={kpis.greenCandidates} />
+                <HeroMetric label="Strong Opportunities" value={kpis.greenCandidates} />
                 <HeroMetric label="New Today" value={freshness.newToday} />
                 <HeroMetric label="New This Week" value={freshness.newThisWeek} />
               </div>
@@ -180,10 +180,11 @@ function DashboardContent() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Kpi label="Green Candidates" value={kpis.greenCandidates.toLocaleString()} sub={`${kpis.verifiedGreens} verified green`} icon={Target} accent="text-primary" to="/deals?classification=green-candidate" />
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <Kpi label="Top Opportunities" value={kpis.verifiedGreens.toLocaleString()} sub="Strict score and confidence" icon={Sparkles} accent="text-signal-green" to="/deals?classification=verified-green" />
+          <Kpi label="Strong Opportunities" value={kpis.greenCandidates.toLocaleString()} sub={`${kpis.verifiedGreens} top opportunities`} icon={Target} accent="text-primary" to="/deals?classification=green-candidate" />
           <Kpi label="New Today" value={freshness.newToday.toLocaleString()} sub={`${freshness.newSourcesToday} source listings`} icon={CalendarDays} accent="text-signal-green" to="/deals?freshness=today" />
-          <Kpi label="New This Week" value={freshness.newThisWeek.toLocaleString()} sub={`${freshness.newGreenCandidates} new candidates`} icon={Clock3} accent="text-signal-amber" to="/deals?freshness=week" />
+          <Kpi label="New This Week" value={freshness.newThisWeek.toLocaleString()} sub={`${freshness.newGreenCandidates} new strong opportunities`} icon={Clock3} accent="text-signal-amber" to="/deals?freshness=week" />
           <Kpi label="Filtered Deals" value={visibleDeals.length.toLocaleString()} sub={`${kpis.importedDeals.toLocaleString()} imported in database`} icon={TrendingUp} accent="text-foreground" to="/deals" />
         </section>
 
@@ -247,7 +248,7 @@ function DashboardContent() {
         <section>
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Green Candidates</div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Strong Opportunities</div>
               <h2 className="font-display text-2xl">High-potential imported opportunities</h2>
             </div>
             <Button asChild variant="outline" size="sm" className="gap-2">
@@ -260,7 +261,7 @@ function DashboardContent() {
             ))}
             {greenCandidates.length === 0 && (
               <div className="ds-card p-8 text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
-                No Green Candidates in the current dashboard view yet.
+                No Strong Opportunities in the current dashboard view yet.
               </div>
             )}
           </div>

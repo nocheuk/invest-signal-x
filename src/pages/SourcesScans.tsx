@@ -78,8 +78,8 @@ export default function SourcesScans() {
             </Button>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
-            <Metric label="Verified Greens" value={inventory.verifiedGreens} />
-            <Metric label="Green Candidates" value={inventory.greenCandidates} />
+            <Metric label="Top Opportunities" value={inventory.verifiedGreens} />
+            <Metric label="Strong Opportunities" value={inventory.greenCandidates} />
             <Metric label="Requires Due Diligence" value={inventory.requiresDueDiligence} />
             <Metric label="Low Priority" value={inventory.lowPriority} />
             <Metric label="Added today" value={inventory.addedToday} />

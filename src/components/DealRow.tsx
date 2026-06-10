@@ -34,7 +34,7 @@ export function DealRow({ deal }: { deal: Deal }) {
         )}>
           {deal.score}
         </div>
-        {classification === "green-candidate" && <span className="hidden lg:inline-flex rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">Candidate</span>}
+        {classification === "green-candidate" && <span className="hidden lg:inline-flex rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">Strong</span>}
         {classification === "low-priority" && <span className="hidden lg:inline-flex rounded-full border border-signal-red/30 bg-signal-red-soft px-2 py-0.5 text-[10px] uppercase tracking-wide text-signal-red">Low priority</span>}
         <div className="hidden sm:flex flex-col">
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Your</span>

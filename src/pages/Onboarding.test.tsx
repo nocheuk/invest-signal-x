@@ -6,6 +6,9 @@ import Onboarding from "@/pages/Onboarding";
 
 const profileUpdateSpy = vi.hoisted(() => vi.fn());
 const profileUpsertErrorState = vi.hoisted(() => ({ errors: [] as Array<Error & { code?: string }> }));
+const profileState = vi.hoisted(() => ({
+  data: { id: "user-1", full_name: "User", company: null, preferences: {}, alert_preferences: {} } as Record<string, unknown>,
+}));
 const strategySaveSpy = vi.hoisted(() => vi.fn());
 const saveAlertSpy = vi.hoisted(() => vi.fn());
 
@@ -19,7 +22,7 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/hooks/useProfile", () => ({
   useProfile: () => ({
-    data: { id: "user-1", full_name: "User", company: null, preferences: {}, alert_preferences: {} },
+    data: profileState.data,
     isLoading: false,
     isError: false,
   }),
@@ -65,6 +68,7 @@ function renderOnboarding(initialPath = "/onboarding") {
         <Routes>
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<div>Dashboard page</div>} />
+          <Route path="/settings" element={<div>Settings page</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -75,6 +79,7 @@ describe("Investor onboarding", () => {
   beforeEach(() => {
     profileUpdateSpy.mockClear();
     profileUpsertErrorState.errors = [];
+    profileState.data = { id: "user-1", full_name: "User", company: null, preferences: {}, alert_preferences: {} };
     sessionStorage.clear();
     strategySaveSpy.mockReset();
     strategySaveSpy.mockResolvedValue(undefined);
@@ -145,7 +150,7 @@ describe("Investor onboarding", () => {
     goToStep("Blockers");
     fireEvent.click(screen.getByRole("button", { name: /poa\/missing price/i }));
     goToStep("Alerts");
-    fireEvent.click(screen.getByRole("button", { name: /only green candidates/i }));
+    fireEvent.click(screen.getByRole("button", { name: /only strong opportunities/i }));
     goToStep("Summary");
     expect(screen.getAllByText("Your acquisition brief").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /save acquisition brief/i }));
@@ -162,7 +167,7 @@ describe("Investor onboarding", () => {
           financingPosition: "Bridging finance",
           dealPreferences: expect.arrayContaining(["Development potential"]),
           dealBlockers: expect.arrayContaining(["POA/missing price"]),
-          alertPreference: "Only Green Candidates",
+          alertPreference: "Only Strong Opportunities",
         }),
       },
       alert_preferences: expect.objectContaining({ email: true, min_score: 72 }),
@@ -204,6 +209,58 @@ describe("Investor onboarding", () => {
     expect(saveAlertSpy).toHaveBeenCalled();
     expect(sessionStorage.getItem("dealsignal:onboarding-warning")).toMatch(/suggested alert could not be created/);
     expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+  });
+
+  it("loads existing answers in edit mode and saves updates back to settings", async () => {
+    profileState.data = {
+      id: "user-1",
+      full_name: "User",
+      company: null,
+      alert_preferences: {},
+      preferences: {
+        onboarding_completed: true,
+        investor_onboarding: {
+          investorType: "Developer",
+          strategy: "Auction opportunities",
+          targetLocations: ["Manchester", "Hampshire"],
+          budgetRange: "GBP 1m - GBP 2.5m",
+          minBudget: 1000000,
+          maxBudget: 2500000,
+          cashAvailable: "GBP 400k",
+          financingPosition: "Bridging finance",
+          minYieldTarget: 8,
+          yieldNotImportant: false,
+          capitalGrowthPriority: true,
+          preferredAssetTypes: ["Industrial"],
+          dealPreferences: ["Auction lots"],
+          dealBlockers: ["POA/missing price"],
+          riskAppetite: "Opportunistic",
+          alertPreference: "Only Strong Opportunities",
+          experienceLevel: "Experienced",
+          completedAt: "2026-06-01T09:00:00Z",
+        },
+      },
+    };
+    renderOnboarding("/onboarding?edit=1");
+
+    expect(screen.getByText("Edit your acquisition brief")).toBeInTheDocument();
+    expect(screen.getByText("Manchester")).toBeInTheDocument();
+
+    advanceToSummaryWithLocation("Poole, Dorset");
+    fireEvent.click(screen.getByRole("button", { name: /save acquisition brief/i }));
+
+    await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalled());
+    expect(profileUpdateSpy.mock.calls[0][0]).toMatchObject({
+      preferences: {
+        onboarding_completed: true,
+        investor_onboarding: expect.objectContaining({
+          investorType: "Developer",
+          targetLocations: ["Poole", "Dorset"],
+          alertPreference: "Only Strong Opportunities",
+        }),
+      },
+    });
+    expect(await screen.findByText("Settings page")).toBeInTheDocument();
   });
 
   it("surfaces the real profile save error in development", async () => {

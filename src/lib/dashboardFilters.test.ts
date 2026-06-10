@@ -282,7 +282,7 @@ describe("dashboard deal filters", () => {
     expect(filterAndSortDeals([imported, acuitus], { ...base, confidence: "all", sort: "confidence" }, weights).map((item) => item.id)).toEqual(["imp-acuitus", "imp-bournemouth"]);
   });
 
-  it("filters green candidates separately from verified green deals", () => {
+  it("filters Strong Opportunities separately from Top Opportunities", () => {
     const candidate = deal({
       id: "imp-candidate",
       score: 73,

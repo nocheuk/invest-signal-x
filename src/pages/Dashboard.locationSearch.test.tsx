@@ -200,14 +200,17 @@ describe("Dashboard focused overview", () => {
 
   it("keeps the dashboard focused on overview sections", () => {
     dealsState.deals = [
-      dashboardDeal({ id: "candidate", title: "Green Candidate Deal", score: 73, rating: "amber", dataConfidenceScore: 80, confidenceLevel: "high" }),
+      dashboardDeal({ id: "candidate", title: "Strong Opportunity Deal", score: 73, rating: "amber", dataConfidenceScore: 80, confidenceLevel: "high" }),
       dashboardDeal({ id: "review", title: "Needs Review Deal", score: 42, rating: "red", needsReview: true }),
     ];
 
     renderDashboard();
 
     expect(screen.getByText("Top Opportunities This Week")).toBeInTheDocument();
-    expect(screen.getAllByText("Green Candidates").length).toBeGreaterThanOrEqual(1);
+    const links = screen.getAllByRole("link");
+    expect(links.some((link) => link.getAttribute("href") === "/deals?classification=verified-green")).toBe(true);
+    expect(links.some((link) => link.getAttribute("href") === "/deals?classification=green-candidate")).toBe(true);
+    expect(screen.getAllByText("Strong Opportunities").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("New Today").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("New This Week").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Quick location search")).toBeInTheDocument();

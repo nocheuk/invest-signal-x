@@ -21,8 +21,8 @@ export function isGreenCandidate(deal: Deal) {
 
 export function greenCandidateReasons(deal: Deal) {
   const reasons: string[] = [];
-  if (deal.score >= 72) reasons.push(`Score ${deal.score} is above the Green Candidate threshold`);
-  if ((deal.dataConfidenceScore ?? 0) >= 75) reasons.push(`Confidence ${deal.dataConfidenceScore} is high enough for candidate review`);
+  if (deal.score >= 72) reasons.push(`Score ${deal.score} is above the Strong Opportunity threshold`);
+  if ((deal.dataConfidenceScore ?? 0) >= 75) reasons.push(`Confidence ${deal.dataConfidenceScore} is high enough for opportunity review`);
   if (deal.guidePrice > 0) reasons.push("Guide price is available");
   if (deal.netInitialYield > 0 || deal.grossYield > 0) reasons.push("Yield is available");
   else if (deal.passingRent > 0) reasons.push("Passing rent is available");
@@ -56,8 +56,8 @@ export function isLowPriority(deal: Deal) {
 }
 
 export function classificationLabel(classification: DealClassification) {
-  if (classification === "verified-green") return "Verified Green";
-  if (classification === "green-candidate") return "Green Candidate";
+  if (classification === "verified-green") return "Top Opportunity";
+  if (classification === "green-candidate") return "Strong Opportunity";
   if (classification === "requires-due-diligence") return "Requires Due Diligence";
   return "Low Priority";
 }
