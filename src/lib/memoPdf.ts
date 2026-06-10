@@ -3,6 +3,7 @@ import { formatGBP, formatPct } from "@/lib/deals";
 import { sourceLabel } from "@/lib/dashboardFilters";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal } from "@/lib/dealClassification";
+import { buildInvestmentThesis } from "@/lib/investmentThesis";
 
 type JsPdfDocument = {
   setProperties: (properties: Record<string, string>) => void;
@@ -46,6 +47,7 @@ export function buildMemoFilename(title: string) {
 export function buildMemoSections(deal: Deal) {
   const reasons = deal.scoreReasons;
   const analysis = getDealAnalysis(deal);
+  const thesis = buildInvestmentThesis(deal);
   return {
     summary: [
       ["Location", deal.location],
@@ -60,6 +62,7 @@ export function buildMemoSections(deal: Deal) {
       ["Data Confidence", deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100 (${deal.confidenceLevel ?? "unknown"})` : "Not available"],
     ],
     investmentSummary: analysis.investmentSummary,
+    investmentThesis: thesis,
     opportunitySignals: analysis.opportunitySignals.length ? analysis.opportunitySignals : ["No opportunity signal available from imported data yet."],
     riskSignals: analysis.riskSignals.length ? analysis.riskSignals : ["No specific risk signal recorded yet."],
     positiveDrivers: analysis.opportunitySignals.length ? analysis.opportunitySignals : ["No positive drivers available from imported data yet."],
@@ -127,6 +130,11 @@ function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date
   y = ensureSpace(doc, y, 30, page, margin);
   sectionTitle(doc, "Investment summary", margin, y);
   y = writeWrapped(doc, sections.investmentSummary, margin, y + 7, page.width - margin * 2, 4.8) + 4;
+  y = ensureSpace(doc, y, 34, page, margin);
+  sectionTitle(doc, "Investment Thesis", margin, y);
+  y = writeWrapped(doc, sections.investmentThesis.summary, margin, y + 7, page.width - margin * 2, 4.8) + 3;
+  y = writeListSection(doc, "Potential upside", sections.investmentThesis.potentialUpside, margin, y, page);
+  y = writeListSection(doc, "Investor verdict", [`${sections.investmentThesis.investorVerdict} (${sections.investmentThesis.confidenceLevel} confidence)`], margin, y, page);
   y = writeListSection(doc, "Opportunity signals", sections.opportunitySignals, margin, y, page);
   y = writeListSection(doc, "Risk signals", sections.riskSignals, margin, y, page);
   y = writeListSection(doc, "Missing data / needs review", sections.missingData, margin, y, page);

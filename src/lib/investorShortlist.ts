@@ -2,6 +2,7 @@ import type { Deal } from "@/lib/deals";
 import { classifyDeal, classificationLabel } from "@/lib/dealClassification";
 import { buildAreaIntelligenceIndex, getAreaIntelligenceFromIndex, type AreaIntelligence, type AreaIntelligenceIndex } from "@/lib/areaIntelligence";
 import { isNewThisWeek } from "@/lib/freshness";
+import { buildInvestmentThesis } from "@/lib/investmentThesis";
 
 export type ShortlistMode = "balanced" | "top-yield" | "most-undervalued" | "highest-confidence";
 
@@ -85,17 +86,20 @@ function weightsForMode(mode: ShortlistMode) {
 }
 
 function shortlistReasons(deal: Deal, areaIntelligence: AreaIntelligence, classification: ReturnType<typeof classifyDeal>, mode: ShortlistMode) {
+  const thesis = buildInvestmentThesis(deal, { areaIntelligence });
   const reasons = [`${classificationLabel(classification)} classification`];
   if (deal.score > 0) reasons.push(`DealSignal score ${deal.score}`);
   if ((deal.dataConfidenceScore ?? 0) >= 75) reasons.push(`Confidence ${deal.dataConfidenceScore}`);
+  if (thesis.investorVerdict === "Review Immediately" || thesis.investorVerdict === "Worth Investigating") reasons.push(`Investor verdict: ${thesis.investorVerdict}`);
   if (deal.netInitialYield > 0) reasons.push(`NIY ${deal.netInitialYield.toFixed(2)}%`);
   else if (deal.grossYield > 0) reasons.push(`Gross yield ${deal.grossYield.toFixed(2)}%`);
   if (areaIntelligence.yieldDelta !== null && areaIntelligence.yieldDelta >= 1) reasons.push(`Yield ${areaIntelligence.yieldDelta.toFixed(1)} pts above local average`);
-  if (areaIntelligence.pricePerSqftDelta !== null && areaIntelligence.pricePerSqftDelta <= -25) reasons.push(`£/sqft £${Math.abs(Math.round(areaIntelligence.pricePerSqftDelta))} below local average`);
+  if (areaIntelligence.pricePerSqftDelta !== null && areaIntelligence.pricePerSqftDelta <= -25) reasons.push(`Price/sqft ${formatCurrency(Math.abs(Math.round(areaIntelligence.pricePerSqftDelta)))} below local average`);
+  if (thesis.potentialUpside[0] && !/^No calculated/.test(thesis.potentialUpside[0])) reasons.push(thesis.potentialUpside[0]);
   if (mode === "top-yield") reasons.push("Ranked by yield emphasis");
   if (mode === "most-undervalued") reasons.push("Ranked by local value signal");
   if (mode === "highest-confidence") reasons.push("Ranked by confidence emphasis");
-  return [...new Set(reasons)].slice(0, 4);
+  return [...new Set(reasons)].slice(0, 5);
 }
 
 function isImportedDeal(deal: Deal) {
@@ -104,4 +108,8 @@ function isImportedDeal(deal: Deal) {
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function formatCurrency(value: number) {
+  return `£${value.toLocaleString()}`;
 }

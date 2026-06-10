@@ -56,6 +56,7 @@ describe("investor shortlist", () => {
     expect(result[0].reasons).toEqual(expect.arrayContaining([
       "Strong Opportunity classification",
       "Confidence 82",
+      "Investor verdict: Review Immediately",
       "NIY 8.50%",
     ]));
   });
