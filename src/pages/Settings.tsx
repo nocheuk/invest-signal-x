@@ -66,7 +66,7 @@ export default function Settings() {
                 </ul>
               </div>
               <Button asChild size="sm" variant="outline">
-                <Link to="/onboarding?edit=1">Edit acquisition brief</Link>
+                <Link to="/onboarding?edit=1&returnTo=%2Fsettings">Edit acquisition brief</Link>
               </Button>
             </div>
           ) : (

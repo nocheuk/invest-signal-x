@@ -1,9 +1,11 @@
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useStrategy } from "@/lib/strategy";
 
 export function StrategyControl() {
   const { name, weights } = useStrategy();
+  const location = useLocation();
+  const editHref = `/onboarding?edit=1&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
   const chips = [
     { label: "Yield", value: weights.yield },
     { label: "Risk Control", value: weights.risk },
@@ -13,7 +15,7 @@ export function StrategyControl() {
   return (
     <div className="ds-card p-3 sm:p-4 flex flex-wrap items-center gap-3">
       <Link
-        to="/onboarding?edit=1"
+        to={editHref}
         className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
       >
         <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
@@ -34,7 +36,7 @@ export function StrategyControl() {
           </span>
         ))}
         <Link
-          to="/onboarding?edit=1"
+          to={editHref}
           className="text-[11px] font-medium text-primary hover:underline ml-1"
         >
           Edit Strategy

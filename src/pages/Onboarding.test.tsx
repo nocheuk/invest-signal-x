@@ -263,6 +263,16 @@ describe("Investor onboarding", () => {
     expect(await screen.findByText("Settings page")).toBeInTheDocument();
   });
 
+  it("respects a safe edit-mode return target after saving", async () => {
+    renderOnboarding("/onboarding?edit=1&returnTo=%2Fdashboard");
+
+    advanceToSummaryWithLocation("Bournemouth");
+    fireEvent.click(screen.getByRole("button", { name: /save acquisition brief/i }));
+
+    await waitFor(() => expect(profileUpdateSpy).toHaveBeenCalled());
+    expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+  });
+
   it("surfaces the real profile save error in development", async () => {
     profileUpsertErrorState.errors = [new Error("RLS denied profile update")];
     renderOnboarding();

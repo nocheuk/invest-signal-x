@@ -140,7 +140,11 @@ describe("AllDeals classification filters", () => {
 
   it.each([
     ["/deals?classification=verified-green", "Top Opportunity", "Top Opportunity Deal"],
+    ["/deals?classification=top-opportunity", "Top Opportunity", "Top Opportunity Deal"],
+    ["/deals?classification=top-opportunities", "Top Opportunity", "Top Opportunity Deal"],
     ["/deals?classification=green-candidate", "Strong Opportunity", "Strong Opportunity Deal"],
+    ["/deals?classification=strong-opportunity", "Strong Opportunity", "Strong Opportunity Deal"],
+    ["/deals?classification=strong-opportunities", "Strong Opportunity", "Strong Opportunity Deal"],
     ["/deals?classification=requires-due-diligence", "Requires Due Diligence", "Diligence Deal"],
     ["/deals?classification=low-priority", "Low Priority", "Low Priority Deal"],
   ])("matches KPI/filter/displayed counts for %s", (path, chipLabel, expectedTitle) => {
@@ -159,5 +163,12 @@ describe("AllDeals classification filters", () => {
     expect(screen.queryByText("Top Opportunity Deal")).not.toBeInTheDocument();
     expect(screen.queryByText("Strong Opportunity Deal")).not.toBeInTheDocument();
     expect(screen.getByText("No deals found in this location.")).toBeInTheDocument();
+  });
+
+  it("shows a clear-all fallback when an explicit URL filter returns no deals", () => {
+    renderAllDeals("/deals?classification=verified-green&location=Nowhere");
+
+    expect(screen.getByText("No deals found in this location.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /clear all filters/i })).toHaveAttribute("href", "/deals");
   });
 });

@@ -74,8 +74,10 @@ export default function Onboarding() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const editMode = new URLSearchParams(location.search).get("edit") === "1";
-  const from = (location.state as { from?: string } | null)?.from || (editMode ? "/settings" : "/dashboard");
+  const routeParams = new URLSearchParams(location.search);
+  const editMode = routeParams.get("edit") === "1";
+  const returnTo = safeReturnTo(routeParams.get("returnTo"));
+  const from = returnTo || (location.state as { from?: string } | null)?.from || (editMode ? "/settings" : "/dashboard");
   const existing = useMemo(() => getInvestorPreferences(profile.data), [profile.data]);
   const [step, setStep] = useState(1);
   const [answers, setAnswers] = useState<InvestorOnboardingAnswers>(DEFAULT_ONBOARDING);
@@ -585,4 +587,11 @@ async function upsertProfile(payload: {
 function isMissingAlertPreferencesColumn(error: { message?: string; code?: string } | null | undefined) {
   if (!error) return false;
   return error.code === "PGRST204" || /alert_preferences/i.test(error.message ?? "");
+}
+
+function safeReturnTo(value: string | null) {
+  if (!value) return "";
+  if (!value.startsWith("/") || value.startsWith("//")) return "";
+  if (value.startsWith("/auth") || value.startsWith("/onboarding")) return "";
+  return value;
 }

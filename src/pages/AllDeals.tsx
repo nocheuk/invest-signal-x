@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Filter, Search } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { DealCard } from "@/components/DealCard";
@@ -15,7 +15,7 @@ import { classificationLabel, classifyDeal, type DealClassification } from "@/li
 import { useStrategy } from "@/lib/strategy";
 import { useWatchlist, PIPELINE_STATUSES, type PipelineStatus } from "@/lib/watchlist";
 import { useRealDeals } from "@/hooks/useRealDeals";
-import { buildSourceOptions, ALL_REAL_DEALS_FILTER, DEMO_SOURCE_FILTER, filterAndSortDeals } from "@/lib/dashboardFilters";
+import { buildFilterDebugSteps, buildSourceOptions, ALL_REAL_DEALS_FILTER, DEMO_SOURCE_FILTER, filterAndSortDeals } from "@/lib/dashboardFilters";
 import { buildDashboardKpis } from "@/lib/dashboardKpis";
 import { buildFreshnessMetrics, filterByFreshness, formatImportDate, sortNewestDeals, type FreshnessFilter } from "@/lib/freshness";
 import { buildAreaIntelligenceIndex, EMPTY_AREA_INTELLIGENCE_INDEX, getAreaIntelligenceFromIndex } from "@/lib/areaIntelligence";
@@ -44,6 +44,18 @@ export default function AllDeals() {
   const now = useMemo(() => new Date(), []);
   const onboardingDefaults = useMemo(() => dashboardDefaultsFromPreferences(getInvestorPreferences(profile.data)), [profile.data]);
   const hasExplicitFilters = useMemo(() => hasExplicitDealFilter(searchParams), [searchParams]);
+  const filters = useMemo(() => ({
+    region,
+    asset,
+    source,
+    rating,
+    confidence,
+    minYield,
+    maxPrice,
+    search,
+    locationQuery,
+    sort,
+  }), [asset, confidence, locationQuery, maxPrice, minYield, rating, region, search, sort, source]);
 
   useEffect(() => {
     const assetParam = searchParams.get("asset");
@@ -71,11 +83,26 @@ export default function AllDeals() {
     return isSupabaseConfigured ? options.filter((option) => option !== DEMO_SOURCE_FILTER && option !== "All") : options;
   }, [deals]);
   const filtered = useMemo(() => {
-    const base = filterAndSortDeals(deals, { region, asset, source, rating, confidence, minYield, maxPrice, search, locationQuery, sort }, weights);
+    const base = filterAndSortDeals(deals, filters, weights);
     const fresh = filterByFreshness(base, freshnessFilter, now);
     if (pipelineStatus === "all") return fresh;
     return fresh.filter((deal) => pipelineItems[deal.id]?.status === pipelineStatus);
-  }, [asset, confidence, deals, freshnessFilter, locationQuery, maxPrice, minYield, now, pipelineItems, pipelineStatus, rating, region, search, sort, source, weights]);
+  }, [deals, filters, freshnessFilter, now, pipelineItems, pipelineStatus, weights]);
+
+  useEffect(() => {
+    if (!shouldLogDealFilterDebug()) return;
+    console.debug("[DealSignal filters] all-deals-route", {
+      receivedParams: searchParams.toString(),
+      classification: rating,
+      freshness: freshnessFilter,
+      pipelineStatus,
+      filters,
+      explicitFilters: hasExplicitFilters,
+      steps: buildFilterDebugSteps(deals, filters),
+      afterFreshness: filterByFreshness(filterAndSortDeals(deals, filters, weights), freshnessFilter, now).length,
+      finalVisible: filtered.length,
+    });
+  }, [deals, filtered.length, filters, freshnessFilter, hasExplicitFilters, now, pipelineStatus, rating, searchParams, weights]);
   const kpis = useMemo(() => buildDashboardKpis({ allDeals: deals, filteredDeals: filtered, watchlistIds: ids, pipelineCounts }), [deals, filtered, ids, pipelineCounts]);
   const freshness = useMemo(() => buildFreshnessMetrics(filtered, now), [filtered, now]);
   const recentlyAdded = useMemo(() => sortNewestDeals(filtered.filter((deal) => deal.isImported || deal.importSourceName)).slice(0, 6), [filtered]);
@@ -164,8 +191,13 @@ export default function AllDeals() {
           </div>
           {filtered.map((deal) => <DealRow key={deal.id} deal={deal} />)}
           {filtered.length === 0 && (
-            <div className="p-12 text-center text-sm text-muted-foreground">
-              {dealsQuery.isError ? "Could not load live deals. Please try again shortly." : locationQuery ? "No deals found in this location." : "No deals match these filters."}
+            <div className="space-y-4 p-12 text-center text-sm text-muted-foreground">
+              <div>{dealsQuery.isError ? "Could not load live deals. Please try again shortly." : locationQuery ? "No deals found in this location." : "No deals match these filters."}</div>
+              {hasExplicitFilters && !dealsQuery.isError && (
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/deals">Clear all filters</Link>
+                </Button>
+              )}
             </div>
           )}
         </section>
@@ -255,8 +287,8 @@ function parseClassificationParam(value: string | null): "all" | Rating | DealCl
     value === "requires-due-diligence" ||
     value === "low-priority"
   ) return value;
-  if (value === "top-opportunity") return "verified-green";
-  if (value === "strong-opportunity") return "green-candidate";
+  if (value === "top-opportunity" || value === "top-opportunities" || value === "verified" || value === "verified-green") return "verified-green";
+  if (value === "strong-opportunity" || value === "strong-opportunities" || value === "green-candidates") return "green-candidate";
   return "all";
 }
 
@@ -305,6 +337,10 @@ function parsePipelineParam(value: string | null): "all" | PipelineStatus {
 function parseSortParam(value: string | null): "score" | "yield" | "price" | "confidence" | "newest" {
   if (value === "yield" || value === "price" || value === "confidence" || value === "newest") return value;
   return "score";
+}
+
+function shouldLogDealFilterDebug() {
+  return (import.meta.env.DEV && import.meta.env.MODE !== "test") || localStorage.getItem("dealsignal:debug-filters") === "1";
 }
 
 function filterChipLabel(value: "all" | Rating | DealClassification) {
