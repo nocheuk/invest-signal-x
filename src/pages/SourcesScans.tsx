@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
-import { Activity, FileText, RadioTower } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, FileText, RadioTower, ShieldAlert } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { buildInventoryAudit, formatInventoryAuditReport } from "@/lib/inventoryAudit";
 import { buildDashboardKpis } from "@/lib/dashboardKpis";
+import { IMPORT_SOURCE_OPTIONS } from "@/lib/dashboardFilters";
+import { buildSourceHealth, summarizeSourceHealth, type SourceHealthStatus } from "@/lib/sourceHealth";
 import { useRealDeals } from "@/hooks/useRealDeals";
 import { formatNationalScanTime, formatScanDuration, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
 import { useWatchlist } from "@/lib/watchlist";
@@ -14,6 +16,8 @@ export default function SourcesScans() {
   const scanStatus = useNationalScanStatus();
   const [report, setReport] = useState("");
   const inventory = useMemo(() => buildInventoryAudit({ deals, scanStatus: scanStatus.data }), [deals, scanStatus.data]);
+  const sourceHealth = useMemo(() => buildSourceHealth({ deals, scanRuns: scanStatus.data?.sourceScanRuns ?? [] }), [deals, scanStatus.data?.sourceScanRuns]);
+  const sourceHealthSummary = useMemo(() => summarizeSourceHealth(sourceHealth), [sourceHealth]);
   const kpis = useMemo(() => buildDashboardKpis({ allDeals: deals, filteredDeals: deals, watchlistIds: ids, pipelineCounts, totalDatabaseDeals: scanStatus.data?.totalDeals }), [deals, ids, pipelineCounts, scanStatus.data?.totalDeals]);
 
   return (
@@ -39,7 +43,7 @@ export default function SourcesScans() {
               <div className="grid gap-2 text-sm">
                 <p><span className="text-muted-foreground">Last national scan:</span> {formatNationalScanTime(scanStatus.data.finishedAt)}</p>
                 <p><span className="text-muted-foreground">Next scheduled scan:</span> daily at 6am UK time</p>
-                <p><span className="text-muted-foreground">Sources:</span> Rightmove Commercial + Acuitus + Eddisons + Allsop</p>
+                <p><span className="text-muted-foreground">Sources:</span> {IMPORT_SOURCE_OPTIONS.join(" + ")}</p>
                 <p><span className="text-muted-foreground">Last run locations:</span> {scanStatus.data.locationsScanned.length ? scanStatus.data.locationsScanned.join(", ") : "Not available"}</p>
                 <p><span className="text-muted-foreground">Queue:</span> {scanStatus.data.totalConfiguredLocations} locations, next index {scanStatus.data.nextIndex}</p>
                 <p><span className="text-muted-foreground">Cycle progress:</span> {scanStatus.data.scanCycleProgress}% · {scanStatus.data.locationsCompletedInCurrentCycle}/{scanStatus.data.totalConfiguredLocations} completed</p>
@@ -54,16 +58,69 @@ export default function SourcesScans() {
           <div className="ds-card p-5 space-y-4">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary" />
-              <h2 className="font-display text-2xl">Source counts</h2>
+              <h2 className="font-display text-2xl">Source health</h2>
             </div>
             <div className="grid grid-cols-2 gap-3">
+              <Metric label="Healthy" value={sourceHealthSummary.Healthy} />
+              <Metric label="Warning" value={sourceHealthSummary.Warning} />
+              <Metric label="Blocked" value={sourceHealthSummary.Blocked} />
+              <Metric label="Disabled" value={sourceHealthSummary.Disabled} />
               <Metric label="Total deals" value={kpis.totalDatabaseDeals} />
               <Metric label="Imported deals" value={inventory.totalImportedDeals} />
-              <Metric label="Rightmove" value={inventory.rightmoveDeals} />
-              <Metric label="Acuitus" value={inventory.acuitusDeals} />
-              <Metric label="Eddisons" value={inventory.eddisonsDeals} />
-              <Metric label="Allsop" value={inventory.allsopDeals} />
             </div>
+          </div>
+        </section>
+
+        <section className="ds-card p-5 space-y-4">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Source Health</div>
+            <h2 className="font-display text-2xl mt-1">Status and inventory quality</h2>
+            <p className="text-sm text-muted-foreground mt-1">Per-source scan health, contribution, and opportunity quality from real imported data.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[980px] rounded-md border border-border/60">
+              <div className="grid grid-cols-[1.5fr_0.8fr_repeat(7,0.8fr)_1.4fr] gap-0 border-b border-border/60 bg-surface-2/70 px-3 py-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <div>Source</div>
+                <div>Status</div>
+                <div>Total</div>
+                <div>New today</div>
+                <div>Contribution</div>
+                <div>Top</div>
+                <div>Strong</div>
+                <div>Last inserted</div>
+                <div>Duration</div>
+                <div>Last success / notes</div>
+              </div>
+              {sourceHealth.map((row) => (
+                <div key={row.source} className="grid grid-cols-[1.5fr_0.8fr_repeat(7,0.8fr)_1.4fr] gap-0 border-b border-border/40 px-3 py-3 text-sm last:border-b-0">
+                  <div className="font-medium">{row.source}</div>
+                  <div><SourceStatusBadge status={row.status} /></div>
+                  <div className="font-mono tabular">{row.totalImportedDeals.toLocaleString()}</div>
+                  <div className="font-mono tabular">{row.newDealsToday.toLocaleString()}</div>
+                  <div className="font-mono tabular">{row.inventoryContributionPct.toFixed(1)}%</div>
+                  <div className="font-mono tabular">{row.topOpportunityCount.toLocaleString()}</div>
+                  <div className="font-mono tabular">{row.strongOpportunityCount.toLocaleString()}</div>
+                  <div className="font-mono tabular">{row.lastInsertedCount.toLocaleString()}</div>
+                  <div className="font-mono tabular">{formatScanDuration(row.lastScanDurationMs)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    <div>{row.lastSuccessfulScan ? formatNationalScanTime(row.lastSuccessfulScan) : "No successful scan"}</div>
+                    {row.warningReasons.length > 0 && <div className="mt-1 text-signal-amber">{row.warningReasons.join("; ")}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="ds-card p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" />
+            <h2 className="font-display text-2xl">Inventory contribution by source</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {IMPORT_SOURCE_OPTIONS.map((source) => (
+              <Metric key={source} label={source} value={inventory.sourceCounts[source] ?? 0} />
+            ))}
           </div>
         </section>
 
@@ -91,6 +148,23 @@ export default function SourcesScans() {
         </section>
       </div>
     </AppLayout>
+  );
+}
+
+function SourceStatusBadge({ status }: { status: SourceHealthStatus }) {
+  const Icon = status === "Healthy" ? CheckCircle2 : status === "Blocked" ? ShieldAlert : AlertTriangle;
+  const className = status === "Healthy"
+    ? "border-signal-green/40 bg-signal-green/10 text-signal-green"
+    : status === "Blocked"
+      ? "border-red-500/40 bg-red-500/10 text-red-300"
+      : status === "Disabled"
+        ? "border-muted-foreground/30 bg-muted/30 text-muted-foreground"
+        : "border-signal-amber/40 bg-signal-amber/10 text-signal-amber";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${className}`}>
+      <Icon className="h-3 w-3" />
+      {status}
+    </span>
   );
 }
 

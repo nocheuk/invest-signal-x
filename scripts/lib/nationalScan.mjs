@@ -1,7 +1,9 @@
 import { runCustomHtmlScraperImport } from "../scrape-site.mjs";
 import { runAllsopImport } from "../scrape-allsop.mjs";
 import { runEddisonsImport } from "../scrape-eddisons.mjs";
+import { runCommercialSourceImport } from "../scrape-commercial-source.mjs";
 import { ALLSOP_COMMERCIAL_SEARCH_URL, ALLSOP_SOURCE_NAME } from "./allsopScraper.mjs";
+import { SOURCE_CONFIGS } from "./commercialSourceScraper.mjs";
 import { EDDISONS_SALE_LISTINGS_URL, EDDISONS_SOURCE_NAME } from "./eddisonsScraper.mjs";
 import { runSavedAlertsForRecentDeals } from "./alerts.mjs";
 import {
@@ -66,6 +68,7 @@ export async function runNationalScan({
   includeAcuitus = true,
   includeEddisons = true,
   includeAllsop = true,
+  includeExpandedSources = true,
   evaluateAlerts = true,
   adapters = defaultNationalAdapters(),
   now = new Date(),
@@ -145,6 +148,23 @@ export async function runNationalScan({
     results.push(result);
   }
 
+  if (includeExpandedSources) {
+    for (const sourceKey of EXPANDED_NATIONAL_SOURCE_KEYS) {
+      const config = SOURCE_CONFIGS[sourceKey];
+      const result = await runAndRecordScan({
+        supabase,
+        dryRun,
+        batchId,
+        scanType: NATIONAL_SCAN_TYPE,
+        locationQuery: "England",
+        sourceName: config.sourceName,
+        metadata: { ...sharedMetadata, national_source: true },
+        run: () => adapters[sourceKey]({ dryRun }),
+      });
+      results.push(result);
+    }
+  }
+
   const alertResult = !dryRun && evaluateAlerts
     ? await runSavedAlertsForRecentDeals({ supabase, since: now, now: new Date() })
     : null;
@@ -163,7 +183,33 @@ export async function runNationalScan({
   };
 }
 
+export const EXPANDED_NATIONAL_SOURCE_KEYS = [
+  "goadsby",
+  "zoopla",
+  "savills",
+  "sdl",
+  "pugh",
+  "bondWolfe",
+  "fisherGerman",
+  "lsh",
+];
+
 function defaultNationalAdapters() {
+  const expandedAdapters = Object.fromEntries(EXPANDED_NATIONAL_SOURCE_KEYS.map((sourceKey) => {
+    const config = SOURCE_CONFIGS[sourceKey];
+    return [sourceKey, ({ dryRun }) => runCommercialSourceImport({
+      sourceKey,
+      searchUrl: config.defaultUrl,
+      sourceName: config.sourceName,
+      dryRun,
+      maxPages: 2,
+      sourceConfig: {
+        national_scan: true,
+        page_url: config.defaultUrl,
+      },
+    })];
+  }));
+
   return {
     rightmove: ({ locationQuery, dryRun }) => runRightmoveLocationSearch({ locationQuery, dryRun }),
     acuitus: ({ dryRun }) => runCustomHtmlScraperImport({
@@ -196,6 +242,7 @@ function defaultNationalAdapters() {
         page_url: ALLSOP_COMMERCIAL_SEARCH_URL,
       },
     }),
+    ...expandedAdapters,
   };
 }
 

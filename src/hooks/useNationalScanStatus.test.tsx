@@ -8,9 +8,16 @@ const rows = vi.hoisted(() => ({
     id: string;
     source_name: string;
     location_query: string;
+    status?: string;
     started_at: string;
     finished_at: string;
     inserted: number;
+    existing?: number;
+    failed?: number;
+    skipped_duplicate?: number;
+    skipped_rent_only?: number;
+    skipped_poa?: number;
+    error_message?: string | null;
     metadata: Record<string, unknown>;
   }>,
   sourceLinks: [
@@ -33,13 +40,20 @@ function resetRows() {
     started_at: "2026-05-28T04:59:00Z",
     finished_at: "2026-05-28T05:03:00Z",
     inserted: 7,
-    metadata: {
+        metadata: {
       locations_scanned: ["London", "Manchester", "Birmingham", "Leeds"],
       total_configured_locations: 160,
       next_index: 4,
       estimated_full_cycle_days: 40,
       scan_cycle_progress: 3,
-    },
+        },
+        status: "completed",
+        existing: 12,
+        failed: 0,
+        skipped_duplicate: 12,
+        skipped_rent_only: 1,
+        skipped_poa: 0,
+        error_message: null,
   }];
   rows.dealCount = 42;
   rows.sourceLinksError = null;
@@ -56,7 +70,7 @@ function resetRows() {
 const calls = vi.hoisted(() => ({
   tables: [] as string[],
   status: "",
-  orderColumn: "",
+  orderColumns: [] as string[],
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -81,11 +95,17 @@ vi.mock("@/lib/supabase/client", () => ({
       }
       return {
         select: () => ({
+          order: (column: string) => {
+            calls.orderColumns.push(column);
+            return {
+              limit: async () => ({ data: rows.scanRuns, error: null }),
+            };
+          },
           eq: (_column: string, value: string) => {
             calls.status = value;
             return {
               order: (column: string) => {
-                calls.orderColumn = column;
+                calls.orderColumns.push(column);
                 return {
                   limit: async () => ({ data: rows.scanRuns, error: null }),
                 };
@@ -110,7 +130,7 @@ describe("useNationalScanStatus", () => {
     resetRows();
     calls.tables = [];
     calls.status = "";
-    calls.orderColumn = "";
+    calls.orderColumns = [];
   });
 
   it("loads the latest completed national scan run", async () => {
@@ -119,9 +139,9 @@ describe("useNationalScanStatus", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(calls).toMatchObject({
       status: "completed",
-      orderColumn: "finished_at",
     });
-    expect(calls.tables).toEqual(["national_scan_runs", "deal_source_links", "deals"]);
+    expect(calls.orderColumns).toEqual(["finished_at", "started_at"]);
+    expect(calls.tables).toEqual(["national_scan_runs", "deal_source_links", "deals", "national_scan_runs"]);
     expect(result.current.data).toMatchObject({
       id: "scan-1",
       sourceName: "Rightmove Commercial",
@@ -140,6 +160,14 @@ describe("useNationalScanStatus", () => {
       locationsCompletedInCurrentCycle: 4,
       lastSuccessfulScanDurationMs: 240000,
       lastScanInsertedCount: 7,
+      sourceScanRuns: [
+        expect.objectContaining({
+          sourceName: "Rightmove Commercial",
+          status: "completed",
+          inserted: 7,
+          existing: 12,
+        }),
+      ],
     });
   });
 

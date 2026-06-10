@@ -5,6 +5,7 @@ import {
   aggregateNationalResults,
   buildNationalScanDiagnostics,
   ENGLAND_PRIORITY_LOCATIONS,
+  EXPANDED_NATIONAL_SOURCE_KEYS,
   NATIONAL_SCAN_BATCH_SIZE,
   runNationalScan,
   selectNationalScanBatch,
@@ -106,6 +107,7 @@ describe("national scan scheduler", () => {
       dryRun: true,
       batchSize: 2,
       locations: ["London", "Manchester", "Birmingham"],
+      includeExpandedSources: false,
       adapters: {
         rightmove: async ({ locationQuery }: { locationQuery: string }) => {
           calls.push(`rightmove:${locationQuery}`);
@@ -151,6 +153,7 @@ describe("national scan scheduler", () => {
       includeAcuitus: false,
       includeEddisons: false,
       includeAllsop: false,
+      includeExpandedSources: false,
       evaluateAlerts: false,
       adapters: {
         rightmove: async ({ locationQuery }: { locationQuery: string }) => ({
@@ -198,6 +201,32 @@ describe("national scan scheduler", () => {
       skippedDuplicate: 13,
       failed: 1,
     });
+  });
+
+  it("includes expanded commercial sources in national scans", async () => {
+    const calls: string[] = [];
+    const expandedAdapters = Object.fromEntries(EXPANDED_NATIONAL_SOURCE_KEYS.map((sourceKey) => [
+      sourceKey,
+      async () => {
+        calls.push(sourceKey);
+        return { source: sourceKey, inserted: 1, existing: 0, failed: 0, processed: 1, total: 1, unique: 1 };
+      },
+    ]));
+
+    await runNationalScan({
+      dryRun: true,
+      batchSize: 1,
+      locations: ["London"],
+      includeAcuitus: false,
+      includeEddisons: false,
+      includeAllsop: false,
+      adapters: {
+        rightmove: async () => ({ source: "Rightmove Commercial", inserted: 0, existing: 0, failed: 0 }),
+        ...expandedAdapters,
+      },
+    });
+
+    expect(calls).toEqual(EXPANDED_NATIONAL_SOURCE_KEYS);
   });
 });
 

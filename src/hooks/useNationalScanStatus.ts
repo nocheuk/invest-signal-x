@@ -1,5 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
+import {
+  ACUITUS_SOURCE,
+  ALLSOP_SOURCE,
+  BOND_WOLFE_SOURCE,
+  EDDISONS_SOURCE,
+  FISHER_GERMAN_SOURCE,
+  GOADSBY_SOURCE,
+  LSH_SOURCE,
+  PUGH_SOURCE,
+  RIGHTMOVE_COMMERCIAL_SOURCE,
+  SAVILLS_SOURCE,
+  SDL_SOURCE,
+  ZOOPLA_SOURCE,
+} from "@/lib/dashboardFilters";
 
 export type NationalScanStatus = {
   id: string;
@@ -17,13 +31,55 @@ export type NationalScanStatus = {
   totalAcuitusDeals: number;
   totalEddisonsDeals: number;
   totalAllsopDeals: number;
+  totalGoadsbyDeals: number;
+  totalZooplaDeals: number;
+  totalSavillsDeals: number;
+  totalSdlDeals: number;
+  totalPughDeals: number;
+  totalBondWolfeDeals: number;
+  totalFisherGermanDeals: number;
+  totalLshDeals: number;
+  sourceDealCounts: Record<string, number>;
+  sourceScanRuns: SourceScanRun[];
   locationsCompletedInCurrentCycle: number;
   lastSuccessfulScanDurationMs: number;
   lastScanInsertedCount: number;
 };
 
+export type SourceScanRun = {
+  id: string;
+  sourceName: string;
+  locationQuery: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  inserted: number;
+  existing: number;
+  failed: number;
+  skippedDuplicate: number;
+  skippedRentOnly: number;
+  skippedPoa: number;
+  errorMessage: string | null;
+};
+
 export const nationalScanStatusQueryKey = ["national-scan-status"];
-const EMPTY_SOURCE_COUNTS = { rightmove: 0, acuitus: 0, eddisons: 0, allsop: 0 };
+const SOURCE_MATCHERS = [
+  { key: "rightmove", label: RIGHTMOVE_COMMERCIAL_SOURCE, patterns: ["rightmove"] },
+  { key: "acuitus", label: ACUITUS_SOURCE, patterns: ["acuitus"] },
+  { key: "eddisons", label: EDDISONS_SOURCE, patterns: ["eddisons"] },
+  { key: "allsop", label: ALLSOP_SOURCE, patterns: ["allsop"] },
+  { key: "goadsby", label: GOADSBY_SOURCE, patterns: ["goadsby"] },
+  { key: "zoopla", label: ZOOPLA_SOURCE, patterns: ["zoopla"] },
+  { key: "savills", label: SAVILLS_SOURCE, patterns: ["savills"] },
+  { key: "sdl", label: SDL_SOURCE, patterns: ["sdl"] },
+  { key: "pugh", label: PUGH_SOURCE, patterns: ["pugh"] },
+  { key: "bondWolfe", label: BOND_WOLFE_SOURCE, patterns: ["bond wolfe", "bondwolfe"] },
+  { key: "fisherGerman", label: FISHER_GERMAN_SOURCE, patterns: ["fisher german", "fishergerman"] },
+  { key: "lsh", label: LSH_SOURCE, patterns: ["lambert smith hampton", "lsh"] },
+] as const;
+const EMPTY_SOURCE_COUNTS = Object.fromEntries(SOURCE_MATCHERS.map((source) => [source.key, 0])) as SourceCountMap;
+
+type SourceCountMap = Record<(typeof SOURCE_MATCHERS)[number]["key"], number>;
 
 export function useNationalScanStatus() {
   return useQuery({
@@ -54,6 +110,12 @@ export function useNationalScanStatus() {
         0,
         "national scan deal count"
       );
+      const sourceScanRuns = await withTimeout(
+        loadRecentSourceScanRuns(supabase),
+        8000,
+        [],
+        "recent source scan runs"
+      );
       const totalConfiguredLocations = Number(metadata.total_configured_locations ?? 0);
       const nextIndex = Number(metadata.next_index ?? 0);
       return {
@@ -72,12 +134,46 @@ export function useNationalScanStatus() {
         totalAcuitusDeals: sourceCounts.acuitus,
         totalEddisonsDeals: sourceCounts.eddisons,
         totalAllsopDeals: sourceCounts.allsop,
+        totalGoadsbyDeals: sourceCounts.goadsby,
+        totalZooplaDeals: sourceCounts.zoopla,
+        totalSavillsDeals: sourceCounts.savills,
+        totalSdlDeals: sourceCounts.sdl,
+        totalPughDeals: sourceCounts.pugh,
+        totalBondWolfeDeals: sourceCounts.bondWolfe,
+        totalFisherGermanDeals: sourceCounts.fisherGerman,
+        totalLshDeals: sourceCounts.lsh,
+        sourceDealCounts: Object.fromEntries(SOURCE_MATCHERS.map((source) => [source.label, sourceCounts[source.key]])),
+        sourceScanRuns,
         locationsCompletedInCurrentCycle: totalConfiguredLocations > 0 && nextIndex === 0 ? totalConfiguredLocations : nextIndex,
         lastSuccessfulScanDurationMs: scanDurationMs(row.started_at, row.finished_at),
         lastScanInsertedCount: Number(row.inserted ?? 0),
       };
     },
   });
+}
+
+async function loadRecentSourceScanRuns(supabase: ReturnType<typeof requireSupabase>): Promise<SourceScanRun[]> {
+  const { data, error } = await supabase
+    .from("national_scan_runs")
+    .select("id,source_name,location_query,status,started_at,finished_at,inserted,existing,failed,skipped_duplicate,skipped_rent_only,skipped_poa,error_message")
+    .order("started_at", { ascending: false })
+    .limit(250);
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    sourceName: String(row.source_name ?? ""),
+    locationQuery: String(row.location_query ?? ""),
+    status: String(row.status ?? ""),
+    startedAt: String(row.started_at ?? ""),
+    finishedAt: row.finished_at ?? null,
+    inserted: Number(row.inserted ?? 0),
+    existing: Number(row.existing ?? 0),
+    failed: Number(row.failed ?? 0),
+    skippedDuplicate: Number(row.skipped_duplicate ?? 0),
+    skippedRentOnly: Number(row.skipped_rent_only ?? 0),
+    skippedPoa: Number(row.skipped_poa ?? 0),
+    errorMessage: row.error_message ?? null,
+  }));
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
@@ -130,22 +226,18 @@ async function loadSourceDealCounts(supabase: ReturnType<typeof requireSupabase>
     if (!data || data.length < pageSize) break;
   }
 
-  const rightmove = new Set<string>();
-  const acuitus = new Set<string>();
-  const eddisons = new Set<string>();
-  const allsop = new Set<string>();
+  const sets = Object.fromEntries(SOURCE_MATCHERS.map((source) => [source.key, new Set<string>()])) as Record<keyof SourceCountMap, Set<string>>;
   for (const row of rows) {
     const importSource = Array.isArray(row.import_sources) ? row.import_sources[0] : row.import_sources;
     const sourceText = sourceClassificationText({
       importSourceName: importSource?.name,
       sourceUrl: row.source_url,
     });
-    if (sourceText.includes("rightmove")) rightmove.add(row.deal_id);
-    if (sourceText.includes("acuitus")) acuitus.add(row.deal_id);
-    if (sourceText.includes("eddisons")) eddisons.add(row.deal_id);
-    if (sourceText.includes("allsop")) allsop.add(row.deal_id);
+    for (const source of SOURCE_MATCHERS) {
+      if (source.patterns.some((pattern) => sourceText.includes(pattern))) sets[source.key].add(row.deal_id);
+    }
   }
-  return { rightmove: rightmove.size, acuitus: acuitus.size, eddisons: eddisons.size, allsop: allsop.size };
+  return Object.fromEntries(SOURCE_MATCHERS.map((source) => [source.key, sets[source.key].size])) as SourceCountMap;
 }
 
 function sourceClassificationText({
