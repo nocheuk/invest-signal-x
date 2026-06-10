@@ -18,6 +18,7 @@ import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { formatAreaDelta, formatAreaValue, getAreaIntelligence } from "@/lib/areaIntelligence";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
+import { buildInvestmentThesis } from "@/lib/investmentThesis";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -59,6 +60,7 @@ export default function DealDetail() {
   const pipelineStatus = getPipelineStatus(deal.id) ?? "Saved";
   const dealAnalysis = getDealAnalysis(deal);
   const areaIntelligence = getAreaIntelligence(deal, allDeals);
+  const investmentThesis = buildInvestmentThesis(deal, { areaIntelligence });
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
   const primarySourceUrl = deal.sourceUrl ?? sourceLinks.data?.find((link) => link.source_url)?.source_url;
@@ -241,6 +243,29 @@ export default function DealDetail() {
             </div>
           </section>
         )}
+
+        <section className="ds-premium-panel p-6 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Investment Thesis</div>
+              <h2 className="font-display text-2xl mt-1">Why this deal may make financial sense</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Generated deterministically from imported fields, area intelligence, scoring signals and missing-data warnings.</p>
+            </div>
+            <div className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              {investmentThesis.investorVerdict}
+            </div>
+          </div>
+          <p className="rounded-lg border border-border/60 bg-background/50 p-4 text-sm leading-relaxed text-muted-foreground">
+            {investmentThesis.summary}
+          </p>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <ReasonList title="Why it looks interesting" items={investmentThesis.whyInteresting} fallback="No strong opportunity signal found yet." tone="primary" />
+            <ReasonList title="Potential upside" items={investmentThesis.potentialUpside} fallback="No calculated upside signal available yet." tone="primary" />
+            <ReasonList title="Key risks" items={investmentThesis.keyRisks} fallback="No specific risk signal recorded yet." tone="amber" />
+            <ReasonList title="What to verify next" items={investmentThesis.verifyNext} fallback="Standard title, lease and comparable checks still apply." tone="default" />
+          </div>
+          <div className="text-xs text-muted-foreground">Thesis confidence: {investmentThesis.confidenceLevel}</div>
+        </section>
 
         <section className="ds-glass p-6 space-y-4">
           <div>

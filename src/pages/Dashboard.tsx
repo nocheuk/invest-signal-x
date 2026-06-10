@@ -24,8 +24,8 @@ import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNation
 import { isAdminUser } from "@/lib/admin";
 import { dashboardDefaultsFromPreferences, getInvestorPreferences, type InvestorPreferences } from "@/lib/onboarding";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { formatGBP, formatPct, type Deal } from "@/lib/deals";
+import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -352,17 +352,21 @@ function SectionHeader({ eyebrow, title, description, action }: { eyebrow: strin
 
 function AnalystOpportunityCard({ item, investorPreferences, weights }: { item: RankedOpportunity; investorPreferences: InvestorPreferences; weights: ReturnType<typeof useStrategy>["weights"] }) {
   const deal = item.deal;
-  const analysis = getDealAnalysis(deal);
   const classification = classifyDeal(deal);
   const strategyScore = personalisedScore(deal, weights);
   const briefSignals = acquisitionBriefSignals(deal, investorPreferences);
+  const thesis = buildInvestmentThesis(deal, {
+    areaIntelligence: item.areaIntelligence,
+    strategyMatch: strategyScore,
+    strategyReasons: briefSignals.positive,
+  });
   const why = uniqueStrings([
     ...item.reasons,
-    ...analysis.opportunitySignals,
+    ...thesis.whyInteresting,
     ...briefSignals.positive,
   ]).slice(0, 4);
   const risks = uniqueStrings([
-    ...analysis.riskSignals,
+    ...thesis.keyRisks,
     ...(deal.scoreReasons?.missingDataWarnings ?? []),
     ...briefSignals.risks,
   ]).slice(0, 3);
@@ -397,7 +401,15 @@ function AnalystOpportunityCard({ item, investorPreferences, weights }: { item: 
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <SignalList title="Why DealSignal likes this" items={why} tone="positive" />
-        <SignalList title="Key Risks" items={risks} tone="risk" />
+        <div className="grid gap-3">
+          <SignalList title="Potential upside" items={thesis.potentialUpside.slice(0, 2)} tone="positive" />
+          <SignalList title="Key Risks" items={risks.slice(0, 2)} tone="risk" />
+        </div>
+      </div>
+      <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Investor verdict</div>
+        <div className="mt-1 text-sm font-semibold text-foreground">{thesis.investorVerdict}</div>
+        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{thesis.summary}</p>
       </div>
     </Link>
   );

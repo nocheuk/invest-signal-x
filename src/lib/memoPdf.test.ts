@@ -67,6 +67,9 @@ describe("memo PDF data", () => {
     expect(sections.summary).toContainEqual(["Data Confidence", "38/100 (low)"]);
     expect(sections.summary).toContainEqual(["Source", "Rightmove Commercial"]);
     expect(sections.investmentSummary).toContain("Telecom House, 35 Holdenhurst Road is a office opportunity in Bournemouth, BH8 8EJ");
+    expect(sections.investmentThesis.summary).toContain("DealSignal Thesis:");
+    expect(sections.investmentThesis.investorVerdict).toBe("Low Priority");
+    expect(sections.investmentThesis.verifyNext).toEqual(expect.arrayContaining(["Confirm tenant covenant", "Confirm lease expiry and WAULT"]));
     expect(sections.opportunitySignals).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
     expect(sections.riskSignals).toEqual(expect.arrayContaining(["Passing rent missing", "Tenant covenant unknown"]));
     expect(sections.positiveDrivers).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
@@ -90,6 +93,8 @@ describe("memo PDF data", () => {
     expect(sections.summary).toContainEqual(["Floor area", "Not available"]);
     expect(sections.summary).toContainEqual(["Price per sqft", "Not available"]);
     expect(sections.summary).toContainEqual(["Data Confidence", "Not available"]);
+    expect(sections.investmentThesis.summary).toContain("no verified guide price");
+    expect(sections.investmentThesis.summary).toContain("no verified yield");
     expect(sections.missingData).toEqual(["Needs review: key underwriting fields are missing or incomplete."]);
     expect(sections.sourceUrl).toBe("Not available");
   });
