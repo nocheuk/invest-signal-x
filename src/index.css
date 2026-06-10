@@ -170,7 +170,8 @@
   }
   .font-mono {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-feature-settings: 'tnum', 'zero';
+    font-feature-settings: 'tnum', 'zero' 0;
+    font-variant-numeric: tabular-nums;
   }
   .tabular {
     font-variant-numeric: tabular-nums;
