@@ -9,7 +9,7 @@ export const FINANCING_POSITIONS = ["Cash buyer", "Commercial mortgage", "Bridgi
 export const DEAL_PREFERENCES = ["Freehold only", "Leasehold accepted", "Tenanted investments", "Vacant possession", "Development potential", "Refurb required", "Planning upside", "Auction lots"] as const;
 export const DEAL_BLOCKERS = ["No tenant information", "Short lease", "POA/missing price", "Low confidence data", "Too much refurbishment", "Planning uncertainty", "Small lot size", "Large lot size", "None"] as const;
 export const RISK_APPETITES = ["Conservative", "Balanced", "Opportunistic", "Distressed/high-risk"] as const;
-export const ALERT_PREFERENCES = ["Daily", "Weekly", "Only Green Candidates", "Only Top Opportunities", "No alerts yet"] as const;
+export const ALERT_PREFERENCES = ["Daily", "Weekly", "Only Strong Opportunities", "Only Top Opportunities", "No alerts yet"] as const;
 export const EXPERIENCE_LEVELS = ["Beginner", "Intermediate", "Experienced", "Professional/institutional"] as const;
 export const BUDGET_RANGES = ["Up to GBP 250k", "GBP 250k - GBP 500k", "GBP 500k - GBP 1m", "GBP 1m - GBP 2.5m", "GBP 2.5m - GBP 5m", "GBP 5m+"] as const;
 
@@ -171,7 +171,7 @@ export function alertFromOnboarding(answers: InvestorOnboardingAnswers): SaveAle
     minYield: answers.yieldNotImportant ? 0 : answers.minYieldTarget,
     maxPrice: answers.maxBudget !== DEFAULT_ONBOARDING.maxBudget ? answers.maxBudget : budgetMaxPrice(answers.budgetRange),
     assetType,
-    minScore: answers.alertPreference === "Only Green Candidates" || answers.alertPreference === "Only Top Opportunities" ? 72 : 60,
+    minScore: isOpportunityOnlyAlertPreference(answers.alertPreference) ? 72 : 60,
     enabled: true,
   };
 }
@@ -180,7 +180,7 @@ export function alertPreferencesFromOnboarding(answers: InvestorOnboardingAnswer
   return {
     email: answers.alertPreference !== "No alerts yet",
     frequency: answers.alertPreference === "Weekly" ? "weekly" : "daily",
-    min_score: answers.alertPreference === "Only Green Candidates" || answers.alertPreference === "Only Top Opportunities" ? 72 : 60,
+    min_score: isOpportunityOnlyAlertPreference(answers.alertPreference) ? 72 : 60,
   };
 }
 
@@ -246,6 +246,11 @@ function budgetMaxPrice(value: string) {
   if (value.includes("500k")) return 500000;
   if (value.includes("250k")) return 250000;
   return 0;
+}
+
+function isOpportunityOnlyAlertPreference(value: string) {
+  const legacyCandidatePreference = ["Only", "Green", "Candidates"].join(" ");
+  return value === "Only Strong Opportunities" || value === legacyCandidatePreference || value === "Only Top Opportunities";
 }
 
 function objectValue(value: unknown): Record<string, unknown> {

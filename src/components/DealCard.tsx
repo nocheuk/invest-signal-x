@@ -132,7 +132,7 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
 
         {candidateReasons.length > 0 && (
           <div className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
-            Green Candidate: {candidateReasons.slice(0, 2).join("; ")}.
+            Strong Opportunity: {candidateReasons.slice(0, 2).join("; ")}.
           </div>
         )}
 

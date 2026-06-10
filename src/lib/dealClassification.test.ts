@@ -45,12 +45,12 @@ function deal(overrides: Partial<Deal> = {}): Deal {
 }
 
 describe("deal classification", () => {
-  it("keeps verified green strict", () => {
+  it("keeps Top Opportunity strict", () => {
     expect(classifyDeal(deal({ score: 78, dataConfidenceScore: 80, rating: "green" }))).toBe("verified-green");
     expect(classifyDeal(deal({ score: 78, dataConfidenceScore: 79, rating: "green" }))).toBe("green-candidate");
   });
 
-  it("classifies high-potential imported deals as green candidates", () => {
+  it("classifies high-potential imported deals as Strong Opportunities", () => {
     const candidate = deal({ score: 72, dataConfidenceScore: 75, guidePrice: 500000, passingRent: 0, netInitialYield: 8 });
 
     expect(isGreenCandidate(candidate)).toBe(true);
@@ -58,7 +58,7 @@ describe("deal classification", () => {
     expect(greenCandidateReasons(candidate)).toContain("Guide price is available");
   });
 
-  it("requires price and yield or rent for green candidates", () => {
+  it("requires price and yield or rent for Strong Opportunities", () => {
     expect(classifyDeal(deal({ guidePrice: 0 }))).toBe("low-priority");
     expect(classifyDeal(deal({ passingRent: 0, netInitialYield: 0, grossYield: 0 }))).toBe("low-priority");
   });
@@ -80,6 +80,8 @@ describe("deal classification", () => {
 
     expect(isLowPriority(diligence)).toBe(false);
     expect(classifyDeal(diligence)).toBe("requires-due-diligence");
+    expect(classificationLabel("verified-green")).toBe("Top Opportunity");
+    expect(classificationLabel("green-candidate")).toBe("Strong Opportunity");
     expect(classificationLabel("requires-due-diligence")).toBe("Requires Due Diligence");
   });
 

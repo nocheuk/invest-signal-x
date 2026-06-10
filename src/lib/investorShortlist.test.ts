@@ -54,7 +54,7 @@ describe("investor shortlist", () => {
 
     expect(result[0].deal.id).toBe("candidate");
     expect(result[0].reasons).toEqual(expect.arrayContaining([
-      "Green Candidate classification",
+      "Strong Opportunity classification",
       "Confidence 82",
       "NIY 8.50%",
     ]));

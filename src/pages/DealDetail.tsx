@@ -277,7 +277,7 @@ export default function DealDetail() {
         <section className="ds-card p-6 space-y-3">
           <h2 className="font-display text-2xl">Diligence classification</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            This deal is currently classified as {classificationLabel(classification)}. Verified Green remains deliberately strict: score at least 78 and confidence at least 80. Green Candidate keeps that strict tier intact, while Requires Due Diligence means the opportunity has usable acquisition data but still needs source documents, lease checks or comparable evidence. Low Priority is reserved for sparse or severe missing-data listings.
+            This deal is currently classified as {classificationLabel(classification)}. Top Opportunity remains deliberately strict: score at least 78 and confidence at least 80. Strong Opportunity keeps that strict tier intact, while Requires Due Diligence means the opportunity has usable acquisition data but still needs source documents, lease checks or comparable evidence. Low Priority is reserved for sparse or severe missing-data listings.
           </p>
           {classification === "green-candidate" && (
             <ul className="space-y-1.5">

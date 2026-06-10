@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ASSET_TYPES, REGIONS, type Rating } from "@/lib/deals";
-import { classifyDeal, type DealClassification } from "@/lib/dealClassification";
+import { classificationLabel, classifyDeal, type DealClassification } from "@/lib/dealClassification";
 import { useStrategy } from "@/lib/strategy";
 import { useWatchlist, PIPELINE_STATUSES, type PipelineStatus } from "@/lib/watchlist";
 import { useRealDeals } from "@/hooks/useRealDeals";
@@ -34,7 +34,7 @@ export default function AllDeals() {
   const [region, setRegion] = useState("All UK");
   const [asset, setAsset] = useState("All");
   const [source, setSource] = useState(isSupabaseConfigured ? ALL_REAL_DEALS_FILTER : "All");
-  const [rating, setRating] = useState<"all" | Rating | DealClassification>((searchParams.get("classification") as DealClassification) ?? "all");
+  const [rating, setRating] = useState<"all" | Rating | DealClassification>(parseClassificationParam(searchParams.get("classification")));
   const [confidence, setConfidence] = useState<"all" | "high" | "medium" | "low">("all");
   const [pipelineStatus, setPipelineStatus] = useState<"all" | PipelineStatus>("all");
   const [freshnessFilter, setFreshnessFilter] = useState<FreshnessFilter>((searchParams.get("freshness") as FreshnessFilter) ?? "all");
@@ -58,6 +58,13 @@ export default function AllDeals() {
     }
     if (onboardingDefaults.minYield) setMinYield(onboardingDefaults.minYield);
   }, [onboardingDefaults.assetType, onboardingDefaults.locationQuery, onboardingDefaults.minYield, searchParams]);
+
+  useEffect(() => {
+    setRating(parseClassificationParam(searchParams.get("classification")));
+    setFreshnessFilter(parseFreshnessParam(searchParams.get("freshness")));
+    setLocationQuery(searchParams.get("location") ?? onboardingDefaults.locationQuery ?? "");
+    setSearch(searchParams.get("q") ?? "");
+  }, [onboardingDefaults.locationQuery, searchParams]);
 
   const sourceOptions = useMemo(() => {
     const options = buildSourceOptions(deals);
@@ -95,7 +102,7 @@ export default function AllDeals() {
 
         <section className="grid gap-4 md:grid-cols-4">
           <MiniMetric label="Filtered deals" value={filtered.length} sub={`${kpis.importedDeals.toLocaleString()} imported`} />
-          <MiniMetric label="Green Candidates" value={kpis.greenCandidates} sub={`${kpis.verifiedGreens} verified green`} />
+          <MiniMetric label="Strong Opportunities" value={kpis.greenCandidates} sub={`${kpis.verifiedGreens} top opportunities`} />
           <MiniMetric label="New Today" value={freshness.newToday} sub={`${freshness.newThisWeek} this week`} />
           <MiniMetric label="Average Yield" value={`${kpis.averageYield.toFixed(1)}%`} sub={`${kpis.yieldSampleSize} samples`} />
         </section>
@@ -136,7 +143,7 @@ export default function AllDeals() {
               Clear filters
             </Button>
             {locationQuery && <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">Location: {locationQuery}</span>}
-            {rating !== "all" && <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">{rating}</span>}
+            {rating !== "all" && <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">{filterChipLabel(rating)}</span>}
           </div>
         </section>
 
@@ -187,7 +194,7 @@ function FeatureList({ title, deals, empty, areaIndex }: { title: string; deals:
 
 function MiniMetric({ label, value, sub }: { label: string; value: number | string; sub: string }) {
   return (
-    <div className="ds-glass p-4">
+    <div className="ds-glass p-4" data-testid={`metric-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-2 font-mono text-2xl font-semibold tabular">{typeof value === "number" ? value.toLocaleString() : value}</div>
       <div className="mt-1 text-xs text-muted-foreground">{sub}</div>
@@ -233,5 +240,36 @@ function FilterSelect({ label, value, onValueChange, options }: { label: string;
 }
 
 function formatOption(value: string) {
+  if (value === "verified-green") return "Top Opportunity";
+  if (value === "green-candidate") return "Strong Opportunity";
+  if (value === "green-candidates-week") return "Strong Opportunities This Week";
   return value.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
+function parseClassificationParam(value: string | null): "all" | Rating | DealClassification {
+  if (
+    value === "green" ||
+    value === "amber" ||
+    value === "red" ||
+    value === "verified-green" ||
+    value === "green-candidate" ||
+    value === "requires-due-diligence" ||
+    value === "low-priority"
+  ) return value;
+  if (value === "top-opportunity") return "verified-green";
+  if (value === "strong-opportunity") return "green-candidate";
+  return "all";
+}
+
+function parseFreshnessParam(value: string | null): FreshnessFilter {
+  if (value === "today" || value === "week" || value === "green-candidates-week" || value === "sources-today") return value;
+  return "all";
+}
+
+function filterChipLabel(value: "all" | Rating | DealClassification) {
+  if (value === "all") return "";
+  if (value === "verified-green" || value === "green-candidate" || value === "requires-due-diligence" || value === "low-priority") {
+    return classificationLabel(value);
+  }
+  return formatOption(value);
 }

@@ -78,7 +78,7 @@ export default function Alerts() {
             <h2 className="font-display text-2xl">{editingId ? "Edit alert" : "Create Alert"}</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            <Field label="Name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} placeholder="South Coast green candidates" />
+            <Field label="Name" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} placeholder="South Coast strong opportunities" />
             <Field label="Location" value={draft.locationQuery} onChange={(value) => setDraft({ ...draft, locationQuery: value })} placeholder="Bournemouth, Dorset, BH1..." />
             <label className="space-y-1.5 text-xs text-muted-foreground">
               Asset type

@@ -51,7 +51,7 @@ describe("investor onboarding helpers", () => {
       riskAppetite: "Opportunistic",
       targetLocations: ["Southampton"],
       budgetRange: "GBP 250k - GBP 500k",
-      alertPreference: "Only Green Candidates",
+      alertPreference: "Only Strong Opportunities",
     };
 
     expect(strategyFromOnboarding(answers).preset).toBe("Opportunistic");

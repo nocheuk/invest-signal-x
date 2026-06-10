@@ -34,8 +34,8 @@ const classificationDots: Record<DealClassification, string> = {
 };
 
 const classificationLabels: Record<DealClassification, string> = {
-  "verified-green": "Verified Green",
-  "green-candidate": "Green Candidate",
+  "verified-green": "Top Opportunity",
+  "green-candidate": "Strong Opportunity",
   "requires-due-diligence": "Requires Due Diligence",
   "low-priority": "Low Priority",
 };
