@@ -34,6 +34,38 @@ describe("deal enrichment engine", () => {
     expect(enrichment.investmentSummary).toContain("Investment let to National Retailer Ltd");
   });
 
+  it("extracts ASDA-style lease and rent review data from source detail text", () => {
+    const enrichment = extractDealEnrichment({
+      sourceUrl: "https://www.rightmove.co.uk/properties/753657524708977#/?channel=COM_BUY",
+      sourceName: "Rightmove Commercial",
+      html: `
+        <main>
+          <h1>Asda Stores Ltd, St Nicholas Gate Retail Park</h1>
+          <p>Long Let Asda Superstore Investment.</p>
+          <ul>
+            <li>Let to ASDA Stores Ltd until May 2038 (no breaks)</li>
+            <li>Current passing rent £771,722 pa</li>
+            <li>Rent reviews in 2028 and 2033</li>
+            <li>Fixed rental increases to £894,657 pa in 2028 and £1,037,175 pa in 2033</li>
+          </ul>
+        </main>
+      `,
+    });
+
+    expect(enrichment).toMatchObject({
+      tenantName: "ASDA Stores Ltd",
+      passingRent: 771722,
+      leaseLength: expect.any(Number),
+      wault: expect.any(Number),
+    });
+    expect(enrichment.extractedPayload).toMatchObject({
+      leaseExpiryText: "May 2038",
+      rentReviewDates: [2028, 2033],
+      rentReviewAmounts: [894657, 1037175],
+      covenantStrength: "Strong",
+    });
+  });
+
   it("stores enrichment and refreshes the linked deal without blocking imports", async () => {
     const supabase = createEnrichmentSupabaseMock();
     const result = await runDealEnrichment({

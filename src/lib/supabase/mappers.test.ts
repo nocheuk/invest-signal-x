@@ -89,7 +89,12 @@ describe("mapDealRow", () => {
         auction_info: {},
         vat_info: "VAT applicable",
         investment_summary: "Investment let to National Retailer Ltd.",
-        extracted_payload: {},
+        extracted_payload: {
+          leaseExpiryText: "May 2038",
+          rentReviews: [{ year: 2028, amount: 894657 }, { year: 2033, amount: 1037175 }],
+          covenantStrength: "Strong",
+          covenantVerified: true,
+        },
         created_at: "2026-06-10T08:00:00Z",
         updated_at: "2026-06-10T08:00:00Z",
       },
@@ -105,9 +110,18 @@ describe("mapDealRow", () => {
         status: "Enriched",
         epcRating: "B",
         vatInfo: "VAT applicable",
+        extractedPayload: {
+          leaseExpiryText: "May 2038",
+        },
       },
     });
     expect(deal.score).toBeGreaterThan(0);
     expect(deal.scoreReasons?.missingDataWarnings).not.toContain("Passing rent missing");
+    expect(deal.scoreReasons?.missingDataWarnings).not.toContain("Tenant covenant unknown");
+    expect(deal.scoreReasons?.missingDataWarnings).not.toContain("Lease length/WAULT missing");
+    expect(deal.redFlags).toEqual(expect.arrayContaining([
+      "Lease expiry extracted: May 2038",
+      "Rent reviews extracted: 2028: £894,657 pa; 2033: £1,037,175 pa",
+    ]));
   });
 });

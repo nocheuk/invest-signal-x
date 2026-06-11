@@ -47,6 +47,7 @@ export interface Deal {
     vatInfo?: string;
     auctionInfo?: Record<string, unknown>;
     investmentSummary?: string;
+    extractedPayload?: Record<string, unknown>;
     lastAttemptedAt?: string;
     lastError?: string;
   };
