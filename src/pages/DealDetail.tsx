@@ -9,6 +9,7 @@ import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { Hint } from "@/components/Hint";
 import { PIPELINE_STATUSES, type PipelineStatus, useWatchlist } from "@/lib/watchlist";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Bookmark, MapPin, Building2, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine, ExternalLink, CalendarDays } from "lucide-react";
@@ -20,6 +21,14 @@ import { getAreaIntelligence } from "@/lib/areaIntelligence";
 import { buildComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
+import {
+  DEFAULT_FINANCIAL_ASSUMPTIONS,
+  buildFinancialAnalysis,
+  formatFinancialMoney,
+  formatFinancialPercent,
+  type FinancialAssumptions,
+  type FinanceScenario,
+} from "@/lib/financialAnalysis";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -36,6 +45,7 @@ export default function DealDetail() {
   const sourceLinks = useDealSourceLinks(deal?.id);
   const { isWatched, notes, setNote, getPipelineStatus, setStatus, saveToPipeline } = useWatchlist();
   const [memoStatus, setMemoStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [financialAssumptions, setFinancialAssumptions] = useState<FinancialAssumptions>(DEFAULT_FINANCIAL_ASSUMPTIONS);
 
   if (isLoading) {
     return (
@@ -70,6 +80,7 @@ export default function DealDetail() {
   const visibleYield = deal.netInitialYield || deal.grossYield;
   const pricePerSqft = deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0);
   const addedDate = new Date(deal.postedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const financialAnalysis = buildFinancialAnalysis(deal, financialAssumptions);
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
     try {
@@ -168,6 +179,43 @@ export default function DealDetail() {
             <SnapshotMetric label="Added" value={addedDate} />
             <SnapshotMetric label="Confidence" value={deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100` : "Not available"} />
           </div>
+        </section>
+
+        <section className="ds-premium-panel p-6 space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Financial Analysis</div>
+              <h2 className="font-display text-2xl mt-1">Deal stack and return scenarios</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Deterministic estimate using guide price, passing rent and editable finance assumptions. Missing rent is not inferred.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-5">
+            <SnapshotMetric label="Guide price" value={formatFinancialMoney(financialAnalysis.acquisitionCosts.guidePrice)} />
+            <SnapshotMetric label="SDLT" value={formatFinancialMoney(financialAnalysis.acquisitionCosts.sdlt)} />
+            <SnapshotMetric label="Legal fees" value={formatFinancialMoney(financialAnalysis.acquisitionCosts.legalFees)} />
+            <SnapshotMetric label="Survey fees" value={formatFinancialMoney(financialAnalysis.acquisitionCosts.surveyFees)} />
+            <SnapshotMetric label="Total acquisition" value={formatFinancialMoney(financialAnalysis.acquisitionCosts.totalAcquisitionCost)} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+            <AssumptionInput label="Interest rate" suffix="%" value={financialAssumptions.interestRatePct} onChange={(value) => updateFinancialAssumption(setFinancialAssumptions, "interestRatePct", value)} />
+            <AssumptionInput label="Legal fees" value={financialAssumptions.legalFees} onChange={(value) => updateFinancialAssumption(setFinancialAssumptions, "legalFees", value)} />
+            <AssumptionInput label="Survey fees" value={financialAssumptions.surveyFees} onChange={(value) => updateFinancialAssumption(setFinancialAssumptions, "surveyFees", value)} />
+            <AssumptionInput label="Arrangement fee" suffix="%" value={financialAssumptions.arrangementFeePct} onChange={(value) => updateFinancialAssumption(setFinancialAssumptions, "arrangementFeePct", value)} />
+            <AssumptionInput label="Void allowance" suffix="%" value={financialAssumptions.voidAllowancePct} onChange={(value) => updateFinancialAssumption(setFinancialAssumptions, "voidAllowancePct", value)} />
+            <AssumptionInput label="Management" suffix="%" value={financialAssumptions.managementAllowancePct} onChange={(value) => updateFinancialAssumption(setFinancialAssumptions, "managementAllowancePct", value)} />
+          </div>
+          <div className="grid gap-3 xl:grid-cols-4">
+            {financialAnalysis.scenarios.map((scenario) => (
+              <FinanceScenarioCard key={scenario.name} scenario={scenario} />
+            ))}
+          </div>
+          {financialAnalysis.scenarios.every((scenario) => scenario.missingRent) && (
+            <div className="rounded-lg border border-signal-amber/30 bg-signal-amber-soft/20 px-4 py-3 text-xs text-signal-amber">
+              Passing rent is missing, so DealSignal cannot calculate net cashflow or cash-on-cash return without inventing income.
+            </div>
+          )}
         </section>
 
         <div className="grid lg:grid-cols-3 gap-5">
@@ -435,6 +483,65 @@ function SnapshotMetric({ label, value }: { label: string; value: string }) {
       <div className="mt-1 break-words font-mono text-sm font-semibold tabular">{value}</div>
     </div>
   );
+}
+
+function AssumptionInput({ label, value, suffix, onChange }: { label: string; value: number; suffix?: string; onChange: (value: number) => void }) {
+  return (
+    <label className="space-y-1.5 rounded-lg border border-border/60 bg-surface-2/40 p-3">
+      <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          min={0}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="h-8 bg-background/70 font-mono text-sm"
+        />
+        {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}
+      </div>
+    </label>
+  );
+}
+
+function FinanceScenarioCard({ scenario }: { scenario: FinanceScenario }) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-surface-2/50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">{scenario.name}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">{scenario.ltv ? `${Math.round(scenario.ltv * 100)}% loan-to-value` : "No debt"}</div>
+        </div>
+        <div className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+          {formatFinancialPercent(scenario.cashOnCashReturn)}
+        </div>
+      </div>
+      <div className="mt-4 space-y-2 text-xs">
+        <FinanceRow label="Cash required" value={formatFinancialMoney(scenario.cashRequired)} />
+        <FinanceRow label="Annual rent" value={formatFinancialMoney(scenario.annualRent)} />
+        <FinanceRow label="Finance cost" value={formatFinancialMoney(scenario.annualFinanceCost)} />
+        <FinanceRow label="Net cashflow" value={formatFinancialMoney(scenario.annualNetCashflow)} />
+        <FinanceRow label="Net yield" value={formatFinancialPercent(scenario.netYield)} />
+        <FinanceRow label="Cash-on-cash" value={formatFinancialPercent(scenario.cashOnCashReturn)} />
+      </div>
+    </div>
+  );
+}
+
+function FinanceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono font-medium tabular">{value}</span>
+    </div>
+  );
+}
+
+function updateFinancialAssumption(
+  setFinancialAssumptions: React.Dispatch<React.SetStateAction<FinancialAssumptions>>,
+  key: keyof FinancialAssumptions,
+  value: number
+) {
+  setFinancialAssumptions((current) => ({ ...current, [key]: Number.isFinite(value) ? value : 0 }));
 }
 
 function ActionButton({

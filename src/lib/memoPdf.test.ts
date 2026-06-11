@@ -99,6 +99,11 @@ describe("memo PDF data", () => {
     expect(sections.investmentThesis.summary).toContain("DealSignal Thesis:");
     expect(sections.investmentThesis.investorVerdict).toBe("Low Priority");
     expect(sections.investmentThesis.verifyNext).toEqual(expect.arrayContaining(["Confirm tenant covenant", "Confirm lease expiry and WAULT"]));
+    expect(sections.financialAnalysis).toEqual(expect.arrayContaining([
+      "Scenario: 60% LTV",
+      "Annual rent: Not available",
+      "Cash-on-cash return: Not available",
+    ]));
     expect(sections.opportunitySignals).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
     expect(sections.riskSignals).toEqual(expect.arrayContaining(["Passing rent missing", "Tenant covenant unknown"]));
     expect(sections.positiveDrivers).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
@@ -142,6 +147,11 @@ describe("memo PDF data", () => {
     expect(sections.investmentThesis.summary).toContain("Tenant recorded as ASDA Stores Ltd");
     expect(sections.investmentThesis.potentialUpside).toEqual(expect.arrayContaining([expect.stringContaining("Rent review uplift exists")]));
     expect(sections.investmentThesis.verifyNext).toEqual(expect.arrayContaining(["Verify rent review clauses"]));
+    expect(sections.financialAnalysis).toEqual(expect.arrayContaining([
+      "SDLT: £202k",
+      "Cash required: £1.94m",
+      "Annual net cashflow: £516k",
+    ]));
     expect(sections.comparableEvidence).toEqual(expect.arrayContaining([
       "Cleaned sample size: 14 usable imported comparables",
       "Raw local sample size: 18 imported peers",
