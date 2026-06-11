@@ -27,6 +27,7 @@ import { dashboardDefaultsFromPreferences, getInvestorPreferences, type Investor
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { formatGBP, formatPct, type Deal } from "@/lib/deals";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
+import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } from "@/lib/financialAnalysis";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -375,6 +376,8 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
   ]).slice(0, 3);
   const visibleYield = deal.netInitialYield || deal.grossYield;
   const strategyMatch = Math.max(0, Math.min(100, strategyScore));
+  const financialAnalysis = buildFinancialAnalysis(deal);
+  const defaultFinanceScenario = financialAnalysis.scenarios.find((scenario) => scenario.name === "60% LTV") ?? financialAnalysis.scenarios[0];
 
   return (
     <Link to={`/deal/${deal.id}`} className="ds-card-elevated block p-5 transition-all hover:-translate-y-0.5 hover:border-primary/40">
@@ -390,10 +393,12 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
         <ScorePill score={deal.score} rating={deal.rating} />
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-9">
         <Metric label="Opportunity" value={classificationLabel(classification)} emphasis={classification === "verified-green" || classification === "green-candidate"} />
         <Metric label="Guide price" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"} />
         <Metric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "Not available"} emphasis={Boolean(visibleYield)} />
+        <Metric label="Cash required" value={formatFinancialMoney(defaultFinanceScenario.cashRequired)} />
+        <Metric label="Cash-on-cash" value={formatFinancialPercent(defaultFinanceScenario.cashOnCashReturn)} emphasis={(defaultFinanceScenario.cashOnCashReturn ?? 0) >= 10} />
         <Metric label="Location" value={deal.location} />
         <Metric label="Source" value={sourceLabel(deal)} />
         <Metric label="Confidence" value={`${deal.dataConfidenceScore ?? 0}%`} emphasis={(deal.dataConfidenceScore ?? 0) >= 75} />

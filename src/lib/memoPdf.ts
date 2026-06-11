@@ -5,6 +5,7 @@ import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal } from "@/lib/dealClassification";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import { type ComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
+import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } from "@/lib/financialAnalysis";
 
 type JsPdfDocument = {
   setProperties: (properties: Record<string, string>) => void;
@@ -49,6 +50,7 @@ export function buildMemoSections(deal: Deal, options: { comparableEvidence?: Co
   const reasons = deal.scoreReasons;
   const analysis = getDealAnalysis(deal);
   const thesis = buildInvestmentThesis(deal, { comparableEvidence: options.comparableEvidence });
+  const financialAnalysis = buildFinancialAnalysis(deal);
   return {
     summary: [
       ["Location", deal.location],
@@ -64,6 +66,7 @@ export function buildMemoSections(deal: Deal, options: { comparableEvidence?: Co
     ],
     investmentSummary: analysis.investmentSummary,
     investmentThesis: thesis,
+    financialAnalysis: memoFinancialAnalysis(financialAnalysis),
     comparableEvidence: memoComparableEvidence(options.comparableEvidence),
     opportunitySignals: analysis.opportunitySignals.length ? analysis.opportunitySignals : ["No opportunity signal available from imported data yet."],
     riskSignals: analysis.riskSignals.length ? analysis.riskSignals : ["No specific risk signal recorded yet."],
@@ -137,6 +140,7 @@ function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date
   y = writeWrapped(doc, sections.investmentThesis.summary, margin, y + 7, page.width - margin * 2, 4.8) + 3;
   y = writeListSection(doc, "Potential upside", sections.investmentThesis.potentialUpside, margin, y, page);
   y = writeListSection(doc, "Investor verdict", [`${sections.investmentThesis.investorVerdict} (${sections.investmentThesis.confidenceLevel} confidence)`], margin, y, page);
+  y = writeListSection(doc, "Financial Analysis", sections.financialAnalysis, margin, y, page);
   y = writeListSection(doc, "Comparable Evidence", sections.comparableEvidence, margin, y, page);
   y = writeListSection(doc, "Opportunity signals", sections.opportunitySignals, margin, y, page);
   y = writeListSection(doc, "Risk signals", sections.riskSignals, margin, y, page);
@@ -217,6 +221,24 @@ function moneyOrUnavailable(value: number) {
 
 function percentOrUnavailable(value: number) {
   return value > 0 ? formatPct(value, 2) : "Not available";
+}
+
+function memoFinancialAnalysis(analysis: ReturnType<typeof buildFinancialAnalysis>) {
+  const scenario = analysis.scenarios.find((item) => item.name === "60% LTV") ?? analysis.scenarios[0];
+  return [
+    `Guide price: ${formatFinancialMoney(analysis.acquisitionCosts.guidePrice)}`,
+    `SDLT: ${formatFinancialMoney(analysis.acquisitionCosts.sdlt)}`,
+    `Legal fees: ${formatFinancialMoney(analysis.acquisitionCosts.legalFees)}`,
+    `Survey fees: ${formatFinancialMoney(analysis.acquisitionCosts.surveyFees)}`,
+    `Total acquisition cost: ${formatFinancialMoney(analysis.acquisitionCosts.totalAcquisitionCost)}`,
+    `Scenario: ${scenario.name}`,
+    `Cash required: ${formatFinancialMoney(scenario.cashRequired)}`,
+    `Annual rent: ${formatFinancialMoney(scenario.annualRent)}`,
+    `Annual finance cost: ${formatFinancialMoney(scenario.annualFinanceCost)}`,
+    `Annual net cashflow: ${formatFinancialMoney(scenario.annualNetCashflow)}`,
+    `Net yield: ${formatFinancialPercent(scenario.netYield)}`,
+    `Cash-on-cash return: ${formatFinancialPercent(scenario.cashOnCashReturn)}`,
+  ];
 }
 
 function memoComparableEvidence(evidence: ComparableEvidence | null | undefined) {
