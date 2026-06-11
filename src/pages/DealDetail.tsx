@@ -17,6 +17,7 @@ import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { formatAreaDelta, formatAreaValue, getAreaIntelligence } from "@/lib/areaIntelligence";
+import { buildComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 
@@ -60,7 +61,8 @@ export default function DealDetail() {
   const pipelineStatus = getPipelineStatus(deal.id) ?? "Saved";
   const dealAnalysis = getDealAnalysis(deal);
   const areaIntelligence = getAreaIntelligence(deal, allDeals);
-  const investmentThesis = buildInvestmentThesis(deal, { areaIntelligence });
+  const comparableEvidence = buildComparableEvidence(deal, allDeals);
+  const investmentThesis = buildInvestmentThesis(deal, { areaIntelligence, comparableEvidence });
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
   const primarySourceUrl = deal.sourceUrl ?? sourceLinks.data?.find((link) => link.source_url)?.source_url;
@@ -71,7 +73,7 @@ export default function DealDetail() {
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
     try {
-      await downloadDealMemoPdf(deal);
+      await downloadDealMemoPdf(deal, { comparableEvidence });
       setMemoStatus("idle");
     } catch (error) {
       console.error("Could not generate memo PDF", error);
@@ -265,6 +267,31 @@ export default function DealDetail() {
             <ReasonList title="What to verify next" items={investmentThesis.verifyNext} fallback="Standard title, lease and comparable checks still apply." tone="default" />
           </div>
           <div className="text-xs text-muted-foreground">Thesis confidence: {investmentThesis.confidenceLevel}</div>
+        </section>
+
+        <section className="ds-glass p-6 space-y-4">
+          <div>
+            <h2 className="font-display text-2xl">Comparable Evidence</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Benchmarks use imported DealSignal opportunities only, grouped by local area and asset type where the sample allows.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <SnapshotMetric label="This deal yield" value={formatComparableMetric(comparableEvidence.dealYield, "yield")} />
+            <SnapshotMetric label="Local avg yield" value={formatComparableMetric(comparableEvidence.averageYield, "yield")} />
+            <SnapshotMetric label="Yield difference" value={formatComparableMetric(comparableEvidence.yieldDifferencePercent, "percent")} />
+            <SnapshotMetric label="Yield percentile" value={formatComparableMetric(comparableEvidence.yieldPercentileRank, "percentile")} />
+            <SnapshotMetric label="This deal GBP/sqft" value={formatComparableMetric(comparableEvidence.dealPricePerSqft, "price")} />
+            <SnapshotMetric label="Local avg GBP/sqft" value={formatComparableMetric(comparableEvidence.averagePricePerSqft, "price")} />
+            <SnapshotMetric label="GBP/sqft difference" value={formatComparableMetric(comparableEvidence.pricePerSqftDifferencePercent, "percent")} />
+            <SnapshotMetric label="Sample size" value={`${comparableEvidence.sampleSize} imported comps`} />
+          </div>
+          {comparableEvidence.isLimited && (
+            <div className="rounded-lg border border-signal-amber/30 bg-signal-amber-soft/20 px-4 py-3 text-xs text-signal-amber">
+              Comparable evidence is limited in this area, so this should be verified manually.
+            </div>
+          )}
+          <ReasonList title="Evidence statements" items={comparableEvidence.statements} fallback="Comparable evidence is not available from imported DealSignal data yet." tone="primary" />
         </section>
 
         <section className="ds-glass p-6 space-y-4">
