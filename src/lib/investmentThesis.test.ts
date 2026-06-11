@@ -69,6 +69,62 @@ const area: AreaIntelligence = {
 };
 
 describe("investment thesis", () => {
+  it("generates a tenant, lease, and rent-aware ASDA-style thesis", () => {
+    const thesis = buildInvestmentThesis(deal({
+      title: "Asda Stores Ltd, St Nicholas Gate Retail Park",
+      location: "Carlisle, Cumberland",
+      guidePrice: 4250000,
+      passingRent: 771722,
+      grossYield: 18.16,
+      netInitialYield: 16.89,
+      sqft: 35807,
+      pricePerSqft: 119,
+      tenant: "ASDA Stores Ltd",
+      covenantStrength: "Strong",
+      tenantHealthScore: 90,
+      leaseLength: 12,
+      wault: 12,
+      rentReview: "Fixed uplift",
+      score: 77,
+      dataConfidenceScore: 76,
+      confidenceLevel: "high",
+      scoreReasons: {
+        positiveDrivers: ["Gross yield above 8%"],
+        negativeDrivers: [],
+        missingDataWarnings: ["No comparable evidence yet"],
+        verifyBeforeTrusting: [],
+      },
+      redFlags: [
+        "Lease expiry extracted: May 2038",
+        "Rent reviews extracted: 2028: GBP 894,657 pa; 2033: GBP 1,037,175 pa",
+      ],
+      enrichment: {
+        status: "Enriched",
+        extractedPayload: {
+          leaseExpiryText: "May 2038",
+          rentReviews: [
+            { year: 2028, amount: 894657 },
+            { year: 2033, amount: 1037175 },
+          ],
+        },
+      },
+    }), { strategyMatch: 82 });
+
+    expect(thesis.summary).toContain("ASDA Stores Ltd");
+    expect(thesis.whyInteresting).toEqual(expect.arrayContaining([
+      "Tenant is identified: ASDA Stores Ltd",
+      "Known tenant with 12 years income visibility",
+      "Lease expiry extracted: May 2038",
+    ]));
+    expect(thesis.potentialUpside).toEqual(expect.arrayContaining([
+      expect.stringContaining("Rent review uplift exists: 2028"),
+      "Long lease / known tenant supports income profile (12 years)",
+      "Matches your acquisition brief at 82%",
+    ]));
+    expect(thesis.verifyNext).toEqual(expect.arrayContaining(["Verify rent review clauses", "Check EPC", "Review title/legal pack", "Verify source listing accuracy"]));
+    expect(thesis.keyRisks.join(" ")).not.toMatch(/tenant unknown|lease information missing|tenant covenant unknown/i);
+  });
+
   it("generates a thesis from strong yield", () => {
     const thesis = buildInvestmentThesis(deal(), { areaIntelligence: area, strategyMatch: 82 });
 
@@ -106,6 +162,7 @@ describe("investment thesis", () => {
     expect(thesis.summary).toContain("no verified yield");
     expect(thesis.potentialUpside).toEqual(["No calculated upside signal is available from the imported data yet."]);
     expect(thesis.verifyNext).toEqual(expect.arrayContaining(["Confirm guide price", "Confirm passing rent", "Confirm floor area"]));
+    expect(`${thesis.summary} ${thesis.potentialUpside.join(" ")}`).not.toMatch(/\b(profit|roi|resale value|guaranteed)\b/i);
   });
 
   it("uses a cautious verdict for low confidence deals", () => {

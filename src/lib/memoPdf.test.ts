@@ -78,6 +78,43 @@ describe("memo PDF data", () => {
     expect(sections.sourceUrl).toBe("https://www.rightmove.co.uk/properties/174711599");
   });
 
+  it("includes the deterministic investment thesis in memo content", () => {
+    const sections = buildMemoSections(deal({
+      title: "Asda Stores Ltd, St Nicholas Gate Retail Park",
+      tenant: "ASDA Stores Ltd",
+      passingRent: 771722,
+      guidePrice: 4250000,
+      grossYield: 18.16,
+      netInitialYield: 16.89,
+      leaseLength: 12,
+      wault: 12,
+      covenantStrength: "Strong",
+      rentReview: "Fixed uplift",
+      score: 77,
+      dataConfidenceScore: 76,
+      scoreReasons: {
+        positiveDrivers: ["Gross yield above 8%"],
+        negativeDrivers: [],
+        missingDataWarnings: ["No comparable evidence yet"],
+        verifyBeforeTrusting: [],
+      },
+      enrichment: {
+        status: "Enriched",
+        extractedPayload: {
+          leaseExpiryText: "May 2038",
+          rentReviews: [
+            { year: 2028, amount: 894657 },
+            { year: 2033, amount: 1037175 },
+          ],
+        },
+      },
+    }));
+
+    expect(sections.investmentThesis.summary).toContain("Tenant recorded as ASDA Stores Ltd");
+    expect(sections.investmentThesis.potentialUpside).toEqual(expect.arrayContaining([expect.stringContaining("Rent review uplift exists")]));
+    expect(sections.investmentThesis.verifyNext).toEqual(expect.arrayContaining(["Verify rent review clauses"]));
+  });
+
   it("shows not available instead of inventing missing underwriting data", () => {
     const sections = buildMemoSections(deal({
       guidePrice: 0,
