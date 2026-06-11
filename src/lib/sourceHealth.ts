@@ -4,6 +4,7 @@ import type { Deal } from "@/lib/deals";
 import { IMPORT_SOURCE_OPTIONS, normalizeSourceLabel, sourceLabel } from "@/lib/dashboardFilters";
 
 export type SourceHealthStatus = "Healthy" | "Warning" | "Blocked" | "Disabled";
+export type InvestorSourceStatus = "Active" | "Monitoring" | "Limited data" | "Updating soon";
 
 export type SourceHealthRow = {
   source: string;
@@ -81,6 +82,20 @@ export function summarizeSourceHealth(rows: SourceHealthRow[]) {
     Blocked: 0,
     Disabled: 0,
   } satisfies Record<SourceHealthStatus, number>);
+}
+
+export function investorSourceStatus(row: SourceHealthRow): InvestorSourceStatus {
+  if (row.totalImportedDeals > 0 && row.status === "Healthy") return "Active";
+  if (row.totalImportedDeals > 0) return "Limited data";
+  if (row.status === "Blocked" || row.scheduleGroup === "problematic") return "Updating soon";
+  return "Monitoring";
+}
+
+export function splitInvestorSourceRows(rows: SourceHealthRow[]) {
+  return {
+    visibleRows: rows.filter((row) => row.totalImportedDeals > 0),
+    monitoredRows: rows.filter((row) => row.totalImportedDeals === 0),
+  };
 }
 
 function classifySourceStatus({
