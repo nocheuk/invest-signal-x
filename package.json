@@ -25,6 +25,7 @@
     "scrape:site": "node --import tsx scripts/scrape-site.mjs",
     "scan:national": "node --import tsx scripts/scan-national.mjs",
     "enrich:deals": "node --import tsx scripts/enrich-deals.mjs",
+    "audit:extraction": "node --import tsx scripts/audit-extraction.mjs",
     "benchmark:national-scan": "node --import tsx scripts/benchmark-national-scan.mjs",
     "validate:rightmove-locations": "node --import tsx scripts/validate-rightmove-locations.mjs",
     "seed:deals": "tsx scripts/seed-deals.mjs",

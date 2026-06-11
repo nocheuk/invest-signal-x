@@ -320,6 +320,38 @@ describe("custom Rightmove Commercial HTML scraper", () => {
     expect(rows[0].normalized.passingRent).toBe(60000);
     expect(filterRightmoveAcquisitionRows(rows).importRows).toHaveLength(1);
   });
+
+  it("extracts ASDA-style structured investment facts without using review uplifts as passing rent", () => {
+    const rows = scrapeRightmoveCommercialHtmlToImportRows({
+      html: pageWithCard(`
+        <article data-testid="property-card">
+          <a href="/properties/753657524708977#/?channel=COM_BUY">
+            <h2>Asda Stores Ltd, St Nicholas Gate Retail Park, London Road, Carlisle, Cumberland</h2>
+            <address>Asda Stores Ltd, St Nicholas Gate Retail Park, London Road, Carlisle, Cumberland</address>
+            <div data-testid="property-price">£4,250,000 Guide Price 35,807 sq. ft.</div>
+            <p>Long Let Asda Superstore Investment - FOR SALE BY AUCTION 11TH JUNE 2026. Let to ASDA Stores Ltd until May 2038 (no breaks). Fixed rental increases to £894,657 pa in 2028 and £1,037,175 pa in 2033.</p>
+          </a>
+        </article>
+      `),
+      pageUrl,
+    });
+
+    expect(rows[0].normalized).toMatchObject({
+      tenant: "ASDA Stores Ltd",
+      guidePrice: 4250000,
+      sqft: 35807,
+      passingRent: undefined,
+      leaseLength: expect.any(Number),
+      wault: expect.any(Number),
+      covenantStrength: "Strong",
+      rentReview: "Fixed uplift",
+    });
+    expect(rows[0].normalized.redFlags).toEqual(expect.arrayContaining([
+      "Lease expiry extracted: May 2038",
+      "Rent reviews extracted: 2028: £894,657 pa; 2033: £1,037,175 pa",
+    ]));
+    expect(rows[0].normalized.redFlags).not.toContain("Tenant covenant unknown");
+  });
 });
 
 function pageWithCard(cardHtml: string) {

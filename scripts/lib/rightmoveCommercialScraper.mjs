@@ -4,6 +4,7 @@ import {
   extractPostcode,
   validateImportRow,
 } from "./dealImportCore.mjs";
+import { extractInvestmentFacts } from "./investmentDataExtraction.mjs";
 
 export const RIGHTMOVE_CUSTOM_SCRAPER_VERSION = "custom-rightmove-commercial-v1";
 export const RIGHTMOVE_PARSE_ERROR = "Rightmove page could not be parsed. The custom scraper may need updating.";
@@ -203,6 +204,14 @@ export function filterRightmoveAcquisitionRows(rows) {
 function normalizeRightmoveListing(item) {
   const title = item.title || item.displayAddress || "Rightmove commercial listing";
   const location = item.displayAddress || title;
+  const facts = extractInvestmentFacts({
+    title,
+    description: item.description,
+    text: item.rawText,
+    payload: item,
+  });
+  const passingRent = facts.passingRent ?? parseNumber(item.rent);
+  const rentReview = facts.rentReviews.length > 0 ? "Fixed uplift" : undefined;
   return {
     externalId: item.propertyId || item.propertyUrl,
     sourceUrl: item.propertyUrl,
@@ -214,14 +223,32 @@ function normalizeRightmoveListing(item) {
     assetType: mapAssetType(item.propertyType || title || item.description),
     source: "Private treaty",
     guidePrice: item.guidePrice,
-    passingRent: parseNumber(item.rent),
+    passingRent,
     sqft: parseNumber(item.sizeSqFt),
-    tenant: "Unknown",
-    covenantStrength: "Moderate",
+    tenant: facts.tenantName ?? "Unknown",
+    covenantStrength: facts.covenantStrength ?? "Moderate",
+    tenantHealthScore: facts.covenantStrength === "Strong" ? 90 : facts.covenantStrength === "Good" ? 76 : undefined,
+    rentReview,
     mainRiskFlag: "Rightmove custom scraper import awaiting analyst review",
     description: item.description,
+    leaseLength: facts.leaseLength,
+    wault: facts.wault,
+    redFlags: buildRightmoveExtractionFlags(facts),
     postedAt: item.addedOn ? parseListedDate(item.addedOn) : new Date().toISOString(),
   };
+}
+
+function buildRightmoveExtractionFlags(facts) {
+  const flags = [];
+  if (facts.leaseExpiryText) flags.push(`Lease expiry extracted: ${facts.leaseExpiryText}`);
+  if (facts.rentReviews.length) {
+    const reviewText = facts.rentReviews
+      .map((review) => review.amount ? `${review.year}: £${review.amount.toLocaleString()} pa` : String(review.year))
+      .join("; ");
+    flags.push(`Rent reviews extracted: ${reviewText}`);
+  }
+  if (facts.tenantName && !facts.covenantVerified) flags.push("Tenant covenant not independently verified");
+  return flags;
 }
 
 function assertParseableHtml(html) {
@@ -409,7 +436,8 @@ function extractAddressFromText(text) {
 }
 
 function extractRent(text) {
-  return text.match(/(\u00a3[\d,]+(?:\.\d+)?\s*(?:pa|per annum|annum|pcm|per month|pw|per week))/i)?.[1] ?? "";
+  const facts = extractInvestmentFacts({ text });
+  return facts.passingRent ? `£${facts.passingRent.toLocaleString()} pa` : "";
 }
 
 function extractSqft(text) {

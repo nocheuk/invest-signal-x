@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 import { mapImportToDealInsert } from "./dealImportCore.mjs";
 import { parseMoney, parseRent, parseSize, USER_AGENT } from "./commercialSourceScraper.mjs";
+import { extractInvestmentFacts } from "./investmentDataExtraction.mjs";
 
 const DEFAULT_LIMIT = 25;
 const DEFAULT_TIMEOUT_MS = 20000;
@@ -72,14 +73,20 @@ export function extractDealEnrichment({ html, sourceUrl = "", sourceName = "" } 
   const areaText = findContext(text, /(floor\s+area|area|sq\s*ft|sqft|gia|nia)\b/i);
   const summary = pickInvestmentSummary(paragraphs);
   const auctionInfo = extractAuctionInfo(text);
+  const facts = extractInvestmentFacts({
+    title: $("h1, title").first().text(),
+    description: summary,
+    text,
+    payload: { paragraphs },
+  });
 
   return {
     sourceUrl,
     sourceName,
-    tenantName: extractTenant(text),
-    passingRent: parseRent(rentText || text),
-    leaseLength: extractYears(text, /(lease\s+length|lease\s+term|unexpired\s+term|term\s+certain|lease)\D{0,70}(\d+(?:\.\d+)?)\s*(?:years|yrs|year)/i),
-    wault: extractYears(text, /\bWAULT\b\D{0,50}(\d+(?:\.\d+)?)\s*(?:years|yrs|year)?/i),
+    tenantName: facts.tenantName ?? extractTenant(text),
+    passingRent: facts.passingRent ?? parseRent(rentText || text),
+    leaseLength: facts.leaseLength ?? extractYears(text, /(lease\s+length|lease\s+term|unexpired\s+term|term\s+certain|lease)\D{0,70}(\d+(?:\.\d+)?)\s*(?:years|yrs|year)/i),
+    wault: extractYears(text, /\bWAULT\b\D{0,50}(\d+(?:\.\d+)?)\s*(?:years|yrs|year)?/i) ?? facts.wault,
     epcRating: extractEpc(text),
     sqft: parseSize(areaText || text),
     guidePrice: parseMoney(guideText || text),
@@ -92,6 +99,13 @@ export function extractDealEnrichment({ html, sourceUrl = "", sourceName = "" } 
       areaText,
       summary,
       auctionInfo,
+      leaseExpiryText: facts.leaseExpiryText,
+      leaseExpiryDate: facts.leaseExpiryDate,
+      rentReviewDates: facts.rentReviewDates,
+      rentReviewAmounts: facts.rentReviewAmounts,
+      rentReviews: facts.rentReviews,
+      covenantStrength: facts.covenantStrength,
+      covenantVerified: facts.covenantVerified,
       sourceUrl,
     },
   };
@@ -240,6 +254,7 @@ async function applyEnrichmentToDeal({ supabase, candidate, enrichment }) {
     postedAt: deal.posted_at,
   };
   const rescored = mapImportToDealInsert(normalized, candidate.sourceName || "Source enrichment");
+  const extracted = enrichment.extractedPayload ?? {};
   const { error } = await supabase
     .from("deals")
     .update({
@@ -252,17 +267,31 @@ async function applyEnrichmentToDeal({ supabase, candidate, enrichment }) {
       wault: rescored.wault,
       lease_length: rescored.lease_length,
       tenant: rescored.tenant,
+      covenant_strength: extracted.covenantStrength ?? rescored.covenant_strength,
       tenant_health_score: rescored.tenant_health_score,
+      rent_review: Array.isArray(extracted.rentReviews) && extracted.rentReviews.length > 0 ? "Fixed uplift" : rescored.rent_review,
       price_per_sqft: rescored.price_per_sqft,
       score: rescored.score,
       rating: rescored.rating,
       score_breakdown: rescored.score_breakdown,
       insights: rescored.insights,
+      red_flags: mergeRedFlags(deal.red_flags, enrichment),
       main_risk_flag: rescored.main_risk_flag,
       updated_at: new Date().toISOString(),
     })
     .eq("id", deal.id);
   if (error) throw error;
+}
+
+function mergeRedFlags(existing, enrichment) {
+  const flags = Array.isArray(existing) ? [...existing] : [];
+  const payload = enrichment.extractedPayload ?? {};
+  if (payload.leaseExpiryText) flags.push(`Lease expiry extracted: ${payload.leaseExpiryText}`);
+  if (Array.isArray(payload.rentReviews) && payload.rentReviews.length > 0) {
+    flags.push(`Rent reviews extracted: ${payload.rentReviews.map((review) => review.amount ? `${review.year}: £${Number(review.amount).toLocaleString()} pa` : review.year).join("; ")}`);
+  }
+  if (enrichment.tenantName && !payload.covenantVerified) flags.push("Tenant covenant not independently verified");
+  return [...new Set(flags)];
 }
 
 export async function fetchDetailHtml(url, { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch } = {}) {

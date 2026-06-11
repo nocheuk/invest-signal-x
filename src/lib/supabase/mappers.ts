@@ -30,6 +30,7 @@ const defaultInsights: Deal["insights"] = {
 
 export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}): Deal {
   const enrichment = sourceMetadata.enrichment?.status === "enriched" ? sourceMetadata.enrichment : null;
+  const extractedPayload = objectRecord(enrichment?.extracted_payload);
   const guidePrice = enrichedNumber(enrichment?.guide_price, row.guide_price);
   const passingRent = enrichedNumber(enrichment?.passing_rent, row.passing_rent);
   const sqft = enrichedNumber(enrichment?.sqft, row.sqft);
@@ -111,7 +112,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     wault: enrichedNumber(enrichment?.wault, row.wault),
     leaseLength: enrichedNumber(enrichment?.lease_length, row.lease_length),
     tenant: enrichment?.tenant_name || row.tenant || "Unknown",
-    covenantStrength: row.covenant_strength as Deal["covenantStrength"],
+    covenantStrength: covenantStrengthFromPayload(extractedPayload) ?? row.covenant_strength as Deal["covenantStrength"],
     tenantHealthScore: safeNumber(row.tenant_health_score),
     rentSustainability: row.rent_sustainability as Deal["rentSustainability"],
     rentReview: row.rent_review as Deal["rentReview"],
@@ -122,7 +123,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
     cashflowAfterDebt: safeNumber(row.cashflow_after_debt),
     returnOnEquity: safeNumber(row.return_on_equity),
     auctionGuideRisk: row.auction_guide_risk as Deal["auctionGuideRisk"],
-    redFlags: row.red_flags ?? [],
+    redFlags: enrichRedFlags(row.red_flags ?? [], extractedPayload, enrichment?.tenant_name ?? undefined),
     mainRiskFlag: importedScore?.mainRiskFlag ?? (finalNeedsReview ? "Needs review" : row.main_risk_flag),
     score: finalScore,
     rating: finalRating,
@@ -136,6 +137,7 @@ export function mapDealRow(row: DealRow, sourceMetadata: DealSourceMetadata = {}
       vatInfo: sourceMetadata.enrichment.vat_info ?? undefined,
       auctionInfo: objectRecord(sourceMetadata.enrichment.auction_info),
       investmentSummary: sourceMetadata.enrichment.investment_summary ?? undefined,
+      extractedPayload: objectRecord(sourceMetadata.enrichment.extracted_payload),
       lastAttemptedAt: sourceMetadata.enrichment.last_attempted_at ?? undefined,
       lastError: sourceMetadata.enrichment.last_error ?? undefined,
     } : undefined,
@@ -213,4 +215,30 @@ function enrichmentStatusLabel(value: string): "Pending" | "Enriched" | "Failed"
 
 function objectRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+function covenantStrengthFromPayload(payload: Record<string, unknown> | undefined): Deal["covenantStrength"] | undefined {
+  const value = typeof payload?.covenantStrength === "string" ? payload.covenantStrength : "";
+  return ["Strong", "Good", "Moderate", "Weak", "Vacant"].includes(value) ? value as Deal["covenantStrength"] : undefined;
+}
+
+function enrichRedFlags(flags: string[], payload: Record<string, unknown> | undefined, tenantName?: string) {
+  const next = [...flags];
+  if (typeof payload?.leaseExpiryText === "string" && payload.leaseExpiryText) {
+    next.push(`Lease expiry extracted: ${payload.leaseExpiryText}`);
+  }
+  const rentReviews = Array.isArray(payload?.rentReviews) ? payload.rentReviews : [];
+  if (rentReviews.length > 0) {
+    next.push(`Rent reviews extracted: ${rentReviews.map((review) => {
+      if (!review || typeof review !== "object") return "";
+      const record = review as Record<string, unknown>;
+      const year = record.year ? String(record.year) : "";
+      const amount = Number(record.amount);
+      return Number.isFinite(amount) && amount > 0 ? `${year}: £${amount.toLocaleString()} pa` : year;
+    }).filter(Boolean).join("; ")}`);
+  }
+  if (tenantName && payload?.covenantVerified === false) {
+    next.push("Tenant covenant not independently verified");
+  }
+  return [...new Set(next)];
 }
