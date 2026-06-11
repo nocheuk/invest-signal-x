@@ -74,6 +74,9 @@ const comparableEvidence: ComparableEvidence = {
   area: "Bournemouth",
   assetType: "Retail",
   sampleSize: 8,
+  rawSampleSize: 10,
+  cleanedSampleSize: 8,
+  excludedSampleSize: 2,
   yieldSampleSize: 8,
   pricePerSqftSampleSize: 8,
   dealYield: 8.1,
@@ -167,10 +170,17 @@ describe("investment thesis", () => {
 
   it("references comparable evidence and low-sample caution", () => {
     const thesis = buildInvestmentThesis(deal(), {
-      comparableEvidence: { ...comparableEvidence, sampleSize: 2, isLimited: true },
+      comparableEvidence: {
+        ...comparableEvidence,
+        sampleSize: 2,
+        cleanedSampleSize: 2,
+        yieldDifferencePercent: null,
+        pricePerSqftDifferencePercent: null,
+        isLimited: true,
+      },
     });
 
-    expect(thesis.whyInteresting).toEqual(expect.arrayContaining(["Yield is 33% above comparable imported deals"]));
+    expect(thesis.whyInteresting).not.toEqual(expect.arrayContaining(["Yield is 33% above comparable imported deals"]));
     expect(thesis.keyRisks).toEqual(expect.arrayContaining(["Comparable evidence is limited"]));
   });
 

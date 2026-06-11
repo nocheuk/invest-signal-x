@@ -284,11 +284,13 @@ export default function DealDetail() {
             <SnapshotMetric label="This deal GBP/sqft" value={formatComparableMetric(comparableEvidence.dealPricePerSqft, "price")} />
             <SnapshotMetric label="Local avg GBP/sqft" value={formatComparableMetric(comparableEvidence.averagePricePerSqft, "price")} />
             <SnapshotMetric label="GBP/sqft difference" value={formatComparableMetric(comparableEvidence.pricePerSqftDifferencePercent, "percent")} />
-            <SnapshotMetric label="Sample size" value={`${comparableEvidence.sampleSize} imported comps`} />
+            <SnapshotMetric label="Cleaned sample" value={`${comparableEvidence.cleanedSampleSize} usable comps`} />
+            <SnapshotMetric label="Raw sample" value={`${comparableEvidence.rawSampleSize} imported peers`} />
+            <SnapshotMetric label="Excluded" value={`${comparableEvidence.excludedSampleSize} outlier/incomplete`} />
           </div>
           {comparableEvidence.isLimited && (
             <div className="rounded-lg border border-signal-amber/30 bg-signal-amber-soft/20 px-4 py-3 text-xs text-signal-amber">
-              Comparable evidence is limited in this area, so this should be verified manually.
+              Comparable evidence limited. Fewer than five usable local peers remain after excluding outliers, incomplete records and low-confidence data.
             </div>
           )}
           <ReasonList title="Evidence statements" items={comparableEvidence.statements} fallback="Comparable evidence is not available from imported DealSignal data yet." tone="primary" />

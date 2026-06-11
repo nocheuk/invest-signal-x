@@ -221,8 +221,21 @@ function percentOrUnavailable(value: number) {
 
 function memoComparableEvidence(evidence: ComparableEvidence | null | undefined) {
   if (!evidence) return ["Comparable evidence was not included in this memo export."];
+  if (evidence.isLimited) {
+    return [
+      `Cleaned sample size: ${evidence.cleanedSampleSize} usable imported comparable${evidence.cleanedSampleSize === 1 ? "" : "s"}`,
+      `Raw local sample size: ${evidence.rawSampleSize} imported peer${evidence.rawSampleSize === 1 ? "" : "s"}`,
+      `Excluded from benchmarks: ${evidence.excludedSampleSize} peer${evidence.excludedSampleSize === 1 ? "" : "s"}`,
+      `This deal yield: ${formatComparableMetric(evidence.dealYield, "yield")}`,
+      `This deal GBP/sqft: ${formatComparableMetric(evidence.dealPricePerSqft, "price")}`,
+      "Comparable evidence limited: fewer than five usable local peers remain after excluding outliers, incomplete records and low-confidence data.",
+      ...evidence.statements,
+    ];
+  }
   return [
-    `Sample size: ${evidence.sampleSize} imported comparable${evidence.sampleSize === 1 ? "" : "s"}`,
+    `Cleaned sample size: ${evidence.cleanedSampleSize} usable imported comparable${evidence.cleanedSampleSize === 1 ? "" : "s"}`,
+    `Raw local sample size: ${evidence.rawSampleSize} imported peer${evidence.rawSampleSize === 1 ? "" : "s"}`,
+    `Excluded from benchmarks: ${evidence.excludedSampleSize} peer${evidence.excludedSampleSize === 1 ? "" : "s"}`,
     `This deal yield: ${formatComparableMetric(evidence.dealYield, "yield")}`,
     `Local average yield: ${formatComparableMetric(evidence.averageYield, "yield")}`,
     `Yield difference: ${formatComparableMetric(evidence.yieldDifferencePercent, "percent")}`,

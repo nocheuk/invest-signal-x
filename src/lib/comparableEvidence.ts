@@ -14,6 +14,9 @@ export type ComparableEvidence = {
   area: string | null;
   assetType?: string;
   sampleSize: number;
+  rawSampleSize: number;
+  cleanedSampleSize: number;
+  excludedSampleSize: number;
   yieldSampleSize: number;
   pricePerSqftSampleSize: number;
   dealYield: number | null;
@@ -31,6 +34,30 @@ export type ComparableEvidence = {
   shortEvidenceLine: string;
 };
 
+export type ComparableMetricAudit = {
+  count: number;
+  min: number | null;
+  max: number | null;
+  median: number | null;
+  p95: number | null;
+};
+
+export type ComparableOutlierAudit = {
+  yieldGreaterThan25: number;
+  yieldBelow1: number;
+  pricePerSqftGreaterThan2000: number;
+  pricePerSqftBelow10: number;
+};
+
+export type ComparableDatasetAudit = {
+  totalDeals: number;
+  importedDeals: number;
+  yieldStats: ComparableMetricAudit;
+  pricePerSqftStats: ComparableMetricAudit;
+  outlierCounts: ComparableOutlierAudit;
+  outliersBySource: Record<keyof ComparableOutlierAudit, Record<string, number>>;
+};
+
 type PeerGroup = {
   group: ComparableGroup;
   area: string;
@@ -40,6 +67,10 @@ type PeerGroup = {
 
 const MIN_STRONG_SAMPLE = 5;
 const MIN_USABLE_SAMPLE = 3;
+const MIN_VALID_YIELD = 1;
+const MAX_VALID_YIELD = 25;
+const MIN_VALID_PRICE_PER_SQFT = 10;
+const MAX_VALID_PRICE_PER_SQFT = 2000;
 
 export function buildComparableEvidence(deal: Deal, deals: Deal[]): ComparableEvidence {
   const peers = deals.filter((peer) => isImportedDeal(peer) && peer.id !== deal.id);
@@ -54,8 +85,51 @@ export function comparableEvidenceStatements(evidence: ComparableEvidence) {
 }
 
 export function comparableEvidenceSummary(evidence: ComparableEvidence) {
-  if (evidence.sampleSize === 0) return "Comparable evidence is not available from imported DealSignal data yet.";
+  if (evidence.rawSampleSize === 0) return "Comparable evidence is not available from imported DealSignal data yet.";
+  if (evidence.isLimited) return "Comparable evidence limited. The usable peer set is too small after excluding outliers and low-confidence records.";
   return evidence.statements[0] ?? "Comparable evidence is limited and should be verified manually.";
+}
+
+export function auditComparableDataset(deals: Deal[]): ComparableDatasetAudit {
+  const importedDeals = deals.filter(isImportedDeal);
+  const yieldValues = importedDeals.map(getYield).filter(isNumber);
+  const priceValues = importedDeals.map(getPricePerSqft).filter(isNumber);
+  const outlierCounts: ComparableOutlierAudit = {
+    yieldGreaterThan25: 0,
+    yieldBelow1: 0,
+    pricePerSqftGreaterThan2000: 0,
+    pricePerSqftBelow10: 0,
+  };
+  const outliersBySource: ComparableDatasetAudit["outliersBySource"] = {
+    yieldGreaterThan25: {},
+    yieldBelow1: {},
+    pricePerSqftGreaterThan2000: {},
+    pricePerSqftBelow10: {},
+  };
+
+  importedDeals.forEach((deal) => {
+    const source = comparableSourceLabel(deal);
+    const yieldValue = getYield(deal);
+    const priceValue = getPricePerSqft(deal);
+    if (yieldValue !== null && yieldValue > MAX_VALID_YIELD) incrementOutlier("yieldGreaterThan25", source);
+    if (yieldValue !== null && yieldValue < MIN_VALID_YIELD) incrementOutlier("yieldBelow1", source);
+    if (priceValue !== null && priceValue > MAX_VALID_PRICE_PER_SQFT) incrementOutlier("pricePerSqftGreaterThan2000", source);
+    if (priceValue !== null && priceValue < MIN_VALID_PRICE_PER_SQFT) incrementOutlier("pricePerSqftBelow10", source);
+  });
+
+  return {
+    totalDeals: deals.length,
+    importedDeals: importedDeals.length,
+    yieldStats: metricAudit(yieldValues),
+    pricePerSqftStats: metricAudit(priceValues),
+    outlierCounts,
+    outliersBySource,
+  };
+
+  function incrementOutlier(kind: keyof ComparableOutlierAudit, source: string) {
+    outlierCounts[kind] += 1;
+    outliersBySource[kind][source] = (outliersBySource[kind][source] ?? 0) + 1;
+  }
 }
 
 function chooseComparableGroup(deal: Deal, peers: Deal[]) {
@@ -67,7 +141,10 @@ function chooseComparableGroup(deal: Deal, peers: Deal[]) {
     groupFor(deal, peers, "region-asset"),
     groupFor(deal, peers, "region"),
   ].filter(Boolean) as PeerGroup[];
-  return candidates.find((candidate) => candidate.peers.length >= MIN_USABLE_SAMPLE) ?? candidates.find((candidate) => candidate.peers.length > 0) ?? null;
+  return candidates.find((candidate) => candidate.peers.filter(isValidComparablePeer).length >= MIN_STRONG_SAMPLE)
+    ?? candidates.find((candidate) => candidate.peers.length >= MIN_USABLE_SAMPLE)
+    ?? candidates.find((candidate) => candidate.peers.length > 0)
+    ?? null;
 }
 
 function groupFor(deal: Deal, peers: Deal[], group: ComparableGroup): PeerGroup | null {
@@ -89,30 +166,35 @@ function groupFor(deal: Deal, peers: Deal[], group: ComparableGroup): PeerGroup 
 }
 
 function evidenceFromGroup(deal: Deal, group: PeerGroup): ComparableEvidence {
-  const dealYield = positiveNumber(deal.netInitialYield || deal.grossYield);
-  const dealPricePerSqft = positiveNumber(deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0));
-  const yields = group.peers.map((peer) => positiveNumber(peer.netInitialYield || peer.grossYield)).filter(isNumber);
-  const prices = group.peers.map((peer) => positiveNumber(peer.pricePerSqft || (peer.guidePrice > 0 && peer.sqft > 0 ? peer.guidePrice / peer.sqft : 0))).filter(isNumber);
-  const averageYield = average(yields);
-  const averagePrice = average(prices);
+  const dealYield = getYield(deal);
+  const dealPricePerSqft = getPricePerSqft(deal);
+  const cleanedPeers = group.peers.filter(isValidComparablePeer);
+  const yields = cleanedPeers.map(getYield).filter(isNumber);
+  const prices = cleanedPeers.map(getPricePerSqft).filter(isNumber);
+  const hasUsableSample = cleanedPeers.length >= MIN_STRONG_SAMPLE;
+  const averageYield = hasUsableSample ? average(yields) : null;
+  const averagePrice = hasUsableSample ? average(prices) : null;
   const evidence: ComparableEvidence = {
     group: group.group,
     area: group.area,
     assetType: group.assetType,
-    sampleSize: group.peers.length,
-    yieldSampleSize: yields.length,
-    pricePerSqftSampleSize: prices.length,
+    sampleSize: cleanedPeers.length,
+    rawSampleSize: group.peers.length,
+    cleanedSampleSize: cleanedPeers.length,
+    excludedSampleSize: Math.max(0, group.peers.length - cleanedPeers.length),
+    yieldSampleSize: hasUsableSample ? yields.length : 0,
+    pricePerSqftSampleSize: hasUsableSample ? prices.length : 0,
     dealYield,
     averageYield,
-    medianYield: median(yields),
+    medianYield: hasUsableSample ? median(yields) : null,
     yieldDifferencePercent: percentageDelta(dealYield, averageYield),
-    yieldPercentileRank: percentileRank(dealYield, yields, "higher"),
+    yieldPercentileRank: hasUsableSample ? percentileRank(dealYield, yields, "higher") : null,
     dealPricePerSqft,
     averagePricePerSqft: averagePrice,
-    medianPricePerSqft: median(prices),
+    medianPricePerSqft: hasUsableSample ? median(prices) : null,
     pricePerSqftDifferencePercent: percentageDelta(dealPricePerSqft, averagePrice),
-    pricePerSqftPercentileRank: percentileRank(dealPricePerSqft, prices, "lower"),
-    isLimited: group.peers.length < MIN_STRONG_SAMPLE,
+    pricePerSqftPercentileRank: hasUsableSample ? percentileRank(dealPricePerSqft, prices, "lower") : null,
+    isLimited: !hasUsableSample,
     statements: [],
     shortEvidenceLine: "",
   };
@@ -121,6 +203,12 @@ function evidenceFromGroup(deal: Deal, group: PeerGroup): ComparableEvidence {
 
 function evidenceStatements(evidence: ComparableEvidence) {
   const statements: string[] = [];
+  if (evidence.isLimited) {
+    if (evidence.rawSampleSize > 0) {
+      return [`Comparable evidence limited: ${evidence.cleanedSampleSize} usable comps from ${evidence.rawSampleSize} raw local peers after excluding outliers, incomplete records and low-confidence data.`];
+    }
+    return ["Comparable evidence is not available from imported DealSignal data yet."];
+  }
   if (evidence.yieldDifferencePercent !== null && evidence.yieldSampleSize >= MIN_USABLE_SAMPLE) {
     if (evidence.yieldDifferencePercent >= 10) {
       statements.push(`Yield is ${Math.round(evidence.yieldDifferencePercent)}% above the local average based on ${evidence.yieldSampleSize} comparable imported opportunities.`);
@@ -139,18 +227,17 @@ function evidenceStatements(evidence: ComparableEvidence) {
       statements.push(`Price per sqft is broadly in line with the local average based on ${evidence.pricePerSqftSampleSize} comparable properties.`);
     }
   }
-  if (evidence.isLimited) statements.push("Comparable evidence is limited in this area, so this should be verified manually.");
   return statements.length ? statements : ["Comparable evidence is not available from imported DealSignal data yet."];
 }
 
 function shortEvidenceLine(evidence: ComparableEvidence) {
+  if (evidence.isLimited) return "Limited local comps";
   if (evidence.yieldDifferencePercent !== null && evidence.yieldSampleSize >= MIN_USABLE_SAMPLE && evidence.yieldDifferencePercent >= 10) {
     return `+${Math.round(evidence.yieldDifferencePercent)}% vs area yield`;
   }
   if (evidence.pricePerSqftDifferencePercent !== null && evidence.pricePerSqftSampleSize >= MIN_USABLE_SAMPLE && evidence.pricePerSqftDifferencePercent <= -10) {
     return `${Math.abs(Math.round(evidence.pricePerSqftDifferencePercent))}% below area GBP/sqft`;
   }
-  if (evidence.isLimited) return "Limited local comps";
   return evidence.sampleSize > 0 ? `${evidence.sampleSize} local comps` : "No local comps yet";
 }
 
@@ -161,6 +248,9 @@ function emptyEvidence(deal: Deal): ComparableEvidence {
     group: null,
     area: null,
     sampleSize: 0,
+    rawSampleSize: 0,
+    cleanedSampleSize: 0,
+    excludedSampleSize: 0,
     yieldSampleSize: 0,
     pricePerSqftSampleSize: 0,
     dealYield,
@@ -194,6 +284,13 @@ function percentileRank(value: number | null, peers: number[], direction: "highe
   return Math.round((beaten / peers.length) * 100);
 }
 
+function percentile(values: number[], percentileValue: number) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.ceil((percentileValue / 100) * sorted.length) - 1;
+  return sorted[Math.min(sorted.length - 1, Math.max(0, index))];
+}
+
 function percentageDelta(value: number | null, benchmark: number | null) {
   if (value === null || !benchmark) return null;
   return ((value - benchmark) / benchmark) * 100;
@@ -215,6 +312,44 @@ function isImportedDeal(deal: Deal) {
   return Boolean(deal.isImported || deal.importSourceName);
 }
 
+function isValidComparablePeer(deal: Deal) {
+  const guidePrice = positiveNumber(deal.guidePrice);
+  const yieldValue = getYield(deal);
+  const pricePerSqft = getPricePerSqft(deal);
+  return Boolean(
+    guidePrice
+    && isKnownAssetType(deal.assetType)
+    && hasComparableConfidence(deal)
+    && yieldValue !== null
+    && yieldValue >= MIN_VALID_YIELD
+    && yieldValue <= MAX_VALID_YIELD
+    && pricePerSqft !== null
+    && pricePerSqft >= MIN_VALID_PRICE_PER_SQFT
+    && pricePerSqft <= MAX_VALID_PRICE_PER_SQFT
+  );
+}
+
+function hasComparableConfidence(deal: Deal) {
+  if (deal.confidenceLevel) return deal.confidenceLevel === "medium" || deal.confidenceLevel === "high";
+  return Number(deal.dataConfidenceScore ?? 0) >= 45;
+}
+
+function isKnownAssetType(value: string | undefined) {
+  return Boolean(value && value.trim() && value.trim().toLowerCase() !== "unknown");
+}
+
+function getYield(deal: Deal) {
+  return positiveNumber(deal.netInitialYield || deal.grossYield);
+}
+
+function getPricePerSqft(deal: Deal) {
+  return positiveNumber(deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0));
+}
+
+function comparableSourceLabel(deal: Deal) {
+  return deal.importSourceName || deal.source || "Unknown";
+}
+
 function positiveNumber(value: number) {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
@@ -233,4 +368,14 @@ function median(values: number[]) {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function metricAudit(values: number[]): ComparableMetricAudit {
+  return {
+    count: values.length,
+    min: values.length ? Math.min(...values) : null,
+    max: values.length ? Math.max(...values) : null,
+    median: median(values),
+    p95: percentile(values, 95),
+  };
 }
