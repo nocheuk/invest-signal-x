@@ -23,7 +23,7 @@ const PLANS = [
       "DealSignal score and confidence",
       "Saved alerts",
       "Pipeline tracking",
-      "PDF investment memos",
+      "PDF investment packs",
     ],
   },
   {
@@ -39,7 +39,7 @@ const PLANS = [
       "More tracked pipeline deals",
       "Priority beta support",
       "Expanded source coverage as it ships",
-      "Exportable deal memos",
+      "Exportable investment packs",
       "Early access to scoring improvements",
     ],
   },

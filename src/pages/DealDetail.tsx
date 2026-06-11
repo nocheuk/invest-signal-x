@@ -87,7 +87,7 @@ export default function DealDetail() {
       await downloadDealMemoPdf(deal, { comparableEvidence });
       setMemoStatus("idle");
     } catch (error) {
-      console.error("Could not generate memo PDF", error);
+      console.error("Could not generate investment pack", error);
       setMemoStatus("error");
     }
   };
@@ -146,7 +146,7 @@ export default function DealDetail() {
                 {watched ? "In pipeline" : "Save to Pipeline"}
               </ActionButton>
               <ActionButton onClick={() => void handleDownloadMemo()} disabled={memoStatus === "loading"} icon={FileText}>
-                {memoStatus === "loading" ? "Generating memo..." : "Download Memo PDF"}
+                {memoStatus === "loading" ? "Generating pack..." : "Download Investment Pack"}
               </ActionButton>
               {primarySourceUrl && (
                 <Button asChild variant="outline" className="gap-2 border-white/10 bg-surface-2/70 hover:border-primary/40 hover:bg-primary/10">
@@ -157,10 +157,26 @@ export default function DealDetail() {
               )}
             </div>
             {memoStatus === "error" && (
-              <div className="mt-3 text-xs text-signal-red">Could not generate the memo PDF. Please try again.</div>
+              <div className="mt-3 text-xs text-signal-red">Could not generate the investment pack. Please try again.</div>
             )}
           </div>
         </div>
+
+        <section className="ds-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Investment Pack</div>
+              <h2 className="mt-1 font-display text-2xl">A structured pack for investor review</h2>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                Includes executive summary, investment thesis, tenant and lease data, cleaned comparable evidence, finance scenarios, verification checklist and disclaimer.
+              </p>
+            </div>
+            <Button type="button" variant="outline" disabled={memoStatus === "loading"} onClick={() => void handleDownloadMemo()} className="gap-2">
+              <FileText className="h-4 w-4" />
+              {memoStatus === "loading" ? "Generating..." : "Download pack"}
+            </Button>
+          </div>
+        </section>
 
         <section className="ds-glass p-5 lg:p-6 space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">

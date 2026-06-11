@@ -110,4 +110,19 @@ describe("DealDetail", () => {
     expect(screen.queryByText(/7,292/)).not.toBeInTheDocument();
     expect(screen.queryByText(/997 local deals/i)).not.toBeInTheDocument();
   });
+
+  it("renames the memo action to investment pack and shows the pack preview", () => {
+    render(
+      <MemoryRouter initialEntries={["/deal/imp-10a4m7"]}>
+        <Routes>
+          <Route path="/deal/:id" element={<DealDetail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("button", { name: /Download Investment Pack/i })).toBeInTheDocument();
+    expect(screen.getByText("A structured pack for investor review")).toBeInTheDocument();
+    expect(screen.getByText(/executive summary, investment thesis, tenant and lease data/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Download Memo PDF/i)).not.toBeInTheDocument();
+  });
 });

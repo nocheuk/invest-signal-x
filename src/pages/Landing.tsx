@@ -22,8 +22,8 @@ const CAPABILITIES = [
   },
   {
     icon: FileText,
-    title: "Investment memos",
-    body: "Generate clean PDF memos from real deal data, including source links, score reasons and what still needs verification.",
+    title: "Investment packs",
+    body: "Generate structured PDF investment packs from real deal data, including thesis, comparables, financial analysis and what still needs verification.",
   },
   {
     icon: Bookmark,
@@ -74,7 +74,7 @@ export default function Landing() {
                 Find commercial property investment opportunities across England automatically.
               </h1>
               <p className="mt-7 max-w-2xl mx-auto text-lg text-muted-foreground leading-relaxed">
-                DealSignal combines commercial property deal discovery, daily national scans, scoring, alerts, PDF memos and pipeline tracking in one focused workflow.
+                DealSignal combines commercial property deal discovery, daily national scans, scoring, alerts, PDF investment packs and pipeline tracking in one focused workflow.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center items-center">
                 <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 ds-glow gap-2 h-12 px-6">
