@@ -1,4 +1,5 @@
-const MONEY = "(?:£|GBP|gbp|Â£)\\s*(\\d{1,3}(?:,\\d{3})+|\\d{4,})(?:\\.\\d+)?";
+const MONEY = "(?:\\u00a3|\\u00c2\\u00a3|GBP|gbp|\\?)\\s*(\\d{1,3}(?:,\\d{3})+|\\d{4,})(?:\\.\\d+)?";
+
 const MONTHS = {
   jan: 0,
   january: 0,
@@ -54,7 +55,7 @@ export function extractInvestmentFacts({ text = "", title = "", description = ""
 export function extractTenantName(text) {
   const source = clean(text);
   const patterns = [
-    /\b(?:let|leased|sold subject)\s+to\s+([^.;\n\r]{3,100}?)(?=\s+(?:until|for|on\s+a|at\s+a|producing|with|subject|expir|from|$)|[.;\n\r])/i,
+    /(?:^|[^A-Za-z])(?:let|leased|sold subject)\s+to\s+([^.;\n\r]{3,100}?)(?=\s+(?:until|for|on\s+a|at\s+a|producing|with|subject|expir|from|$)|[.;\n\r])/i,
     /\btenant(?:\s+name)?\s*[:\-]\s*([^.;\n\r]{3,100})/i,
     /\boccupied\s+by\s+([^.;\n\r]{3,100}?)(?=\s+(?:until|for|on\s+a|at\s+a|producing|with|subject|expir|from|$)|[.;\n\r])/i,
   ];
@@ -68,9 +69,9 @@ export function extractTenantName(text) {
 export function extractPassingRent(text) {
   const source = clean(text);
   const contexts = [
-    /\b(?:current\s+)?passing\s+rent\D{0,45}(?:of\s+)?(?:£|GBP|gbp|Â£)\s*(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?\s*(?:pa|per\s+annum|annum|p\.?a\.?)\b/i,
-    /\b(?:gross\s+rental\s+income|rental\s+income|current\s+rent|rent\s+passing|producing)\D{0,45}(?:of\s+)?(?:£|GBP|gbp|Â£)\s*(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?\s*(?:pa|per\s+annum|annum|p\.?a\.?)\b/i,
-    /\brent\s+(?:of\s+)?(?:£|GBP|gbp|Â£)\s*(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?\s*(?:pa|per\s+annum|annum|p\.?a\.?)\b/i,
+    /\b(?:current\s+)?passing\s+rent\D{0,45}(?:of\s+)?(?:\u00a3|\u00c2\u00a3|GBP|gbp|\?)\s*(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?\s*(?:pa|per\s+annum|annum|p\.?a\.?)\b/i,
+    /\b(?:gross\s+rental\s+income|rental\s+income|current\s+rent|rent\s+passing|producing)\D{0,45}(?:of\s+)?(?:\u00a3|\u00c2\u00a3|GBP|gbp|\?)\s*(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?\s*(?:pa|per\s+annum|annum|p\.?a\.?)\b/i,
+    /\brent\s+(?:of\s+)?(?:\u00a3|\u00c2\u00a3|GBP|gbp|\?)\s*(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?\s*(?:pa|per\s+annum|annum|p\.?a\.?)\b/i,
     new RegExp(`${MONEY}\\s*(?:pa|per\\s+annum|annum|p\\.?a\\.?)\\b\\D{0,35}\\b(?:passing\\s+rent|rental\\s+income|current\\s+rent)`, "i"),
   ];
   for (const pattern of contexts) {
@@ -87,7 +88,7 @@ export function extractPassingRent(text) {
 export function extractLeaseExpiry(text) {
   const source = clean(text);
   const patterns = [
-    /\b(?:let|leased)[^.;\n\r]{0,120}?\buntil\s+([0-3]?\d\s+[A-Za-z]+\s+\d{4}|[A-Za-z]+\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{4})/i,
+    /(?:^|[^A-Za-z])(?:let|leased)[^.;\n\r]{0,120}?\buntil\s+([0-3]?\d\s+[A-Za-z]+\s+\d{4}|[A-Za-z]+\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{4})/i,
     /\b(?:lease\s+expiry|expiry|expires|expiring)\s*[:\-]?\s*([0-3]?\d\s+[A-Za-z]+\s+\d{4}|[A-Za-z]+\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{4})/i,
   ];
   for (const pattern of patterns) {
@@ -198,10 +199,13 @@ function trimFact(value) {
     .replace(/\s+\([^)]+$/, "")
     .replace(/\b(no\s+breaks?|breaks?)\b.*$/i, "")
     .replace(/\b(?:producing|at|on|until|for|with|subject|from)\b.*$/i, "")
-    .replace(/[-–|]+$/g, "")
+    .replace(/[-|]+$/g, "")
     .trim();
 }
 
 function clean(value) {
-  return String(value ?? "").replace(/\s+/g, " ").trim();
+  return String(value ?? "")
+    .replace(/([a-z0-9)])(?=(Let\s+to|Leased\s+to|Fixed\s+rental|Gross\s+rental|Rental\s+income|Current\s+rent|Passing\s+rent|Rent\s+reviews?|Marketed\s+by))/gi, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
