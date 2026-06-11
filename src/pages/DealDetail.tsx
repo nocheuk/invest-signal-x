@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
-import { formatAreaDelta, formatAreaValue, getAreaIntelligence } from "@/lib/areaIntelligence";
+import { getAreaIntelligence } from "@/lib/areaIntelligence";
 import { buildComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
 import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
@@ -296,37 +296,6 @@ export default function DealDetail() {
           <ReasonList title="Evidence statements" items={comparableEvidence.statements} fallback="Comparable evidence is not available from imported DealSignal data yet." tone="primary" />
         </section>
 
-        <section className="ds-glass p-6 space-y-4">
-          <div>
-            <h2 className="font-display text-2xl">Area Intelligence</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Local benchmarks are calculated only from imported DealSignal deals in the same city, postcode area or region.
-            </p>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <AreaIntelStat
-              label="Yield"
-              value={deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "Not available"}
-              benchmarkLabel={areaIntelligence.stats ? `${areaIntelligence.stats.area} average` : "Area average"}
-              benchmark={formatAreaValue(areaIntelligence.stats?.averageYield ?? null, "yield")}
-              delta={formatAreaDelta(areaIntelligence.yieldDelta, "yield")}
-              sample={areaIntelligence.stats?.dealCount ?? 0}
-            />
-            <AreaIntelStat
-              label="£/sqft"
-              value={deal.pricePerSqft ? `£${deal.pricePerSqft}` : "Not available"}
-              benchmarkLabel={areaIntelligence.stats ? `${areaIntelligence.stats.area} average` : "Area average"}
-              benchmark={formatAreaValue(areaIntelligence.stats?.averagePricePerSqft ?? null, "price")}
-              sample={areaIntelligence.stats?.dealCount ?? 0}
-            />
-          </div>
-          {(!areaIntelligence.stats || areaIntelligence.stats.dealCount < 3) && (
-            <div className="rounded-lg border border-signal-amber/30 bg-signal-amber-soft/20 px-4 py-3 text-xs text-signal-amber">
-              Limited local sample. Treat area comparisons as directional until more imported deals are available.
-            </div>
-          )}
-          <ReasonList title="Area insights" items={areaIntelligence.insights} fallback="Limited area data" tone="primary" />
-        </section>
 
         <section className="ds-card p-6 space-y-3">
           <h2 className="font-display text-2xl">Diligence classification</h2>
@@ -526,24 +495,6 @@ function UWCard({ icon: Icon, title, rows }: { icon: React.ComponentType<{ class
   );
 }
 
-function AreaIntelStat({ label, value, benchmarkLabel, benchmark, sample, delta }: { label: string; value: string; benchmarkLabel: string; benchmark: string; sample: number; delta?: string }) {
-  return (
-    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-        <div className="font-mono text-2xl font-semibold tabular mt-1">{value}</div>
-        {delta && <div className="mt-1 inline-flex rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary">{delta}</div>}
-      </div>
-      <div className="flex items-end justify-between gap-3 border-t border-border/40 pt-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{benchmarkLabel}</div>
-          <div className="font-mono text-lg font-semibold tabular mt-0.5">{benchmark}</div>
-        </div>
-        <div className="text-[11px] text-muted-foreground">{sample ? `${sample} local deal${sample === 1 ? "" : "s"}` : "No local sample"}</div>
-      </div>
-    </div>
-  );
-}
 
 function ReasonList({ title, items, fallback, tone }: { title: string; items: string[]; fallback: string; tone: "primary" | "amber" | "red" | "default" }) {
   const dot = tone === "primary" ? "bg-primary" : tone === "amber" ? "bg-signal-amber" : tone === "red" ? "bg-signal-red" : "bg-muted-foreground";
