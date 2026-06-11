@@ -4,6 +4,7 @@ import { sourceLabel } from "@/lib/dashboardFilters";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal } from "@/lib/dealClassification";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
+import { type ComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
 
 type JsPdfDocument = {
   setProperties: (properties: Record<string, string>) => void;
@@ -20,14 +21,14 @@ type JsPdfDocument = {
   internal: { pageSize: { getHeight: () => number; getWidth: () => number } };
 };
 
-export async function downloadDealMemoPdf(deal: Deal) {
+export async function downloadDealMemoPdf(deal: Deal, options: { comparableEvidence?: ComparableEvidence | null } = {}) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" }) as JsPdfDocument;
   const filename = buildMemoFilename(deal.title);
   const generatedAt = new Date();
   const imageDataUrl = deal.imageUrl ? await fetchImageAsDataUrl(deal.imageUrl).catch(() => undefined) : undefined;
 
-  renderMemo(doc, deal, { generatedAt, imageDataUrl });
+  renderMemo(doc, deal, { generatedAt, imageDataUrl, comparableEvidence: options.comparableEvidence });
   doc.save(filename);
 }
 
@@ -44,10 +45,10 @@ export function buildMemoFilename(title: string) {
   return `dealsignal-memo-${slug || "property"}.pdf`;
 }
 
-export function buildMemoSections(deal: Deal) {
+export function buildMemoSections(deal: Deal, options: { comparableEvidence?: ComparableEvidence | null } = {}) {
   const reasons = deal.scoreReasons;
   const analysis = getDealAnalysis(deal);
-  const thesis = buildInvestmentThesis(deal);
+  const thesis = buildInvestmentThesis(deal, { comparableEvidence: options.comparableEvidence });
   return {
     summary: [
       ["Location", deal.location],
@@ -63,6 +64,7 @@ export function buildMemoSections(deal: Deal) {
     ],
     investmentSummary: analysis.investmentSummary,
     investmentThesis: thesis,
+    comparableEvidence: memoComparableEvidence(options.comparableEvidence),
     opportunitySignals: analysis.opportunitySignals.length ? analysis.opportunitySignals : ["No opportunity signal available from imported data yet."],
     riskSignals: analysis.riskSignals.length ? analysis.riskSignals : ["No specific risk signal recorded yet."],
     positiveDrivers: analysis.opportunitySignals.length ? analysis.opportunitySignals : ["No positive drivers available from imported data yet."],
@@ -83,11 +85,11 @@ export function buildMemoSections(deal: Deal) {
   };
 }
 
-function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date; imageDataUrl?: string }) {
+function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date; imageDataUrl?: string; comparableEvidence?: ComparableEvidence | null }) {
   const page = { width: doc.internal.pageSize.getWidth(), height: doc.internal.pageSize.getHeight() };
   const margin = 16;
   let y = 16;
-  const sections = buildMemoSections(deal);
+  const sections = buildMemoSections(deal, { comparableEvidence: options.comparableEvidence });
 
   doc.setProperties({
     title: `DealSignal Memo - ${deal.title}`,
@@ -135,6 +137,7 @@ function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date
   y = writeWrapped(doc, sections.investmentThesis.summary, margin, y + 7, page.width - margin * 2, 4.8) + 3;
   y = writeListSection(doc, "Potential upside", sections.investmentThesis.potentialUpside, margin, y, page);
   y = writeListSection(doc, "Investor verdict", [`${sections.investmentThesis.investorVerdict} (${sections.investmentThesis.confidenceLevel} confidence)`], margin, y, page);
+  y = writeListSection(doc, "Comparable Evidence", sections.comparableEvidence, margin, y, page);
   y = writeListSection(doc, "Opportunity signals", sections.opportunitySignals, margin, y, page);
   y = writeListSection(doc, "Risk signals", sections.riskSignals, margin, y, page);
   y = writeListSection(doc, "Missing data / needs review", sections.missingData, margin, y, page);
@@ -214,6 +217,20 @@ function moneyOrUnavailable(value: number) {
 
 function percentOrUnavailable(value: number) {
   return value > 0 ? formatPct(value, 2) : "Not available";
+}
+
+function memoComparableEvidence(evidence: ComparableEvidence | null | undefined) {
+  if (!evidence) return ["Comparable evidence was not included in this memo export."];
+  return [
+    `Sample size: ${evidence.sampleSize} imported comparable${evidence.sampleSize === 1 ? "" : "s"}`,
+    `This deal yield: ${formatComparableMetric(evidence.dealYield, "yield")}`,
+    `Local average yield: ${formatComparableMetric(evidence.averageYield, "yield")}`,
+    `Yield difference: ${formatComparableMetric(evidence.yieldDifferencePercent, "percent")}`,
+    `This deal GBP/sqft: ${formatComparableMetric(evidence.dealPricePerSqft, "price")}`,
+    `Local average GBP/sqft: ${formatComparableMetric(evidence.averagePricePerSqft, "price")}`,
+    `GBP/sqft difference: ${formatComparableMetric(evidence.pricePerSqftDifferencePercent, "percent")}`,
+    ...evidence.statements,
+  ];
 }
 
 async function fetchImageAsDataUrl(url: string) {

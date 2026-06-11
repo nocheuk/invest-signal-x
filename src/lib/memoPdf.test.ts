@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Deal } from "@/lib/deals";
+import type { ComparableEvidence } from "@/lib/comparableEvidence";
 import { buildMemoFilename, buildMemoSections } from "@/lib/memoPdf";
 
 function deal(overrides: Partial<Deal> = {}): Deal {
@@ -52,6 +53,31 @@ function deal(overrides: Partial<Deal> = {}): Deal {
     ...overrides,
   };
 }
+
+const comparableEvidence: ComparableEvidence = {
+  group: "city-asset",
+  area: "Bournemouth",
+  assetType: "Office",
+  sampleSize: 14,
+  yieldSampleSize: 14,
+  pricePerSqftSampleSize: 14,
+  dealYield: 8.1,
+  averageYield: 6.7,
+  medianYield: 6.5,
+  yieldDifferencePercent: 21,
+  yieldPercentileRank: 86,
+  dealPricePerSqft: 116,
+  averagePricePerSqft: 142,
+  medianPricePerSqft: 140,
+  pricePerSqftDifferencePercent: -18,
+  pricePerSqftPercentileRank: 79,
+  isLimited: false,
+  statements: [
+    "Yield is 21% above the local average based on 14 comparable imported opportunities.",
+    "Price per sqft is 18% below the local average based on 14 comparable properties.",
+  ],
+  shortEvidenceLine: "+21% vs area yield",
+};
 
 describe("memo PDF data", () => {
   it("builds a clean memo filename", () => {
@@ -108,11 +134,17 @@ describe("memo PDF data", () => {
           ],
         },
       },
-    }));
+    }), { comparableEvidence });
 
     expect(sections.investmentThesis.summary).toContain("Tenant recorded as ASDA Stores Ltd");
     expect(sections.investmentThesis.potentialUpside).toEqual(expect.arrayContaining([expect.stringContaining("Rent review uplift exists")]));
     expect(sections.investmentThesis.verifyNext).toEqual(expect.arrayContaining(["Verify rent review clauses"]));
+    expect(sections.comparableEvidence).toEqual(expect.arrayContaining([
+      "Sample size: 14 imported comparables",
+      "Yield difference: +21%",
+      "GBP/sqft difference: -18%",
+      "Yield is 21% above the local average based on 14 comparable imported opportunities.",
+    ]));
   });
 
   it("shows not available instead of inventing missing underwriting data", () => {

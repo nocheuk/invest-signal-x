@@ -13,6 +13,7 @@ import { ALL_REAL_DEALS_FILTER, filterAndSortDeals, sourceLabel } from "@/lib/da
 import { classifyDeal, classificationLabel } from "@/lib/dealClassification";
 import { buildFreshnessMetrics, formatAddedAgo, isNewThisWeek } from "@/lib/freshness";
 import { EMPTY_AREA_INTELLIGENCE_INDEX, buildAreaIntelligenceIndex } from "@/lib/areaIntelligence";
+import { buildComparableEvidence } from "@/lib/comparableEvidence";
 import { top10ThisWeek, top25Opportunities, type RankedOpportunity } from "@/lib/investorShortlist";
 import { useAuth } from "@/lib/auth";
 import { matchReasons, personalisedScore, useStrategy } from "@/lib/strategy";
@@ -175,7 +176,7 @@ function DashboardContent() {
           )}
           <div className="grid gap-4 xl:grid-cols-2">
             {bestOpportunities.length > 0 ? bestOpportunities.map((item) => (
-              <AnalystOpportunityCard key={item.deal.id} item={item} investorPreferences={investorPreferences} weights={weights} />
+              <AnalystOpportunityCard key={item.deal.id} item={item} allDeals={deals} investorPreferences={investorPreferences} weights={weights} />
             )) : (
               <EmptyPanel loading={dealsQuery.isLoading} message="No analyst-ranked opportunities yet. Imports will populate this section as scans complete." />
             )}
@@ -350,13 +351,15 @@ function SectionHeader({ eyebrow, title, description, action }: { eyebrow: strin
   );
 }
 
-function AnalystOpportunityCard({ item, investorPreferences, weights }: { item: RankedOpportunity; investorPreferences: InvestorPreferences; weights: ReturnType<typeof useStrategy>["weights"] }) {
+function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }: { item: RankedOpportunity; allDeals: Deal[]; investorPreferences: InvestorPreferences; weights: ReturnType<typeof useStrategy>["weights"] }) {
   const deal = item.deal;
   const classification = classifyDeal(deal);
   const strategyScore = personalisedScore(deal, weights);
   const briefSignals = acquisitionBriefSignals(deal, investorPreferences);
+  const comparableEvidence = buildComparableEvidence(deal, allDeals);
   const thesis = buildInvestmentThesis(deal, {
     areaIntelligence: item.areaIntelligence,
+    comparableEvidence,
     strategyMatch: strategyScore,
     strategyReasons: briefSignals.positive,
   });
@@ -409,6 +412,7 @@ function AnalystOpportunityCard({ item, investorPreferences, weights }: { item: 
       <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3">
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Investor verdict</div>
         <div className="mt-1 text-sm font-semibold text-foreground">{thesis.investorVerdict}</div>
+        <div className="mt-1 text-xs font-medium text-primary">{comparableEvidence.shortEvidenceLine}</div>
         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{thesis.summary}</p>
       </div>
     </Link>

@@ -1,4 +1,5 @@
 import type { AreaIntelligence } from "@/lib/areaIntelligence";
+import type { ComparableEvidence } from "@/lib/comparableEvidence";
 import { formatGBP, formatPct, type Deal } from "@/lib/deals";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal } from "@/lib/dealClassification";
@@ -18,6 +19,7 @@ export type InvestmentThesis = {
 
 export type InvestmentThesisOptions = {
   areaIntelligence?: AreaIntelligence | null;
+  comparableEvidence?: ComparableEvidence | null;
   strategyMatch?: number;
   strategyReasons?: string[];
 };
@@ -31,11 +33,16 @@ export function buildInvestmentThesis(deal: Deal, options: InvestmentThesisOptio
   const source = sourceLabel(deal);
   const whyInteresting = unique([
     ...opportunityFromCoreFields(deal, options),
+    ...opportunityFromComparableEvidence(options.comparableEvidence),
     ...analysis.opportunitySignals,
     ...(options.strategyReasons ?? []),
   ]).slice(0, 6);
-  const potentialUpside = unique(upsideFromDeal(deal, options.areaIntelligence, options.strategyMatch)).slice(0, 5);
+  const potentialUpside = unique([
+    ...upsideFromComparableEvidence(options.comparableEvidence),
+    ...upsideFromDeal(deal, options.areaIntelligence, options.strategyMatch),
+  ]).slice(0, 5);
   const keyRisks = unique([
+    ...risksFromComparableEvidence(options.comparableEvidence),
     ...analysis.riskSignals,
     ...(deal.scoreReasons?.negativeDrivers ?? []),
     ...(deal.scoreReasons?.missingDataWarnings ?? []),
@@ -46,7 +53,7 @@ export function buildInvestmentThesis(deal: Deal, options: InvestmentThesisOptio
     ...(deal.scoreReasons?.verifyBeforeTrusting ?? []),
     "Compare nearby sold/listed evidence",
   ]).slice(0, 10);
-  const investorVerdict = verdictForDeal(deal, classification, confidenceScore, options.strategyMatch, options.areaIntelligence);
+  const investorVerdict = verdictForDeal(deal, classification, confidenceScore, options.strategyMatch, options.areaIntelligence, options.comparableEvidence);
   const summary = thesisSummary({
     deal,
     classification,
@@ -128,6 +135,42 @@ function upsideFromDeal(deal: Deal, area: AreaIntelligence | null | undefined, s
   return upside;
 }
 
+function opportunityFromComparableEvidence(evidence: ComparableEvidence | null | undefined) {
+  const signals: string[] = [];
+  if (!evidence || evidence.sampleSize === 0) return signals;
+  if (evidence.yieldDifferencePercent !== null && evidence.yieldDifferencePercent >= 10 && evidence.yieldSampleSize >= 3) {
+    signals.push(`Yield is ${Math.round(evidence.yieldDifferencePercent)}% above comparable imported deals`);
+  }
+  if (evidence.pricePerSqftDifferencePercent !== null && evidence.pricePerSqftDifferencePercent <= -10 && evidence.pricePerSqftSampleSize >= 3) {
+    signals.push(`Price per sqft is ${Math.abs(Math.round(evidence.pricePerSqftDifferencePercent))}% below comparable imported deals`);
+  }
+  return signals;
+}
+
+function upsideFromComparableEvidence(evidence: ComparableEvidence | null | undefined) {
+  const upside: string[] = [];
+  if (!evidence || evidence.sampleSize === 0) return upside;
+  if (evidence.yieldDifferencePercent !== null && evidence.yieldDifferencePercent >= 10 && evidence.yieldSampleSize >= 3) {
+    upside.push(`Yield is ${Math.round(evidence.yieldDifferencePercent)}% above the local comparable average`);
+  }
+  if (evidence.pricePerSqftDifferencePercent !== null && evidence.pricePerSqftDifferencePercent <= -10 && evidence.pricePerSqftSampleSize >= 3) {
+    upside.push(`Price per sqft is ${Math.abs(Math.round(evidence.pricePerSqftDifferencePercent))}% below the local comparable average`);
+  }
+  return upside;
+}
+
+function risksFromComparableEvidence(evidence: ComparableEvidence | null | undefined) {
+  const risks: string[] = [];
+  if (!evidence || evidence.sampleSize === 0 || evidence.isLimited) risks.push("Comparable evidence is limited");
+  if (evidence?.pricePerSqftDifferencePercent !== null && evidence?.pricePerSqftDifferencePercent !== undefined && evidence.pricePerSqftDifferencePercent >= 10 && evidence.pricePerSqftSampleSize >= 3) {
+    risks.push(`Premium pricing: ${Math.round(evidence.pricePerSqftDifferencePercent)}% above comparable imported deals`);
+  }
+  if (evidence?.yieldDifferencePercent !== null && evidence?.yieldDifferencePercent !== undefined && evidence.yieldDifferencePercent <= -10 && evidence.yieldSampleSize >= 3) {
+    risks.push(`Yield is ${Math.abs(Math.round(evidence.yieldDifferencePercent))}% below comparable imported deals`);
+  }
+  return risks;
+}
+
 function verifyFromMissingData(deal: Deal) {
   const warnings = new Set([...(deal.scoreReasons?.missingDataWarnings ?? []), ...getDealAnalysis(deal).riskSignals]);
   const checklist: string[] = [];
@@ -150,10 +193,12 @@ function verdictForDeal(
   classification: ReturnType<typeof classifyDeal>,
   confidenceScore: number,
   strategyMatch: number | undefined,
-  area: AreaIntelligence | null | undefined
+  area: AreaIntelligence | null | undefined,
+  evidence: ComparableEvidence | null | undefined
 ): InvestorVerdict {
   if (classification === "low-priority" || confidenceScore < 45 || deal.score < 55) return "Low Priority";
-  const areaSupport = (area?.yieldDelta ?? 0) >= 1 || (area?.pricePerSqftDelta ?? 0) <= -25;
+  const comparableSupport = (evidence?.yieldDifferencePercent ?? 0) >= 10 || (evidence?.pricePerSqftDifferencePercent ?? 0) <= -10;
+  const areaSupport = comparableSupport || (area?.yieldDelta ?? 0) >= 1 || (area?.pricePerSqftDelta ?? 0) <= -25;
   const strategySupport = (strategyMatch ?? 0) >= 70;
   if (classification === "verified-green" && confidenceScore >= 80) return "Review Immediately";
   if (classification === "green-candidate" && confidenceScore >= 75 && (deal.score >= 74 || areaSupport || strategySupport)) return "Review Immediately";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AreaIntelligence } from "@/lib/areaIntelligence";
+import type { ComparableEvidence } from "@/lib/comparableEvidence";
 import type { Deal } from "@/lib/deals";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 
@@ -68,6 +69,31 @@ const area: AreaIntelligence = {
   insights: ["Above average yield", "Below average £/sqft"],
 };
 
+const comparableEvidence: ComparableEvidence = {
+  group: "city-asset",
+  area: "Bournemouth",
+  assetType: "Retail",
+  sampleSize: 8,
+  yieldSampleSize: 8,
+  pricePerSqftSampleSize: 8,
+  dealYield: 8.1,
+  averageYield: 6.1,
+  medianYield: 6,
+  yieldDifferencePercent: 33,
+  yieldPercentileRank: 88,
+  dealPricePerSqft: 100,
+  averagePricePerSqft: 150,
+  medianPricePerSqft: 145,
+  pricePerSqftDifferencePercent: -33,
+  pricePerSqftPercentileRank: 88,
+  isLimited: false,
+  statements: [
+    "Yield is 33% above the local average based on 8 comparable imported opportunities.",
+    "Price per sqft is 33% below the local average based on 8 comparable properties.",
+  ],
+  shortEvidenceLine: "+33% vs area yield",
+};
+
 describe("investment thesis", () => {
   it("generates a tenant, lease, and rent-aware ASDA-style thesis", () => {
     const thesis = buildInvestmentThesis(deal({
@@ -126,7 +152,7 @@ describe("investment thesis", () => {
   });
 
   it("generates a thesis from strong yield", () => {
-    const thesis = buildInvestmentThesis(deal(), { areaIntelligence: area, strategyMatch: 82 });
+    const thesis = buildInvestmentThesis(deal(), { areaIntelligence: area, comparableEvidence, strategyMatch: 82 });
 
     expect(thesis.summary).toContain("DealSignal Thesis:");
     expect(thesis.whyInteresting).toEqual(expect.arrayContaining(["Income yield is above 8% at 8.1%"]));
@@ -134,9 +160,18 @@ describe("investment thesis", () => {
   });
 
   it("generates defensible upside from below-area price per sqft", () => {
-    const thesis = buildInvestmentThesis(deal(), { areaIntelligence: area });
+    const thesis = buildInvestmentThesis(deal(), { areaIntelligence: area, comparableEvidence });
 
-    expect(thesis.potentialUpside.some((item) => item.includes("Price per sqft is 33% below the local average") && item.includes("/sq ft lower"))).toBe(true);
+    expect(thesis.potentialUpside).toEqual(expect.arrayContaining(["Price per sqft is 33% below the local comparable average"]));
+  });
+
+  it("references comparable evidence and low-sample caution", () => {
+    const thesis = buildInvestmentThesis(deal(), {
+      comparableEvidence: { ...comparableEvidence, sampleSize: 2, isLimited: true },
+    });
+
+    expect(thesis.whyInteresting).toEqual(expect.arrayContaining(["Yield is 33% above comparable imported deals"]));
+    expect(thesis.keyRisks).toEqual(expect.arrayContaining(["Comparable evidence is limited"]));
   });
 
   it("does not invent missing financial facts", () => {
