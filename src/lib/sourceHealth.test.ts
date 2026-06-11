@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SourceScanRun } from "@/hooks/useNationalScanStatus";
 import type { Deal } from "@/lib/deals";
-import { buildSourceHealth, summarizeSourceHealth } from "@/lib/sourceHealth";
+import { buildSourceHealth, investorSourceStatus, splitInvestorSourceRows, summarizeSourceHealth } from "@/lib/sourceHealth";
 
 describe("source health", () => {
   it("counts inventory quality and classifies source status", () => {
@@ -53,6 +53,14 @@ describe("source health", () => {
       Warning: 1,
       Blocked: 1,
       Disabled: 1,
+    });
+    expect(investorSourceStatus(rows.find((row) => row.source === "Rightmove Commercial")!)).toBe("Active");
+    expect(investorSourceStatus(rows.find((row) => row.source === "Savills Commercial")!)).toBe("Limited data");
+    expect(investorSourceStatus(rows.find((row) => row.source === "Zoopla Commercial")!)).toBe("Updating soon");
+    expect(investorSourceStatus(rows.find((row) => row.source === "Pugh Auctions")!)).toBe("Monitoring");
+    expect(splitInvestorSourceRows(rows)).toMatchObject({
+      visibleRows: expect.arrayContaining([expect.objectContaining({ source: "Rightmove Commercial" })]),
+      monitoredRows: expect.arrayContaining([expect.objectContaining({ source: "Zoopla Commercial" }), expect.objectContaining({ source: "Pugh Auctions" })]),
     });
   });
 });
