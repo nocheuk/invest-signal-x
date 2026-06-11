@@ -137,7 +137,7 @@ function upsideFromDeal(deal: Deal, area: AreaIntelligence | null | undefined, s
 
 function opportunityFromComparableEvidence(evidence: ComparableEvidence | null | undefined) {
   const signals: string[] = [];
-  if (!evidence || evidence.sampleSize === 0) return signals;
+  if (!evidence || evidence.sampleSize === 0 || evidence.isLimited) return signals;
   if (evidence.yieldDifferencePercent !== null && evidence.yieldDifferencePercent >= 10 && evidence.yieldSampleSize >= 3) {
     signals.push(`Yield is ${Math.round(evidence.yieldDifferencePercent)}% above comparable imported deals`);
   }
@@ -149,7 +149,7 @@ function opportunityFromComparableEvidence(evidence: ComparableEvidence | null |
 
 function upsideFromComparableEvidence(evidence: ComparableEvidence | null | undefined) {
   const upside: string[] = [];
-  if (!evidence || evidence.sampleSize === 0) return upside;
+  if (!evidence || evidence.sampleSize === 0 || evidence.isLimited) return upside;
   if (evidence.yieldDifferencePercent !== null && evidence.yieldDifferencePercent >= 10 && evidence.yieldSampleSize >= 3) {
     upside.push(`Yield is ${Math.round(evidence.yieldDifferencePercent)}% above the local comparable average`);
   }
@@ -197,7 +197,7 @@ function verdictForDeal(
   evidence: ComparableEvidence | null | undefined
 ): InvestorVerdict {
   if (classification === "low-priority" || confidenceScore < 45 || deal.score < 55) return "Low Priority";
-  const comparableSupport = (evidence?.yieldDifferencePercent ?? 0) >= 10 || (evidence?.pricePerSqftDifferencePercent ?? 0) <= -10;
+  const comparableSupport = !evidence?.isLimited && ((evidence?.yieldDifferencePercent ?? 0) >= 10 || (evidence?.pricePerSqftDifferencePercent ?? 0) <= -10);
   const areaSupport = comparableSupport || (area?.yieldDelta ?? 0) >= 1 || (area?.pricePerSqftDelta ?? 0) <= -25;
   const strategySupport = (strategyMatch ?? 0) >= 70;
   if (classification === "verified-green" && confidenceScore >= 80) return "Review Immediately";

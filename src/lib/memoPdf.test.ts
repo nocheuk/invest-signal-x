@@ -59,6 +59,9 @@ const comparableEvidence: ComparableEvidence = {
   area: "Bournemouth",
   assetType: "Office",
   sampleSize: 14,
+  rawSampleSize: 18,
+  cleanedSampleSize: 14,
+  excludedSampleSize: 4,
   yieldSampleSize: 14,
   pricePerSqftSampleSize: 14,
   dealYield: 8.1,
@@ -140,7 +143,8 @@ describe("memo PDF data", () => {
     expect(sections.investmentThesis.potentialUpside).toEqual(expect.arrayContaining([expect.stringContaining("Rent review uplift exists")]));
     expect(sections.investmentThesis.verifyNext).toEqual(expect.arrayContaining(["Verify rent review clauses"]));
     expect(sections.comparableEvidence).toEqual(expect.arrayContaining([
-      "Sample size: 14 imported comparables",
+      "Cleaned sample size: 14 usable imported comparables",
+      "Raw local sample size: 18 imported peers",
       "Yield difference: +21%",
       "GBP/sqft difference: -18%",
       "Yield is 21% above the local average based on 14 comparable imported opportunities.",
