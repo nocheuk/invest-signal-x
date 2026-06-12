@@ -110,4 +110,34 @@ describe("DealDetail", () => {
     expect(screen.queryByText(/7,292/)).not.toBeInTheDocument();
     expect(screen.queryByText(/997 local deals/i)).not.toBeInTheDocument();
   });
+
+  it("renames the memo action to investment pack and shows the pack preview", () => {
+    render(
+      <MemoryRouter initialEntries={["/deal/imp-10a4m7"]}>
+        <Routes>
+          <Route path="/deal/:id" element={<DealDetail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("button", { name: /Download Investment Pack/i })).toBeInTheDocument();
+    expect(screen.getByText("A structured pack for investor review")).toBeInTheDocument();
+    expect(screen.getByText(/executive summary, investment thesis, tenant and lease data/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Download Memo PDF/i)).not.toBeInTheDocument();
+  });
+
+  it("renders national ranking evidence on the deal detail page", () => {
+    render(
+      <MemoryRouter initialEntries={["/deal/imp-10a4m7"]}>
+        <Routes>
+          <Route path="/deal/:id" element={<DealDetail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("heading", { name: "Where this deal sits in the DealSignal feed" })).toBeInTheDocument();
+    expect(screen.getByText("National Ranking")).toBeInTheDocument();
+    expect(screen.getByText(/Top \d+% nationally/)).toBeInTheDocument();
+    expect(screen.getByText("Why it made the list")).toBeInTheDocument();
+  });
 });

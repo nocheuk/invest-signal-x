@@ -234,6 +234,8 @@ describe("Dashboard focused overview", () => {
     renderDashboard();
 
     expect(screen.getByText("DealSignal Analyst Brief")).toBeInTheDocument();
+    expect(screen.getByText("Today's Opportunities")).toBeInTheDocument();
+    expect(screen.getByText(/Daily Opportunity Feed:/)).toBeInTheDocument();
     expect(screen.getByText(/Today DealSignal analysed/)).toBeInTheDocument();
     expect(screen.getByText("Total analysed")).toBeInTheDocument();
     expect(screen.getByText("Today's Best Opportunities")).toBeInTheDocument();
