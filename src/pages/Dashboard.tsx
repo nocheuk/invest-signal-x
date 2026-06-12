@@ -31,6 +31,7 @@ import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } 
 import { buildDailyOpportunityFeed, type NationalRanking } from "@/lib/dailyOpportunityFeed";
 import { buildAnalystScoreBreakdown } from "@/lib/analystScoreBreakdown";
 import { useUsageTracking, type UserEventType } from "@/lib/usageTracking";
+import { buildAcquisitionReadiness } from "@/lib/acquisitionReadiness";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -373,14 +374,18 @@ function NationalScanSummary({ isLoading, isError, data }: { isLoading: boolean;
 function DailyOpportunityCard({ item }: { item: NationalRanking }) {
   const deal = item.deal;
   const visibleYield = deal.netInitialYield || deal.grossYield;
+  const readiness = buildAcquisitionReadiness(deal);
+  const missing = readiness.missingLabels.slice(0, 3);
   return (
     <Link to={`/deal/${deal.id}`} className="ds-card block p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">National rank</div>
-          <div className="mt-1 font-mono text-2xl font-semibold text-primary tabular">#{item.rank}</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">Rank #{item.rank} of {item.total.toLocaleString()}</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">{formatPercentile(item.percentile)} percentile</div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Acquisition readiness</div>
+          <div className="mt-1 font-mono text-2xl font-semibold text-primary tabular">Readiness: {readiness.score}%</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
+            {missing.length ? `Missing: ${missing.join(", ")}` : "Core fields present"}
+          </div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">Top {item.topPercent}% nationally</div>
         </div>
         <ScorePill score={deal.score} rating={deal.rating} />
       </div>
@@ -471,6 +476,8 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
   const strategyMatch = Math.max(0, Math.min(100, strategyScore));
   const financialAnalysis = buildFinancialAnalysis(deal);
   const defaultFinanceScenario = financialAnalysis.scenarios.find((scenario) => scenario.name === "60% LTV") ?? financialAnalysis.scenarios[0];
+  const readiness = buildAcquisitionReadiness(deal, comparableEvidence);
+  const missingReadiness = readiness.missingLabels.slice(0, 3);
 
   return (
     <Link to={`/deal/${deal.id}`} className="ds-card-elevated block p-5 transition-all hover:-translate-y-0.5 hover:border-primary/40">
@@ -486,7 +493,7 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
         <ScorePill score={deal.score} rating={deal.rating} />
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-9">
+      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-10">
         <Metric label="Opportunity" value={classificationLabel(classification)} emphasis={classification === "verified-green" || classification === "green-candidate"} />
         <Metric label="Guide price" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"} />
         <Metric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "Not available"} emphasis={Boolean(visibleYield)} />
@@ -496,6 +503,17 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
         <Metric label="Source" value={sourceLabel(deal)} />
         <Metric label="Confidence" value={`${deal.dataConfidenceScore ?? 0}%`} emphasis={(deal.dataConfidenceScore ?? 0) >= 75} />
         <Metric label="Strategy match" value={`${strategyMatch}%`} emphasis={strategyMatch >= 72} />
+        <Metric label="Readiness" value={`${readiness.score}%`} emphasis={readiness.score >= 70} />
+      </div>
+
+      <div className="mt-3 rounded-lg border border-border/60 bg-surface-2/60 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Acquisition readiness</div>
+          <div className="font-mono text-sm font-semibold tabular text-primary">{readiness.score}%</div>
+        </div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {missingReadiness.length ? `Missing: ${missingReadiness.join(", ")}` : "Core fields present"}
+        </div>
       </div>
 
       <ScoreExplanation deal={deal} strategyScore={strategyMatch} comparableEvidence={comparableEvidence} />
