@@ -240,27 +240,16 @@ export default function DealDetail() {
         <section className="ds-card p-5 lg:p-6 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-widest text-primary font-medium">Acquisition Readiness</div>
-              <h2 className="font-display text-2xl mt-1">Readiness: {acquisitionReadiness.score}%</h2>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Due Diligence Status</div>
+              <h2 className="font-display text-2xl mt-1">{acquisitionReadiness.band}</h2>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{acquisitionReadiness.summary}</p>
             </div>
-            <div className="rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
-              {acquisitionReadiness.band}
+            <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Information Completeness</div>
+              <div className="mt-0.5 font-mono text-lg font-semibold text-primary tabular">{acquisitionReadiness.score}%</div>
             </div>
           </div>
-          {acquisitionReadiness.missingLabels.length > 0 && (
-            <div className="rounded-lg border border-signal-amber/30 bg-signal-amber-soft/20 px-4 py-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-signal-amber">Missing</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {acquisitionReadiness.missingLabels.map((label) => (
-                  <span key={label} className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground">
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          <ReadinessChecklist readiness={acquisitionReadiness} />
+          <DueDiligenceChecklist readiness={acquisitionReadiness} />
         </section>
 
         <section className="ds-card p-5">
@@ -269,7 +258,7 @@ export default function DealDetail() {
               <div className="text-xs uppercase tracking-widest text-primary font-medium">Investment Pack</div>
               <h2 className="mt-1 font-display text-2xl">A structured pack for investor review</h2>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                Includes verdict, readiness, investment thesis, tenant and lease data, cleaned comparable evidence, finance scenarios, verification checklist and disclaimer.
+                Includes verdict, due diligence status, investment thesis, tenant and lease data, cleaned comparable evidence, finance scenarios, verification checklist and disclaimer.
               </p>
             </div>
             <Button type="button" variant="outline" disabled={memoStatus === "loading"} onClick={() => void handleDownloadMemo()} className="gap-2">
@@ -565,18 +554,48 @@ function HeroStat({ label, value }: { label: React.ReactNode; value: string }) {
   );
 }
 
-function ReadinessChecklist({ readiness }: { readiness: AcquisitionReadiness }) {
+function DueDiligenceChecklist({ readiness }: { readiness: AcquisitionReadiness }) {
+  const available = readiness.checklist.filter((item) => item.present);
+  const missing = readiness.checklist.filter((item) => !item.present);
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {readiness.checklist.map((item) => (
-        <div key={item.key} className="flex items-start gap-2 rounded-lg border border-border/60 bg-surface-2/40 p-3">
-          <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", item.present ? "bg-signal-green" : "bg-signal-amber")} />
-          <div>
-            <div className="text-sm font-medium">{item.label}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{item.detail}</div>
-          </div>
-        </div>
-      ))}
+    <div className="grid gap-3 md:grid-cols-2">
+      <DiligenceList title="Available" items={available} tone="available" fallback="No core diligence fields are available yet." />
+      <DiligenceList title="Missing" items={missing} tone="missing" fallback="No core diligence fields are missing." />
+    </div>
+  );
+}
+
+function DiligenceList({
+  title,
+  items,
+  tone,
+  fallback,
+}: {
+  title: string;
+  items: AcquisitionReadiness["checklist"];
+  tone: "available" | "missing";
+  fallback: string;
+}) {
+  const isAvailable = tone === "available";
+  return (
+    <div className={cn(
+      "rounded-lg border p-4",
+      isAvailable ? "border-signal-green/30 bg-signal-green-soft/10" : "border-signal-amber/30 bg-signal-amber-soft/20"
+    )}>
+      <div className={cn("text-xs font-medium uppercase tracking-wide", isAvailable ? "text-signal-green" : "text-signal-amber")}>{title}</div>
+      <ul className="mt-3 space-y-2">
+        {items.length ? items.map((item) => (
+          <li key={item.key} className="flex items-start gap-2 text-sm">
+            <span className={cn("mt-0.5 font-semibold", isAvailable ? "text-signal-green" : "text-signal-amber")}>{isAvailable ? "✓" : "✕"}</span>
+            <div>
+              <div className="font-medium">{item.label}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{item.detail}</div>
+            </div>
+          </li>
+        )) : (
+          <li className="text-sm text-muted-foreground">{fallback}</li>
+        )}
+      </ul>
     </div>
   );
 }
@@ -758,7 +777,7 @@ function firstAvailable(...groups: string[][]) {
 function buildTriageSummary(summary: string, risks: string[], readiness: AcquisitionReadiness) {
   const conciseSummary = summary.replace(/\s+/g, " ").trim();
   const firstRisk = firstAvailable(risks, readiness.missingLabels.map((label) => `${label} missing`));
-  return `${conciseSummary} Acquisition readiness is ${readiness.score}% (${readiness.band}). Biggest check before action: ${firstRisk}.`;
+  return `${conciseSummary} Due diligence status is ${readiness.band}; information completeness is ${readiness.score}%. Biggest check before action: ${firstRisk}.`;
 }
 
 function buildKeyTakeaways(thesis: InvestmentThesis, comparableEvidence: ComparableEvidence | null, readiness: AcquisitionReadiness) {

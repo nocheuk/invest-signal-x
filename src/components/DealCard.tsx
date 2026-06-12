@@ -117,11 +117,11 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
 
         <div className="rounded-lg border border-border/60 bg-surface-2/50 p-2.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] text-muted-foreground">Readiness</div>
-            <div className="font-mono text-xs font-semibold tabular">{readiness.score}%</div>
+            <div className="text-[11px] text-muted-foreground">Due diligence status</div>
+            <div className="text-xs font-semibold text-primary">{readiness.band}</div>
           </div>
           <div className="mt-1 text-[11px] text-muted-foreground">
-            {missingReadiness.length ? `Missing: ${missingReadiness.join(", ")}` : "Core fields present"}
+            {missingReadiness.length ? `Missing: ${missingReadiness.join(", ")}` : readiness.band}
           </div>
         </div>
 

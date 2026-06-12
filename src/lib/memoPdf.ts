@@ -171,7 +171,7 @@ function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date
   y = writeListSection(doc, "Key risks", sections.investmentThesis.keyRisks, margin, y, page);
   y = writeListSection(doc, "Investor verdict", [`${sections.investmentThesis.investorVerdict} (${sections.investmentThesis.confidenceLevel} confidence)`], margin, y, page);
   y = writeListSection(doc, "National Ranking", sections.nationalRanking, margin, y, page);
-  y = writeListSection(doc, "Acquisition Readiness", sections.acquisitionReadiness, margin, y, page);
+  y = writeListSection(doc, "Due Diligence Status", sections.acquisitionReadiness, margin, y, page);
   y = writeListSection(doc, "Analyst Score Breakdown", sections.scoreBreakdown, margin, y, page);
   y = writeListSection(doc, "Tenant / Lease / Income", sections.tenantLeaseIncome, margin, y, page);
   y = writeListSection(doc, "Comparable Evidence", sections.comparableEvidence, margin, y, page);
@@ -296,10 +296,15 @@ function memoNationalRanking(ranking: NationalRanking | null | undefined) {
 }
 
 function memoAcquisitionReadiness(readiness: AcquisitionReadiness) {
+  const available = readiness.checklist.filter((item) => item.present);
+  const missing = readiness.checklist.filter((item) => !item.present);
   return [
-    `Readiness: ${readiness.score}% (${readiness.band})`,
-    readiness.summary,
-    ...readiness.checklist.map((item) => `${item.label}: ${item.present ? "present" : "missing"} - ${item.detail}`),
+    `Status: ${readiness.band}`,
+    `Information completeness: ${readiness.score}%`,
+    `Available: ${available.length ? available.map((item) => item.label).join(", ") : "None recorded"}`,
+    `Missing: ${missing.length ? missing.map((item) => item.label).join(", ") : "No core diligence fields missing"}`,
+    ...available.map((item) => `Available - ${item.label}: ${item.detail}`),
+    ...missing.map((item) => `Missing - ${item.label}: ${item.detail}`),
   ];
 }
 

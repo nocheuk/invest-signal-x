@@ -128,11 +128,11 @@ describe("DealDetail", () => {
 
     expect(screen.getByRole("button", { name: /Download Investment Pack/i })).toBeInTheDocument();
     expect(screen.getByText("A structured pack for investor review")).toBeInTheDocument();
-    expect(screen.getByText(/verdict, readiness, investment thesis, tenant and lease data/i)).toBeInTheDocument();
+    expect(screen.getByText(/verdict, due diligence status, investment thesis, tenant and lease data/i)).toBeInTheDocument();
     expect(screen.queryByText(/Download Memo PDF/i)).not.toBeInTheDocument();
   });
 
-  it("renders the triage verdict, key numbers, and readiness checklist", () => {
+  it("renders the triage verdict, key numbers, and due diligence checklist", () => {
     render(
       <MemoryRouter initialEntries={["/deal/imp-10a4m7"]}>
         <Routes>
@@ -145,9 +145,11 @@ describe("DealDetail", () => {
     expect(screen.getByRole("heading", { name: "Review Immediately" })).toBeInTheDocument();
     expect(screen.getByText(/Top \d+% nationally/)).toBeInTheDocument();
     expect(screen.getByText("Key Numbers")).toBeInTheDocument();
-    expect(screen.getByText("Acquisition Readiness")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Readiness: 89%" })).toBeInTheDocument();
-    expect(screen.getByText("Review ready")).toBeInTheDocument();
+    expect(screen.getByText("Due Diligence Status")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Mostly Verified" })).toBeInTheDocument();
+    expect(screen.getByText("Information Completeness")).toBeInTheDocument();
+    expect(screen.getByText("89%")).toBeInTheDocument();
+    expect(screen.getByText("Available")).toBeInTheDocument();
     expect(screen.getByText("Missing")).toBeInTheDocument();
     expect(screen.getAllByText("EPC missing").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Key Takeaways")).toBeInTheDocument();

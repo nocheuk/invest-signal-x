@@ -253,7 +253,7 @@ describe("Dashboard focused overview", () => {
     expect(screen.getAllByText("Score Explanation").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Contributors").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Why ranked?").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/Readiness: \d+%/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Due diligence status").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Missing: Tenant, Lease/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Why DealSignal likes this").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Key Risks").length).toBeGreaterThanOrEqual(1);

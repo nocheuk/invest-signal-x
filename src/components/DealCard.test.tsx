@@ -118,11 +118,11 @@ describe("DealCard", () => {
     expect(screen.getByRole("button", { name: "Save to Pipeline" })).toBeInTheDocument();
   });
 
-  it("shows compact acquisition readiness on the card", () => {
+  it("shows compact due diligence status on the card", () => {
     renderCard(deal({ sourceUrl: "https://example.com/deal" }));
 
-    expect(screen.getByText("Readiness")).toBeInTheDocument();
-    expect(screen.getByText("22%")).toBeInTheDocument();
+    expect(screen.getByText("Due diligence status")).toBeInTheDocument();
+    expect(screen.getByText("Limited Information")).toBeInTheDocument();
     expect(screen.getByText(/Missing: Rent, Tenant, Lease/)).toBeInTheDocument();
   });
 
