@@ -12,6 +12,7 @@ import { buildSourceHealth, investorSourceStatus, splitInvestorSourceRows, summa
 import { buildSourceOpportunityAudit } from "@/lib/sourceOpportunityAudit";
 import { useRealDeals } from "@/hooks/useRealDeals";
 import { formatNationalScanTime, formatScanDuration, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
+import { useFeedbackUsageAdmin, type FeedbackUsageAdminData } from "@/hooks/useFeedbackUsageAdmin";
 import { useWatchlist } from "@/lib/watchlist";
 
 export default function SourcesScans() {
@@ -30,6 +31,7 @@ export default function SourcesScans() {
   const enrichmentMetrics = scanStatus.data?.enrichmentMetrics ?? { total: 0, enriched: 0, failed: 0, pending: 0, queueSize: 0, successRate: 0 };
   const enrichmentImpact = scanStatus.data?.enrichmentImpact;
   const showTechnicalDiagnostics = isAdminUser(auth.user) || sourceDiagnosticsEnabled();
+  const feedbackUsage = useFeedbackUsageAdmin(showTechnicalDiagnostics);
   const latestSourceUpdate = latestSuccessfulScan(sourceHealth);
 
   return (
@@ -170,6 +172,23 @@ export default function SourcesScans() {
         {showTechnicalDiagnostics && (
           <section className="ds-card p-5 space-y-4">
             <div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Feedback and Usage</div>
+              <h2 className="font-display text-2xl mt-1">Product learning diagnostics</h2>
+              <p className="text-sm text-muted-foreground mt-1">Latest user feedback and first-party event counts for admin review.</p>
+            </div>
+            {feedbackUsage.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading feedback and usage...</p>
+            ) : feedbackUsage.isError ? (
+              <p className="text-sm text-signal-amber">Feedback and usage data is not available for this user.</p>
+            ) : (
+              <FeedbackUsageDiagnostics data={feedbackUsage.data} />
+            )}
+          </section>
+        )}
+
+        {showTechnicalDiagnostics && (
+          <section className="ds-card p-5 space-y-4">
+            <div>
               <div className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Source Opportunity Audit</div>
               <h2 className="font-display text-2xl mt-1">Expansion priority</h2>
               <p className="text-sm text-muted-foreground mt-1">Ranked from dry-runs, live page checks, parser output, and estimated unique acquisition inventory.</p>
@@ -259,6 +278,55 @@ function SourceStatusBadge({ status }: { status: SourceHealthStatus }) {
       <Icon className="h-3 w-3" />
       {status}
     </span>
+  );
+}
+
+function FeedbackUsageDiagnostics({ data }: { data: FeedbackUsageAdminData }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+      <div className="rounded-md border border-border/60 bg-surface-2/60 p-3">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Latest feedback</div>
+        <div className="mt-3 space-y-3">
+          {data.latestFeedback.length ? data.latestFeedback.map((item) => (
+            <div key={item.id} className="rounded-md border border-border/50 bg-background/40 p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">{formatEventLabel(item.type)}</span>
+                <span className="text-xs text-muted-foreground">{formatNationalScanTime(item.created_at)}</span>
+              </div>
+              <p className="mt-2 text-muted-foreground">{item.message}</p>
+              <div className="mt-2 text-xs text-muted-foreground">
+                {item.current_page}{item.deal_id ? ` · Deal ${item.deal_id}` : ""}{item.source_url ? ` · ${item.source_url}` : ""}
+              </div>
+            </div>
+          )) : (
+            <p className="text-sm text-muted-foreground">No feedback submitted yet.</p>
+          )}
+        </div>
+      </div>
+      <div className="space-y-4">
+        <UsageCountPanel title="Most common events" rows={data.eventCounts.map((row) => ({ label: formatEventLabel(row.eventType), count: row.count }))} />
+        <UsageCountPanel title="Most opened deals" rows={data.mostOpenedDeals.map((row) => ({ label: row.dealId, count: row.count }))} />
+        <UsageCountPanel title="Most downloaded investment packs" rows={data.mostDownloadedInvestmentPacks.map((row) => ({ label: row.dealId, count: row.count }))} />
+      </div>
+    </div>
+  );
+}
+
+function UsageCountPanel({ title, rows }: { title: string; rows: Array<{ label: string; count: number }> }) {
+  return (
+    <div className="rounded-md border border-border/60 bg-surface-2/60 p-3">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="mt-3 space-y-1 text-sm">
+        {rows.length ? rows.slice(0, 8).map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-3">
+            <span className="truncate text-muted-foreground">{row.label}</span>
+            <span className="font-mono font-semibold tabular">{row.count.toLocaleString()}</span>
+          </div>
+        )) : (
+          <div className="text-muted-foreground">No events recorded yet.</div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -408,6 +476,13 @@ function latestSuccessfulScan(rows: SourceHealthRow[]) {
 
 function activeSourceNames(rows: SourceHealthRow[]) {
   return rows.map((row) => row.source);
+}
+
+function formatEventLabel(value: string) {
+  return value
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function sourceDiagnosticsEnabled() {

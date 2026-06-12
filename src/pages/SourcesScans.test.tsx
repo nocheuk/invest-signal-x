@@ -58,6 +58,29 @@ vi.mock("@/hooks/useNationalScanStatus", async () => {
   };
 });
 
+vi.mock("@/hooks/useFeedbackUsageAdmin", () => ({
+  useFeedbackUsageAdmin: (enabled: boolean) => ({
+    data: {
+      latestFeedback: enabled ? [{
+        id: "feedback-1",
+        user_id: "user-1",
+        type: "bug_report",
+        message: "The source link is stale.",
+        deal_id: "deal-1",
+        source_url: "https://example.com/deal-1",
+        current_page: "/deal/deal-1",
+        metadata: {},
+        created_at: "2026-06-10T09:00:00Z",
+      }] : [],
+      eventCounts: enabled ? [{ eventType: "opened_deal", count: 4 }] : [],
+      mostOpenedDeals: enabled ? [{ dealId: "deal-1", count: 3 }] : [],
+      mostDownloadedInvestmentPacks: enabled ? [{ dealId: "deal-1", count: 2 }] : [],
+    },
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 vi.mock("@/lib/watchlist", () => ({
   useWatchlist: () => ({
     ids: [],
@@ -98,6 +121,7 @@ describe("SourcesScans", () => {
     expect(screen.queryByText("Disabled")).not.toBeInTheDocument();
     expect(screen.queryByText("Blocked")).not.toBeInTheDocument();
     expect(screen.queryByText("Problematic")).not.toBeInTheDocument();
+    expect(screen.queryByText("Feedback and Usage")).not.toBeInTheDocument();
     expect(screen.getAllByText("Rightmove Commercial").length).toBeGreaterThan(0);
     expect(screen.queryByText("Zoopla Commercial")).not.toBeInTheDocument();
 
@@ -115,6 +139,9 @@ describe("SourcesScans", () => {
     expect(screen.getAllByText("Disabled").length).toBeGreaterThan(0);
     expect(screen.getByText("Blocked backoff")).toBeInTheDocument();
     expect(screen.getByText("Source Opportunity Audit")).toBeInTheDocument();
+    expect(screen.getByText("Feedback and Usage")).toBeInTheDocument();
+    expect(screen.getByText("The source link is stale.")).toBeInTheDocument();
+    expect(screen.getByText("Opened Deal")).toBeInTheDocument();
     const audit = screen.getByText("Source Opportunity Audit").closest("section")!;
     expect(within(audit).getByText("Pugh Auctions")).toBeInTheDocument();
     expect(within(audit).getByText("Build immediately")).toBeInTheDocument();

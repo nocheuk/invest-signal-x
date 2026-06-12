@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { formatGBP, formatPct } from "@/lib/deals";
@@ -30,6 +30,7 @@ import {
   type FinanceScenario,
 } from "@/lib/financialAnalysis";
 import { getNationalRankingForDeal } from "@/lib/dailyOpportunityFeed";
+import { useUsageTracking } from "@/lib/usageTracking";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -45,8 +46,15 @@ export default function DealDetail() {
   const { deal, data: allDeals = [], isLoading, isError } = useDeal(id);
   const sourceLinks = useDealSourceLinks(deal?.id);
   const { isWatched, notes, setNote, getPipelineStatus, setStatus, saveToPipeline } = useWatchlist();
+  const { trackEvent } = useUsageTracking();
   const [memoStatus, setMemoStatus] = useState<"idle" | "loading" | "error">("idle");
   const [financialAssumptions, setFinancialAssumptions] = useState<FinancialAssumptions>(DEFAULT_FINANCIAL_ASSUMPTIONS);
+  const trackedSourceUrl = deal?.sourceUrl ?? sourceLinks.data?.find((link) => link.source_url)?.source_url;
+
+  useEffect(() => {
+    if (!deal?.id) return;
+    void trackEvent({ eventType: "opened_deal", dealId: deal.id, sourceUrl: trackedSourceUrl });
+  }, [deal?.id, trackedSourceUrl, trackEvent]);
 
   if (isLoading) {
     return (
@@ -77,16 +85,18 @@ export default function DealDetail() {
   const investmentThesis = buildInvestmentThesis(deal, { areaIntelligence, comparableEvidence });
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
-  const primarySourceUrl = deal.sourceUrl ?? sourceLinks.data?.find((link) => link.source_url)?.source_url;
+  const primarySourceUrl = trackedSourceUrl;
   const sourceLabel = getSourceLabel(deal);
   const visibleYield = deal.netInitialYield || deal.grossYield;
   const pricePerSqft = deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0);
   const addedDate = new Date(deal.postedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   const financialAnalysis = buildFinancialAnalysis(deal, financialAssumptions);
+
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
     try {
       await downloadDealMemoPdf(deal, { comparableEvidence, nationalRanking });
+      void trackEvent({ eventType: "downloaded_investment_pack", dealId: deal.id, sourceUrl: primarySourceUrl });
       setMemoStatus("idle");
     } catch (error) {
       console.error("Could not generate investment pack", error);
@@ -140,7 +150,9 @@ export default function DealDetail() {
             <div className="mt-6 flex flex-wrap gap-2">
               <ActionButton
                 onClick={() => {
-                  if (!watched) void saveToPipeline(deal.id);
+                  if (!watched) {
+                    void saveToPipeline(deal.id);
+                  }
                 }}
                 active={watched}
                 icon={Bookmark}
@@ -152,7 +164,7 @@ export default function DealDetail() {
               </ActionButton>
               {primarySourceUrl && (
                 <Button asChild variant="outline" className="gap-2 border-white/10 bg-surface-2/70 hover:border-primary/40 hover:bg-primary/10">
-                  <a href={primarySourceUrl} target="_blank" rel="noreferrer">
+                  <a href={primarySourceUrl} target="_blank" rel="noreferrer" onClick={() => void trackEvent({ eventType: "opened_source_listing", dealId: deal.id, sourceUrl: primarySourceUrl })}>
                     <ExternalLink className="h-4 w-4" />Open Source Listing
                   </a>
                 </Button>

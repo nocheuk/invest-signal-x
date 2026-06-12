@@ -50,6 +50,7 @@ import {
   strategyFromOnboarding,
   type InvestorOnboardingAnswers,
 } from "@/lib/onboarding";
+import { useUsageTracking } from "@/lib/usageTracking";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
@@ -72,6 +73,7 @@ export default function Onboarding() {
   const strategy = useStrategy();
   const savedAlerts = useSavedAlerts();
   const queryClient = useQueryClient();
+  const { trackEvent } = useUsageTracking();
   const navigate = useNavigate();
   const location = useLocation();
   const routeParams = new URLSearchParams(location.search);
@@ -189,6 +191,15 @@ export default function Onboarding() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["profile", auth.user.id] });
+      void trackEvent({
+        eventType: "changed_acquisition_brief",
+        metadata: {
+          mode,
+          edit_mode: editMode,
+          target_locations: finalAnswers.targetLocations,
+          preferred_asset_types: finalAnswers.preferredAssetTypes,
+        },
+      });
       if (sideEffectWarnings.length) sessionStorage.setItem("dealsignal:onboarding-warning", sideEffectWarnings.join(" "));
       navigate(from, { replace: true });
     } catch (saveError) {
