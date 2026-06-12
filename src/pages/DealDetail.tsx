@@ -12,14 +12,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bookmark, MapPin, Building2, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine, ExternalLink, CalendarDays } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ArrowLeft, Bookmark, MapPin, Building2, AlertTriangle, ShieldCheck, TrendingUp, FileText, Layers, Search, ChartLine, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { getAreaIntelligence } from "@/lib/areaIntelligence";
 import { buildComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
-import { sourceLabel as getSourceLabel } from "@/lib/dashboardFilters";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import {
   DEFAULT_FINANCIAL_ASSUMPTIONS,
@@ -32,6 +32,7 @@ import {
 import { getNationalRankingForDeal } from "@/lib/dailyOpportunityFeed";
 import { useUsageTracking } from "@/lib/usageTracking";
 import { buildAnalystScoreBreakdown } from "@/lib/analystScoreBreakdown";
+import { buildAcquisitionReadiness, type AcquisitionReadiness } from "@/lib/acquisitionReadiness";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -85,14 +86,14 @@ export default function DealDetail() {
   const nationalRanking = getNationalRankingForDeal(deal, allDeals);
   const investmentThesis = buildInvestmentThesis(deal, { areaIntelligence, comparableEvidence });
   const analystScoreBreakdown = buildAnalystScoreBreakdown(deal, { comparableEvidence });
+  const acquisitionReadiness = buildAcquisitionReadiness(deal, comparableEvidence);
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
   const primarySourceUrl = trackedSourceUrl;
-  const sourceLabel = getSourceLabel(deal);
   const visibleYield = deal.netInitialYield || deal.grossYield;
   const pricePerSqft = deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0);
-  const addedDate = new Date(deal.postedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   const financialAnalysis = buildFinancialAnalysis(deal, financialAssumptions);
+  const triageSummary = buildTriageSummary(investmentThesis.summary, investmentThesis.keyRisks, acquisitionReadiness);
 
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
@@ -178,68 +179,75 @@ export default function DealDetail() {
           </div>
         </div>
 
+        <section className="ds-premium-panel p-5 lg:p-6 space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Investment Verdict</div>
+              <h2 className="mt-1 font-display text-3xl">{investmentThesis.investorVerdict}</h2>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{triageSummary}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <ScorePill score={deal.score} rating={deal.rating} size="lg" />
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Opportunity</div>
+                <div className="font-semibold text-primary">{classificationLabel(classification)}</div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <SnapshotMetric label="Score" value={`${deal.score}/100`} />
+            <SnapshotMetric label="National rank" value={nationalRanking ? `#${nationalRanking.rank} of ${nationalRanking.total}` : "Not ranked"} />
+            <SnapshotMetric label="Percentile" value={nationalRanking ? `${formatPercentile(nationalRanking.percentile)} percentile` : "Not available"} />
+            <SnapshotMetric label="Data quality" value={deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100` : "Not available"} />
+            <SnapshotMetric label="Biggest risk" value={firstAvailable(investmentThesis.keyRisks, acquisitionReadiness.missingLabels.map((label) => `${label} missing`), [deal.mainRiskFlag])} />
+          </div>
+        </section>
+
+        <section className="ds-glass p-5 lg:p-6 space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Key Numbers</div>
+              <h2 className="font-display text-2xl mt-1">Can the basic economics be assessed?</h2>
+            </div>
+            <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+            <SnapshotMetric label="Guide price" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"} />
+            <SnapshotMetric label="Passing rent" value={deal.passingRent > 0 ? `${formatGBP(deal.passingRent)} pa` : "Not available"} />
+            <SnapshotMetric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "Not available"} />
+            <SnapshotMetric label="Sq ft" value={deal.sqft ? deal.sqft.toLocaleString() : "Not available"} />
+            <SnapshotMetric label="GBP/sqft" value={pricePerSqft ? formatGBP(Math.round(pricePerSqft)) : "Not available"} />
+            <SnapshotMetric label="Data quality" value={deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100` : "Not available"} />
+          </div>
+        </section>
+
+        <section className="ds-card p-5 lg:p-6 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Acquisition Readiness</div>
+              <h2 className="font-display text-2xl mt-1">{acquisitionReadiness.band}</h2>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{acquisitionReadiness.summary}</p>
+            </div>
+            <div className="rounded-full border border-primary/30 bg-primary/10 px-4 py-2 font-mono text-lg font-semibold text-primary tabular">
+              {acquisitionReadiness.score}%
+            </div>
+          </div>
+          <ReadinessChecklist readiness={acquisitionReadiness} />
+        </section>
+
         <section className="ds-card p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-widest text-primary font-medium">Investment Pack</div>
               <h2 className="mt-1 font-display text-2xl">A structured pack for investor review</h2>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                Includes executive summary, investment thesis, tenant and lease data, cleaned comparable evidence, finance scenarios, verification checklist and disclaimer.
+                Includes verdict, readiness, investment thesis, tenant and lease data, cleaned comparable evidence, finance scenarios, verification checklist and disclaimer.
               </p>
             </div>
             <Button type="button" variant="outline" disabled={memoStatus === "loading"} onClick={() => void handleDownloadMemo()} className="gap-2">
               <FileText className="h-4 w-4" />
               {memoStatus === "loading" ? "Generating..." : "Download pack"}
             </Button>
-          </div>
-        </section>
-
-        <section className="ds-glass p-5 lg:p-6 space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-primary font-medium">National Ranking</div>
-              <h2 className="font-display text-2xl mt-1">Where this deal sits in the DealSignal feed</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Ranked nationally against imported acquisition opportunities using the existing score, confidence, yield, area value and diligence signals.</p>
-            </div>
-            {nationalRanking && (
-              <div className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                Top {nationalRanking.topPercent}% nationally
-              </div>
-            )}
-          </div>
-          {nationalRanking ? (
-            <>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <SnapshotMetric label="Rank" value={`#${nationalRanking.rank} of ${nationalRanking.total}`} />
-                <SnapshotMetric label="Percentile" value={`${formatPercentile(nationalRanking.percentile)} percentile`} />
-                <SnapshotMetric label="Top band" value={`Top ${nationalRanking.topPercent}%`} />
-                <SnapshotMetric label="Feed score" value={`${nationalRanking.rankingScore}/100`} />
-              </div>
-              <ReasonList title="Why it made the list" items={nationalRanking.whyMadeList} fallback="High relative DealSignal rank." tone="primary" />
-            </>
-          ) : (
-            <p className="rounded-lg border border-border/60 bg-surface-2/40 p-4 text-sm text-muted-foreground">
-              This deal is not currently ranked in the national opportunity feed, usually because it is not an imported acquisition opportunity.
-            </p>
-          )}
-        </section>
-
-        <section className="ds-glass p-5 lg:p-6 space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-primary font-medium">Investment Snapshot</div>
-              <h2 className="font-display text-2xl mt-1">Key underwriting inputs</h2>
-            </div>
-            <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} />
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
-            <SnapshotMetric label="Guide price" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "Not available"} />
-            <SnapshotMetric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "Not available"} />
-            <SnapshotMetric label="Sq ft" value={deal.sqft ? deal.sqft.toLocaleString() : "Not available"} />
-            <SnapshotMetric label="£/sqft" value={pricePerSqft ? formatGBP(Math.round(pricePerSqft)) : "Not available"} />
-            <SnapshotMetric label="Source" value={sourceLabel} />
-            <SnapshotMetric label="Added" value={addedDate} />
-            <SnapshotMetric label="Confidence" value={deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100` : "Not available"} />
           </div>
         </section>
 
@@ -280,105 +288,6 @@ export default function DealDetail() {
           )}
         </section>
 
-        <div className="grid lg:grid-cols-3 gap-5">
-          {/* Score breakdown */}
-          <div className="ds-card p-6 lg:col-span-2 space-y-5">
-            <div>
-              <h2 className="font-display text-2xl">Score breakdown</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Weighted across five institutional underwriting categories.</p>
-            </div>
-            <div className="space-y-3">
-              {WEIGHTS.map((c) => {
-                const score = deal.scoreBreakdown[c.key];
-                return (
-                  <div key={c.key} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span>{c.label}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">{c.w}%</span>
-                      </div>
-                      <span className="font-mono tabular text-sm font-semibold">{score}<span className="text-muted-foreground text-xs">/100</span></span>
-                    </div>
-                    <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
-                      <div className={cn(
-                        "h-full rounded-full transition-all",
-                        score >= 75 ? "bg-gradient-to-r from-signal-green to-emerald-400" :
-                        score >= 55 ? "bg-gradient-to-r from-signal-amber to-yellow-400" :
-                        "bg-gradient-to-r from-signal-red to-rose-400"
-                      )} style={{ width: `${score}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Risk flags */}
-          <div className="ds-card p-6 space-y-4">
-            <h2 className="font-display text-2xl">Risk flags</h2>
-            <div className="space-y-2">
-              <RiskRow level={deal.rating === "red" ? "high" : deal.rating === "amber" ? "med" : "low"} label="Main risk" value={deal.mainRiskFlag} />
-              <RiskRow level={deal.voidRiskScore > 50 ? "high" : deal.voidRiskScore > 25 ? "med" : "low"} label="Void / reletting" value={`${deal.voidRiskScore}/100`} />
-              <RiskRow level={deal.exitYieldSensitivity === "High" ? "high" : deal.exitYieldSensitivity === "Moderate" ? "med" : "low"} label={<Hint term="Exit yield sensitivity">Exit sensitivity</Hint>} value={deal.exitYieldSensitivity} />
-              <RiskRow level={deal.covenantStrength === "Weak" || deal.covenantStrength === "Vacant" ? "high" : deal.covenantStrength === "Moderate" ? "med" : "low"} label="Covenant" value={deal.covenantStrength} />
-              {deal.auctionGuideRisk && (
-                <RiskRow level={deal.auctionGuideRisk === "High" ? "high" : deal.auctionGuideRisk === "Moderate" ? "med" : "low"} label="Guide-price risk" value={deal.auctionGuideRisk} />
-              )}
-            </div>
-            {deal.redFlags.length > 0 && (
-              <div className="pt-3 border-t border-border/60">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">Hidden red flags</div>
-                <ul className="space-y-1.5 text-xs">
-                  {deal.redFlags.map((f, i) => (
-                    <li key={i} className="flex items-start gap-2"><AlertTriangle className="h-3 w-3 text-signal-red shrink-0 mt-0.5" />{f}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {dealAnalysis && (
-          <section className="ds-glass p-6 space-y-4">
-            <div>
-              <h2 className="font-display text-2xl">Deal analysis</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Deterministic signals generated only from imported source data and underwriting fields.</p>
-            </div>
-            <p className="rounded-lg border border-border/60 bg-surface-2/40 p-4 text-sm leading-relaxed text-muted-foreground">
-              {dealAnalysis.investmentSummary}
-            </p>
-            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
-              <ReasonList title="Opportunity signals" items={dealAnalysis.opportunitySignals} fallback="No strong opportunity signal found yet." tone="primary" />
-              <ReasonList title="Risk signals" items={dealAnalysis.riskSignals} fallback="No specific risk signal recorded yet." tone="amber" />
-              <ReasonList title="Missing data" items={deal.scoreReasons?.missingDataWarnings ?? []} fallback="No missing-data warning recorded." tone="red" />
-              <ReasonList title="Verify before trusting" items={deal.scoreReasons?.verifyBeforeTrusting ?? []} fallback="Standard title, lease and comparable checks still apply." tone="default" />
-            </div>
-          </section>
-        )}
-
-        <section className="ds-premium-panel p-6 space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-primary font-medium">Investment Thesis</div>
-              <h2 className="font-display text-2xl mt-1">Why this deal may make financial sense</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Generated deterministically from imported fields, area intelligence, scoring signals and missing-data warnings.</p>
-            </div>
-            <div className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              {investmentThesis.investorVerdict}
-            </div>
-          </div>
-          <p className="rounded-lg border border-border/60 bg-background/50 p-4 text-sm leading-relaxed text-muted-foreground">
-            {investmentThesis.summary}
-          </p>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <ReasonList title="Why it looks interesting" items={investmentThesis.whyInteresting} fallback="No strong opportunity signal found yet." tone="primary" />
-            <ReasonList title="Potential upside" items={investmentThesis.potentialUpside} fallback="No calculated upside signal available yet." tone="primary" />
-            <ReasonList title="Key risks" items={investmentThesis.keyRisks} fallback="No specific risk signal recorded yet." tone="amber" />
-            <ReasonList title="What to verify next" items={investmentThesis.verifyNext} fallback="Standard title, lease and comparable checks still apply." tone="default" />
-          </div>
-          <div className="text-xs text-muted-foreground">Thesis confidence: {investmentThesis.confidenceLevel}</div>
-        </section>
-
         <section className="ds-glass p-6 space-y-4">
           <div>
             <h2 className="font-display text-2xl">Comparable Evidence</h2>
@@ -406,40 +315,93 @@ export default function DealDetail() {
           <ReasonList title="Evidence statements" items={comparableEvidence.statements} fallback="Comparable evidence is not available from imported DealSignal data yet." tone="primary" />
         </section>
 
-        <section className="ds-premium-panel p-6 space-y-4">
-          <div>
-            <div className="text-xs uppercase tracking-widest text-primary font-medium">Analyst Score Breakdown</div>
-            <h2 className="font-display text-2xl mt-1">Why this scored highly</h2>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{analystScoreBreakdown.explanation}</p>
+        <section className="ds-card p-5 lg:p-6">
+          <div className="mb-2">
+            <div className="text-xs uppercase tracking-widest text-primary font-medium">Secondary analysis</div>
+            <h2 className="font-display text-2xl mt-1">Deeper diligence detail</h2>
           </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            <ScoreContributorList title="Positive contributors" items={analystScoreBreakdown.positives} tone="positive" />
-            <ScoreContributorList title="Negative contributors" items={analystScoreBreakdown.negatives} tone="negative" />
-          </div>
-        </section>
+          <Accordion type="multiple" className="space-y-2">
+            <AccordionItem value="score-breakdown" className="rounded-lg border border-border/60 bg-surface-2/40 px-4">
+              <AccordionTrigger>Analyst Score Breakdown</AccordionTrigger>
+              <AccordionContent>
+                <p className="mb-4 text-sm text-muted-foreground">{analystScoreBreakdown.explanation}</p>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <ScoreContributorList title="Positive contributors" items={analystScoreBreakdown.positives} tone="positive" />
+                  <ScoreContributorList title="Negative contributors" items={analystScoreBreakdown.negatives} tone="negative" />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
+            <AccordionItem value="investment-thesis" className="rounded-lg border border-border/60 bg-surface-2/40 px-4">
+              <AccordionTrigger>Full Investment Thesis</AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <p className="rounded-lg border border-border/60 bg-background/50 p-4 text-sm leading-relaxed text-muted-foreground">
+                  {investmentThesis.summary}
+                </p>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <ReasonList title="Why it looks interesting" items={investmentThesis.whyInteresting} fallback="No strong opportunity signal found yet." tone="primary" />
+                  <ReasonList title="Potential upside" items={investmentThesis.potentialUpside} fallback="No calculated upside signal available yet." tone="primary" />
+                  <ReasonList title="Key risks" items={investmentThesis.keyRisks} fallback="No specific risk signal recorded yet." tone="amber" />
+                  <ReasonList title="What to verify next" items={investmentThesis.verifyNext} fallback="Standard title, lease and comparable checks still apply." tone="default" />
+                </div>
+                <div className="text-xs text-muted-foreground">Thesis confidence: {investmentThesis.confidenceLevel}</div>
+              </AccordionContent>
+            </AccordionItem>
 
-        <section className="ds-card p-6 space-y-3">
-          <h2 className="font-display text-2xl">Diligence classification</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            This deal is currently classified as {classificationLabel(classification)}. Top Opportunity remains deliberately strict: score at least 78 and confidence at least 80. Strong Opportunity keeps that strict tier intact, while Requires Due Diligence means the opportunity has usable acquisition data but still needs source documents, lease checks or comparable evidence. Low Priority is reserved for sparse or severe missing-data listings.
-          </p>
-          {classification === "green-candidate" && (
-            <ul className="space-y-1.5">
-              {candidateReasons.map((reason) => (
-                <li key={reason} className="flex items-start gap-2 text-xs text-primary">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                  <span>{reason}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Underwriting breakdown grid */}
-        <section className="space-y-3">
-          <h2 className="font-display text-2xl">Professional underwriting breakdown</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <AccordionItem value="underwriting-details" className="rounded-lg border border-border/60 bg-surface-2/40 px-4">
+              <AccordionTrigger>Underwriting Details</AccordionTrigger>
+              <AccordionContent className="space-y-5">
+                <div className="grid gap-5 lg:grid-cols-3">
+                  <div className="lg:col-span-2 space-y-3">
+                    <div className="text-xs uppercase tracking-widest text-muted-foreground">Score categories</div>
+                    {WEIGHTS.map((c) => {
+                      const score = deal.scoreBreakdown[c.key];
+                      return (
+                        <div key={c.key} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span>{c.label}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">{c.w}%</span>
+                            </div>
+                            <span className="font-mono tabular text-sm font-semibold">{score}<span className="text-muted-foreground text-xs">/100</span></span>
+                          </div>
+                          <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
+                            <div className={cn(
+                              "h-full rounded-full transition-all",
+                              score >= 75 ? "bg-gradient-to-r from-signal-green to-emerald-400" :
+                              score >= 55 ? "bg-gradient-to-r from-signal-amber to-yellow-400" :
+                              "bg-gradient-to-r from-signal-red to-rose-400"
+                            )} style={{ width: `${score}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs uppercase tracking-widest text-muted-foreground">Risk flags</div>
+                    <RiskRow level={deal.rating === "red" ? "high" : deal.rating === "amber" ? "med" : "low"} label="Main risk" value={deal.mainRiskFlag} />
+                    <RiskRow level={deal.voidRiskScore > 50 ? "high" : deal.voidRiskScore > 25 ? "med" : "low"} label="Void / reletting" value={`${deal.voidRiskScore}/100`} />
+                    <RiskRow level={deal.exitYieldSensitivity === "High" ? "high" : deal.exitYieldSensitivity === "Moderate" ? "med" : "low"} label={<Hint term="Exit yield sensitivity">Exit sensitivity</Hint>} value={deal.exitYieldSensitivity} />
+                    <RiskRow level={deal.covenantStrength === "Weak" || deal.covenantStrength === "Vacant" ? "high" : deal.covenantStrength === "Moderate" ? "med" : "low"} label="Covenant" value={deal.covenantStrength} />
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-background/50 p-4">
+                  <div className="text-xs uppercase tracking-widest text-muted-foreground">Diligence classification</div>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                    This deal is currently classified as {classificationLabel(classification)}. Top Opportunity remains deliberately strict: score at least 78 and confidence at least 80.
+                  </p>
+                  {classification === "green-candidate" && candidateReasons.length > 0 && (
+                    <ul className="mt-3 space-y-1.5">
+                      {candidateReasons.map((reason) => (
+                        <li key={reason} className="flex items-start gap-2 text-xs text-primary">
+                          <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <UWCard icon={TrendingUp} title="Income quality" rows={[
               ["Gross yield", deal.grossYield ? formatPct(deal.grossYield, 2) : "—"],
               [<Hint term="NIY" key="niy">NIY</Hint>, deal.netInitialYield ? formatPct(deal.netInitialYield, 2) : "—"],
@@ -477,34 +439,47 @@ export default function DealDetail() {
               ["Channel", deal.source],
               ["Posted", new Date(deal.postedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })],
             ]} />
-          </div>
-        </section>
-
-        {sourceLinks.data && sourceLinks.data.length > 0 && (
-          <section className="ds-card p-6 space-y-3">
-            <h2 className="font-display text-2xl">Source attribution</h2>
-            <div className="space-y-2">
-              {sourceLinks.data.map((link) => (
-                <div key={link.id} className="flex items-center justify-between gap-3 text-sm border-b border-border/40 last:border-0 py-2">
-                  <span className="text-muted-foreground">Imported source</span>
-                  {link.source_url ? (
-                    <a href={link.source_url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate max-w-md">
-                      {link.source_url}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">No source URL recorded</span>
-                  )}
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
+              </AccordionContent>
+            </AccordionItem>
 
-        <section className="ds-card p-6 space-y-3">
-          <h2 className="font-display text-2xl">Verify before action</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            DealSignal is not financial advice and is not a valuation. Treat the score as a triage signal only. Verify the source listing, price, lease terms, tenancy, title, planning, condition and comparable evidence before making an offer.
-          </p>
+            <AccordionItem value="source-attribution" className="rounded-lg border border-border/60 bg-surface-2/40 px-4">
+              <AccordionTrigger>Source Attribution</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-2">
+                  {(sourceLinks.data?.length ? sourceLinks.data : [{ id: "source-url", source_url: primarySourceUrl }]).map((link) => (
+                    <div key={link.id} className="flex items-center justify-between gap-3 text-sm border-b border-border/40 last:border-0 py-2">
+                      <span className="text-muted-foreground">Imported source</span>
+                      {link.source_url ? (
+                        <a href={link.source_url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate max-w-md">
+                          {link.source_url}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">No source URL recorded</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="verification-checklist" className="rounded-lg border border-border/60 bg-surface-2/40 px-4">
+              <AccordionTrigger>Verification Checklist</AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                {dealAnalysis && (
+                  <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <ReasonList title="Opportunity signals" items={dealAnalysis.opportunitySignals} fallback="No strong opportunity signal found yet." tone="primary" />
+                    <ReasonList title="Risk signals" items={dealAnalysis.riskSignals} fallback="No specific risk signal recorded yet." tone="amber" />
+                    <ReasonList title="Missing data" items={deal.scoreReasons?.missingDataWarnings ?? []} fallback="No missing-data warning recorded." tone="red" />
+                    <ReasonList title="Verify before trusting" items={deal.scoreReasons?.verifyBeforeTrusting ?? []} fallback="Standard title, lease and comparable checks still apply." tone="default" />
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  DealSignal is not financial advice and is not a valuation. Treat the score as a triage signal only. Verify the source listing, price, lease terms, tenancy, title, planning, condition and comparable evidence before making an offer.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </section>
         {/* Pipeline */}
         <div className="ds-card p-6 space-y-3">
@@ -546,6 +521,22 @@ function HeroStat({ label, value }: { label: React.ReactNode; value: string }) {
     <div className="bg-surface-2/80 backdrop-blur border border-white/10 rounded-lg p-3 shadow-lg shadow-black/20">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="font-mono text-lg font-semibold tabular mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+function ReadinessChecklist({ readiness }: { readiness: AcquisitionReadiness }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {readiness.checklist.map((item) => (
+        <div key={item.key} className="flex items-start gap-2 rounded-lg border border-border/60 bg-surface-2/40 p-3">
+          <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", item.present ? "bg-signal-green" : "bg-signal-amber")} />
+          <div>
+            <div className="text-sm font-medium">{item.label}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{item.detail}</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -714,6 +705,20 @@ function UWCard({ icon: Icon, title, rows }: { icon: React.ComponentType<{ class
 
 function formatPercentile(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function firstAvailable(...groups: string[][]) {
+  for (const group of groups) {
+    const value = group.find((item) => item && item.trim());
+    if (value) return value;
+  }
+  return "No major risk recorded";
+}
+
+function buildTriageSummary(summary: string, risks: string[], readiness: AcquisitionReadiness) {
+  const conciseSummary = summary.replace(/\s+/g, " ").trim();
+  const firstRisk = firstAvailable(risks, readiness.missingLabels.map((label) => `${label} missing`));
+  return `${conciseSummary} Acquisition readiness is ${readiness.score}% (${readiness.band}). Biggest check before action: ${firstRisk}.`;
 }
 
 

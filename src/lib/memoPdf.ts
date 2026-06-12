@@ -8,6 +8,7 @@ import { type ComparableEvidence, formatComparableMetric } from "@/lib/comparabl
 import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } from "@/lib/financialAnalysis";
 import type { NationalRanking } from "@/lib/dailyOpportunityFeed";
 import { buildAnalystScoreBreakdown, scoreBreakdownLines } from "@/lib/analystScoreBreakdown";
+import { buildAcquisitionReadiness, type AcquisitionReadiness } from "@/lib/acquisitionReadiness";
 
 type JsPdfDocument = {
   setProperties: (properties: Record<string, string>) => void;
@@ -54,6 +55,7 @@ export function buildMemoSections(deal: Deal, options: { comparableEvidence?: Co
   const thesis = buildInvestmentThesis(deal, { comparableEvidence: options.comparableEvidence });
   const financialAnalysis = buildFinancialAnalysis(deal);
   const analystScoreBreakdown = buildAnalystScoreBreakdown(deal, { comparableEvidence: options.comparableEvidence });
+  const acquisitionReadiness = buildAcquisitionReadiness(deal, options.comparableEvidence);
   const verificationChecklist = memoVerificationChecklist(deal, thesis.verifyNext, reasons?.verifyBeforeTrusting ?? []);
   return {
     executiveSummary: [
@@ -83,6 +85,7 @@ export function buildMemoSections(deal: Deal, options: { comparableEvidence?: Co
       analystScoreBreakdown.explanation,
       ...scoreBreakdownLines(analystScoreBreakdown),
     ],
+    acquisitionReadiness: memoAcquisitionReadiness(acquisitionReadiness),
     tenantLeaseIncome: memoTenantLeaseIncome(deal),
     nationalRanking: memoNationalRanking(options.nationalRanking),
     financialAnalysis: memoFinancialAnalysis(financialAnalysis),
@@ -168,6 +171,7 @@ function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date
   y = writeListSection(doc, "Key risks", sections.investmentThesis.keyRisks, margin, y, page);
   y = writeListSection(doc, "Investor verdict", [`${sections.investmentThesis.investorVerdict} (${sections.investmentThesis.confidenceLevel} confidence)`], margin, y, page);
   y = writeListSection(doc, "National Ranking", sections.nationalRanking, margin, y, page);
+  y = writeListSection(doc, "Acquisition Readiness", sections.acquisitionReadiness, margin, y, page);
   y = writeListSection(doc, "Analyst Score Breakdown", sections.scoreBreakdown, margin, y, page);
   y = writeListSection(doc, "Tenant / Lease / Income", sections.tenantLeaseIncome, margin, y, page);
   y = writeListSection(doc, "Comparable Evidence", sections.comparableEvidence, margin, y, page);
@@ -288,6 +292,14 @@ function memoNationalRanking(ranking: NationalRanking | null | undefined) {
     `Feed score: ${ranking.rankingScore}/100`,
     `Investor verdict: ${ranking.verdict}`,
     ...ranking.whyMadeList.map((reason) => `Why it made the list: ${reason}`),
+  ];
+}
+
+function memoAcquisitionReadiness(readiness: AcquisitionReadiness) {
+  return [
+    `Readiness: ${readiness.score}% (${readiness.band})`,
+    readiness.summary,
+    ...readiness.checklist.map((item) => `${item.label}: ${item.present ? "present" : "missing"} - ${item.detail}`),
   ];
 }
 

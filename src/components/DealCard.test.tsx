@@ -118,6 +118,14 @@ describe("DealCard", () => {
     expect(screen.getByRole("button", { name: "Save to Pipeline" })).toBeInTheDocument();
   });
 
+  it("shows compact acquisition readiness on the card", () => {
+    renderCard(deal({ sourceUrl: "https://example.com/deal" }));
+
+    expect(screen.getByText("Readiness")).toBeInTheDocument();
+    expect(screen.getByText("22%")).toBeInTheDocument();
+    expect(screen.getByText(/Missing: Rent, Tenant, Lease/)).toBeInTheDocument();
+  });
+
   it("shows when an imported deal was added", () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     renderCard(deal({ postedAt: twoHoursAgo }));

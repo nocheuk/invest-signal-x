@@ -129,6 +129,12 @@ describe("investment pack PDF data", () => {
       "Annual rent: Not available",
       "60% LTV cash-on-cash return: Not available",
     ]));
+    expect(sections.acquisitionReadiness).toEqual(expect.arrayContaining([
+      "Readiness: 33% (Not ready)",
+      expect.stringContaining("Rent: missing"),
+      expect.stringContaining("Tenant: missing"),
+      expect.stringContaining("Source URL: present"),
+    ]));
     expect(sections.opportunitySignals).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
     expect(sections.riskSignals).toEqual(expect.arrayContaining(["Passing rent missing", "Tenant covenant unknown"]));
     expect(sections.positiveDrivers).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
@@ -204,6 +210,12 @@ describe("investment pack PDF data", () => {
     expect(sections.scoreBreakdown).toEqual(expect.arrayContaining([
       expect.stringContaining("DealSignal score"),
       expect.stringContaining("Yield"),
+    ]));
+    expect(sections.acquisitionReadiness).toEqual(expect.arrayContaining([
+      "Readiness: 89% (Review ready)",
+      expect.stringContaining("Tenant: present"),
+      expect.stringContaining("Rent: present"),
+      expect.stringContaining("EPC: missing"),
     ]));
   });
 
