@@ -143,11 +143,19 @@ describe("DealDetail", () => {
 
     expect(screen.getByText("Investment Verdict")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Review Immediately" })).toBeInTheDocument();
+    expect(screen.getByText(/Top \d+% nationally/)).toBeInTheDocument();
     expect(screen.getByText("Key Numbers")).toBeInTheDocument();
     expect(screen.getByText("Acquisition Readiness")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Readiness: 89%" })).toBeInTheDocument();
     expect(screen.getByText("Review ready")).toBeInTheDocument();
-    expect(screen.getByText("EPC missing")).toBeInTheDocument();
+    expect(screen.getByText("Missing")).toBeInTheDocument();
+    expect(screen.getAllByText("EPC missing").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Key Takeaways")).toBeInTheDocument();
+    expect(screen.getByText("What matters first")).toBeInTheDocument();
+    expect(screen.getByText(/Yield \d+% above local average/)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Where this deal sits in the DealSignal feed" })).not.toBeInTheDocument();
+    expect(screen.queryByText("National rank")).not.toBeInTheDocument();
+    expect(screen.queryByText("Percentile")).not.toBeInTheDocument();
   });
 
   it("collapses secondary analysis into accordions", () => {
@@ -169,6 +177,9 @@ describe("DealDetail", () => {
     expect(screen.queryByRole("heading", { name: "Professional underwriting breakdown" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Analyst Score Breakdown" }));
+    expect(screen.getByText("National rank")).toBeInTheDocument();
+    expect(screen.getByText("Percentile")).toBeInTheDocument();
+    expect(screen.getAllByText(/Top \d+% nationally/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Positive contributors")).toBeInTheDocument();
     expect(screen.getByText("Negative contributors")).toBeInTheDocument();
     expect(screen.getByText(/DealSignal score 77\/100/i)).toBeInTheDocument();

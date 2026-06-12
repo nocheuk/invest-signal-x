@@ -19,8 +19,8 @@ import { downloadDealMemoPdf } from "@/lib/memoPdf";
 import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { getAreaIntelligence } from "@/lib/areaIntelligence";
-import { buildComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
-import { buildInvestmentThesis } from "@/lib/investmentThesis";
+import { buildComparableEvidence, formatComparableMetric, type ComparableEvidence } from "@/lib/comparableEvidence";
+import { buildInvestmentThesis, type InvestmentThesis } from "@/lib/investmentThesis";
 import {
   DEFAULT_FINANCIAL_ASSUMPTIONS,
   buildFinancialAnalysis,
@@ -94,6 +94,8 @@ export default function DealDetail() {
   const pricePerSqft = deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0);
   const financialAnalysis = buildFinancialAnalysis(deal, financialAssumptions);
   const triageSummary = buildTriageSummary(investmentThesis.summary, investmentThesis.keyRisks, acquisitionReadiness);
+  const nationalRankBadge = nationalRanking ? `Top ${nationalRanking.topPercent}% nationally` : null;
+  const keyTakeaways = buildKeyTakeaways(investmentThesis, comparableEvidence, acquisitionReadiness);
 
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
@@ -125,6 +127,11 @@ export default function DealDetail() {
               <div className="space-y-3 max-w-2xl">
                 <div className="flex items-center gap-2">
                   <ClassificationBadge classification={classification} className={classification === "green-candidate" ? "bg-primary/20 shadow-lg shadow-primary/20" : undefined} />
+                  {nationalRankBadge && (
+                    <span className="rounded-full border border-white/15 bg-surface-2/80 px-2 py-0.5 text-[11px] text-muted-foreground">
+                      {nationalRankBadge}
+                    </span>
+                  )}
                   <span className="text-xs text-muted-foreground">·</span>
                   <span className="text-xs text-muted-foreground">{deal.assetType} · {deal.source}</span>
                 </div>
@@ -194,12 +201,21 @@ export default function DealDetail() {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <SnapshotMetric label="Score" value={`${deal.score}/100`} />
-            <SnapshotMetric label="National rank" value={nationalRanking ? `#${nationalRanking.rank} of ${nationalRanking.total}` : "Not ranked"} />
-            <SnapshotMetric label="Percentile" value={nationalRanking ? `${formatPercentile(nationalRanking.percentile)} percentile` : "Not available"} />
             <SnapshotMetric label="Data quality" value={deal.dataConfidenceScore !== undefined ? `${deal.dataConfidenceScore}/100` : "Not available"} />
             <SnapshotMetric label="Biggest risk" value={firstAvailable(investmentThesis.keyRisks, acquisitionReadiness.missingLabels.map((label) => `${label} missing`), [deal.mainRiskFlag])} />
+          </div>
+        </section>
+
+        <section className="ds-card p-5 lg:p-6 space-y-4">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-primary font-medium">Key Takeaways</div>
+            <h2 className="font-display text-2xl mt-1">What matters first</h2>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <ReasonList title="Positive" items={keyTakeaways.positive} fallback="No strong positive signal recorded yet." tone="primary" maxItems={2} />
+            <ReasonList title="Risks" items={keyTakeaways.risks} fallback="No major risk signal recorded yet." tone="amber" maxItems={2} />
           </div>
         </section>
 
@@ -225,13 +241,25 @@ export default function DealDetail() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-widest text-primary font-medium">Acquisition Readiness</div>
-              <h2 className="font-display text-2xl mt-1">{acquisitionReadiness.band}</h2>
+              <h2 className="font-display text-2xl mt-1">Readiness: {acquisitionReadiness.score}%</h2>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{acquisitionReadiness.summary}</p>
             </div>
-            <div className="rounded-full border border-primary/30 bg-primary/10 px-4 py-2 font-mono text-lg font-semibold text-primary tabular">
-              {acquisitionReadiness.score}%
+            <div className="rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
+              {acquisitionReadiness.band}
             </div>
           </div>
+          {acquisitionReadiness.missingLabels.length > 0 && (
+            <div className="rounded-lg border border-signal-amber/30 bg-signal-amber-soft/20 px-4 py-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-signal-amber">Missing</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {acquisitionReadiness.missingLabels.map((label) => (
+                  <span key={label} className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground">
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <ReadinessChecklist readiness={acquisitionReadiness} />
         </section>
 
@@ -325,6 +353,18 @@ export default function DealDetail() {
               <AccordionTrigger>Analyst Score Breakdown</AccordionTrigger>
               <AccordionContent>
                 <p className="mb-4 text-sm text-muted-foreground">{analystScoreBreakdown.explanation}</p>
+                {nationalRanking ? (
+                  <div className="mb-4 grid gap-3 sm:grid-cols-4">
+                    <SnapshotMetric label="National rank" value={`#${nationalRanking.rank} of ${nationalRanking.total}`} />
+                    <SnapshotMetric label="Percentile" value={`${formatPercentile(nationalRanking.percentile)} percentile`} />
+                    <SnapshotMetric label="Top band" value={`Top ${nationalRanking.topPercent}% nationally`} />
+                    <SnapshotMetric label="Feed score" value={`${nationalRanking.rankingScore}/100`} />
+                  </div>
+                ) : (
+                  <p className="mb-4 rounded-lg border border-border/60 bg-background/50 p-3 text-xs text-muted-foreground">
+                    This deal is not currently ranked in the national opportunity feed.
+                  </p>
+                )}
                 <div className="grid gap-3 lg:grid-cols-2">
                   <ScoreContributorList title="Positive contributors" items={analystScoreBreakdown.positives} tone="positive" />
                   <ScoreContributorList title="Negative contributors" items={analystScoreBreakdown.negatives} tone="negative" />
@@ -721,10 +761,31 @@ function buildTriageSummary(summary: string, risks: string[], readiness: Acquisi
   return `${conciseSummary} Acquisition readiness is ${readiness.score}% (${readiness.band}). Biggest check before action: ${firstRisk}.`;
 }
 
+function buildKeyTakeaways(thesis: InvestmentThesis, comparableEvidence: ComparableEvidence | null, readiness: AcquisitionReadiness) {
+  const positive = uniqueStrings([
+    comparableEvidence?.yieldDifferencePercent && comparableEvidence.yieldDifferencePercent > 0
+      ? `Yield ${Math.round(comparableEvidence.yieldDifferencePercent)}% above local average`
+      : "",
+    comparableEvidence?.dealPricePerSqft && comparableEvidence.averagePricePerSqft && comparableEvidence.pricePerSqftDifferencePercent && comparableEvidence.pricePerSqftDifferencePercent < 0
+      ? `${formatGBP(Math.round(comparableEvidence.dealPricePerSqft))}/sqft vs ${formatGBP(Math.round(comparableEvidence.averagePricePerSqft))}/sqft market average`
+      : "",
+    ...thesis.whyInteresting,
+    ...thesis.potentialUpside,
+  ]).slice(0, 2);
+  const risks = uniqueStrings([
+    ...readiness.missingLabels.slice(0, 2).map((label) => `${label} missing`),
+    ...thesis.keyRisks,
+  ]).slice(0, 2);
+  return { positive, risks };
+}
 
-function ReasonList({ title, items, fallback, tone }: { title: string; items: string[]; fallback: string; tone: "primary" | "amber" | "red" | "default" }) {
+function uniqueStrings(items: string[]) {
+  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+}
+
+function ReasonList({ title, items, fallback, tone, maxItems }: { title: string; items: string[]; fallback: string; tone: "primary" | "amber" | "red" | "default"; maxItems?: number }) {
   const dot = tone === "primary" ? "bg-primary" : tone === "amber" ? "bg-signal-amber" : tone === "red" ? "bg-signal-red" : "bg-muted-foreground";
-  const shown = items.length > 0 ? items : [fallback];
+  const shown = (items.length > 0 ? items : [fallback]).slice(0, maxItems);
 
   return (
     <div className="rounded-lg border border-border/60 bg-surface-2/40 p-4 space-y-2">
