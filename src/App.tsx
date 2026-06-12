@@ -9,6 +9,7 @@ import { WatchlistProvider } from "@/lib/watchlist";
 import { StrategyProvider } from "@/lib/strategy";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
@@ -35,6 +36,7 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <FeedbackWidget />
                 <Routes>
                   <Route path="/" element={<Landing />} />
                   <Route path="/auth" element={<Auth />} />

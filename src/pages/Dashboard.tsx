@@ -29,6 +29,7 @@ import { formatGBP, formatPct, type Deal } from "@/lib/deals";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } from "@/lib/financialAnalysis";
 import { buildDailyOpportunityFeed, type NationalRanking } from "@/lib/dailyOpportunityFeed";
+import { useUsageTracking, type UserEventType } from "@/lib/usageTracking";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -47,6 +48,7 @@ function DashboardContent() {
   const profile = useProfile();
   const nationalScanStatus = useNationalScanStatus();
   const locationImport = useLocationImport();
+  const { trackEvent } = useUsageTracking();
   const [searchParams] = useSearchParams();
   const [locationQuery, setLocationQuery] = useState("");
   const [locationEdited, setLocationEdited] = useState(false);
@@ -133,7 +135,9 @@ function DashboardContent() {
     if (!locationQuery.trim()) return;
     setLocationImportResult(null);
     try {
-      setLocationImportResult(await locationImport.mutateAsync({ locationQuery: locationQuery.trim() }));
+      const result = await locationImport.mutateAsync({ locationQuery: locationQuery.trim() });
+      setLocationImportResult(result);
+      void trackEvent({ eventType: "ran_location_search", metadata: { location_query: locationQuery.trim(), imported: result.imported, refreshed: result.refreshed ?? result.existing } });
     } catch {
       // The mutation state renders the user-facing error.
     }
@@ -321,8 +325,8 @@ function DashboardContent() {
               </Button>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Kpi label="Top Opportunities" value={kpis.verifiedGreens.toLocaleString()} sub="Strict score and confidence" icon={Sparkles} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "verified-green" })} />
-              <Kpi label="Strong Opportunities" value={kpis.greenCandidates.toLocaleString()} sub={`${kpis.verifiedGreens} top opportunities`} icon={Target} accent="text-primary" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "green-candidate" })} />
+              <Kpi label="Top Opportunities" value={kpis.verifiedGreens.toLocaleString()} sub="Strict score and confidence" icon={Sparkles} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "verified-green" })} eventType="clicked_top_opportunity" />
+              <Kpi label="Strong Opportunities" value={kpis.greenCandidates.toLocaleString()} sub={`${kpis.verifiedGreens} top opportunities`} icon={Target} accent="text-primary" to={dashboardDealsRoute({ ...dashboardSearchParams, classification: "green-candidate" })} eventType="clicked_strong_opportunity" />
               <Kpi label="New Today" value={freshness.newToday.toLocaleString()} sub={`${freshness.newSourcesToday} source listings`} icon={Clock3} accent="text-signal-green" to={dashboardDealsRoute({ ...dashboardSearchParams, freshness: "today" })} />
               <Kpi label="Filtered Deals" value={visibleDeals.length.toLocaleString()} sub={`${kpis.importedDeals.toLocaleString()} imported`} icon={TrendingUp} accent="text-foreground" to={dashboardDealsRoute(dashboardSearchParams)} />
             </div>
@@ -615,9 +619,13 @@ function EmptyPanel({ loading, message }: { loading: boolean; message: string })
   );
 }
 
-function Kpi({ label, value, sub, icon: Icon, accent, to }: { label: string; value: string; sub: string; icon: ComponentType<{ className?: string }>; accent: string; to: string }) {
+function Kpi({ label, value, sub, icon: Icon, accent, to, eventType }: { label: string; value: string; sub: string; icon: ComponentType<{ className?: string }>; accent: string; to: string; eventType?: UserEventType }) {
+  const { trackEvent } = useUsageTracking();
   return (
-    <Link to={to} onClick={() => logDealFilterDebug("dashboard-kpi-click", { label, to, searchParams: to.split("?")[1] ?? "" })} className="ds-glass p-4 space-y-3 text-left transition-all duration-300 hover:border-primary/40 hover:-translate-y-0.5">
+    <Link to={to} onClick={() => {
+      logDealFilterDebug("dashboard-kpi-click", { label, to, searchParams: to.split("?")[1] ?? "" });
+      if (eventType) void trackEvent({ eventType, metadata: { label, to } });
+    }} className="ds-glass p-4 space-y-3 text-left transition-all duration-300 hover:border-primary/40 hover:-translate-y-0.5">
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</span>
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />

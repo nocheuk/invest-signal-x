@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useSt
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
+import { trackUserEvent } from "@/lib/usageTracking";
 
 export const PIPELINE_STATUSES = ["Saved", "Reviewing", "Viewing Booked", "Offer Submitted", "Passed", "Purchased"] as const;
 export type PipelineStatus = typeof PIPELINE_STATUSES[number];
@@ -134,6 +135,11 @@ function nextStateFromPatch(state: WatchlistState, dealId: string, patch: Pipeli
 
 function nextStateAfterRemove(state: WatchlistState, dealId: string): WatchlistState {
   return buildState(state.watchlistId, Object.values(state.pipelineItems).filter((item) => item.dealId !== dealId));
+}
+
+function currentPage() {
+  if (typeof window === "undefined") return "unknown";
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 export function WatchlistProvider({ children }: { children: ReactNode }) {
@@ -293,6 +299,12 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     getPipelineStatus: (id) => state.pipelineItems[id]?.status,
     saveToPipeline: async (id, status = "Saved") => {
       await upsertMutation.mutateAsync({ dealId: id, patch: { status } });
+      void trackUserEvent(auth.user?.id, {
+        eventType: "saved_to_pipeline",
+        dealId: id,
+        currentPage: currentPage(),
+        metadata: { status },
+      });
     },
     setStatus: async (id, status) => {
       await upsertMutation.mutateAsync({ dealId: id, patch: { status } });
@@ -306,7 +318,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     remove: async (id) => {
       await removeMutation.mutateAsync({ dealId: id });
     },
-  }), [error, pipelineCounts, removeMutation, state, upsertMutation]);
+  }), [auth.user?.id, error, pipelineCounts, removeMutation, state, upsertMutation]);
 
   return <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>;
 }

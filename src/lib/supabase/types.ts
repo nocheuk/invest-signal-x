@@ -160,6 +160,16 @@ export type Database = {
         Insert: { id?: string; scan_type?: string; location_query: string; normalized_location: string; source_name: string; status?: string; inserted?: number; existing?: number; failed?: number; skipped_duplicate?: number; skipped_rent_only?: number; skipped_poa?: number; result?: Json; metadata?: Json; error_message?: string | null; started_at?: string; finished_at?: string | null };
         Update: Partial<Database["public"]["Tables"]["national_scan_runs"]["Insert"]>;
       };
+      user_feedback: {
+        Row: { id: string; user_id: string; type: string; message: string; deal_id: string | null; source_url: string | null; current_page: string; metadata: Json; created_at: string };
+        Insert: { id?: string; user_id: string; type: string; message: string; deal_id?: string | null; source_url?: string | null; current_page: string; metadata?: Json; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["user_feedback"]["Insert"]>;
+      };
+      user_events: {
+        Row: { id: string; user_id: string; event_type: string; deal_id: string | null; source_url: string | null; current_page: string; metadata: Json; created_at: string };
+        Insert: { id?: string; user_id: string; event_type: string; deal_id?: string | null; source_url?: string | null; current_page: string; metadata?: Json; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["user_events"]["Insert"]>;
+      };
     };
   };
 };

@@ -124,6 +124,12 @@ vi.mock("@/hooks/useLocationImport", async () => {
   };
 });
 
+vi.mock("@/lib/usageTracking", () => ({
+  useUsageTracking: () => ({
+    trackEvent: vi.fn(),
+  }),
+}));
+
 vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: true,
 }));

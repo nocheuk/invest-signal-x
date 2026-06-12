@@ -92,6 +92,12 @@ vi.mock("@/lib/watchlist", () => ({
   }),
 }));
 
+vi.mock("@/lib/usageTracking", () => ({
+  useUsageTracking: () => ({
+    trackEvent: vi.fn(),
+  }),
+}));
+
 describe("DealDetail", () => {
   it("renders cleaned Comparable Evidence without the old polluted Area Intelligence section", () => {
     render(

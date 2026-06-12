@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useSavedAlerts, type SavedAlert, type SaveAlertInput } from "@/hooks/useSavedAlerts";
 import { ASSET_TYPES } from "@/lib/deals";
 import { defaultAlertName } from "@/lib/alerts";
+import { useUsageTracking } from "@/lib/usageTracking";
 import { cn } from "@/lib/utils";
 
 const EMPTY_ALERT: SaveAlertInput = {
@@ -21,6 +22,7 @@ const EMPTY_ALERT: SaveAlertInput = {
 
 export default function Alerts() {
   const savedAlerts = useSavedAlerts();
+  const { trackEvent } = useUsageTracking();
   const [draft, setDraft] = useState<SaveAlertInput>(EMPTY_ALERT);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -32,6 +34,7 @@ export default function Alerts() {
       assetType: draft.assetType || "All",
     };
     await savedAlerts.saveAlert(input);
+    if (!editingId) void trackEvent({ eventType: "created_alert", metadata: { location_query: input.locationQuery, asset_type: input.assetType, min_score: input.minScore } });
     setDraft(EMPTY_ALERT);
     setEditingId(null);
   };

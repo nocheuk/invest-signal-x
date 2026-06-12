@@ -46,6 +46,12 @@ vi.mock("@/hooks/useSavedAlerts", () => ({
   useSavedAlerts: () => ({ saveAlert: saveAlertSpy }),
 }));
 
+vi.mock("@/lib/usageTracking", () => ({
+  useUsageTracking: () => ({
+    trackEvent: vi.fn(),
+  }),
+}));
+
 vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: true,
   requireSupabase: () => ({
