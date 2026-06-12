@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { DealCard } from "@/components/DealCard";
 import { DealRow } from "@/components/DealRow";
 import { StrategyControl } from "@/components/StrategyControl";
+import { StrategyModeSelector } from "@/components/StrategyModeSelector";
 import { Hint } from "@/components/Hint";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import { buildAreaIntelligenceIndex, EMPTY_AREA_INTELLIGENCE_INDEX, getAreaIntel
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 import { dashboardDefaultsFromPreferences, getInvestorPreferences } from "@/lib/onboarding";
+import { parseStrategyMode, strategyModeById, strategyModeDescription, type StrategyModeId } from "@/lib/strategyModes";
 
 export default function AllDeals() {
   const { dealsQuery, deals } = useRealDeals();
@@ -37,6 +39,7 @@ export default function AllDeals() {
   const [pipelineStatus, setPipelineStatus] = useState<"all" | PipelineStatus>("all");
   const [freshnessFilter, setFreshnessFilter] = useState<FreshnessFilter>((searchParams.get("freshness") as FreshnessFilter) ?? "all");
   const [sort, setSort] = useState<"score" | "yield" | "price" | "confidence" | "newest">("score");
+  const [strategyMode, setStrategyMode] = useState<StrategyModeId>(parseStrategyMode(searchParams.get("strategyMode")));
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [locationQuery, setLocationQuery] = useState(searchParams.get("location") ?? "");
   const [minYield, setMinYield] = useState(0);
@@ -55,7 +58,8 @@ export default function AllDeals() {
     search,
     locationQuery,
     sort,
-  }), [asset, confidence, locationQuery, maxPrice, minYield, rating, region, search, sort, source]);
+    strategyMode,
+  }), [asset, confidence, locationQuery, maxPrice, minYield, rating, region, search, sort, source, strategyMode]);
 
   useEffect(() => {
     const assetParam = searchParams.get("asset");
@@ -74,6 +78,7 @@ export default function AllDeals() {
     setConfidence(parseConfidenceParam(searchParams.get("confidence")));
     setPipelineStatus(parsePipelineParam(searchParams.get("pipeline")));
     setSort(parseSortParam(searchParams.get("sort")));
+    setStrategyMode(parseStrategyMode(searchParams.get("strategyMode")));
     setMinYield(minYieldParam ?? defaultMinYield);
     setMaxPrice(maxPriceParam ?? 0);
   }, [hasExplicitFilters, onboardingDefaults.assetType, onboardingDefaults.locationQuery, onboardingDefaults.minYield, searchParams]);
@@ -127,6 +132,16 @@ export default function AllDeals() {
           <StrategyControl />
         </header>
 
+        <section className="ds-card p-4 space-y-3">
+          <StrategyModeSelector value={strategyMode} onChange={setStrategyMode} />
+          <p className="text-sm text-muted-foreground">{strategyModeDescription(strategyMode)}</p>
+          {strategyMode === "high-street-conversion" && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+              High Street Conversion feed: showing deals where listing text indicates upper-floor, mixed-use, town-centre or residential conversion potential.
+            </div>
+          )}
+        </section>
+
         <section className="grid gap-4 md:grid-cols-4">
           <MiniMetric label="Filtered deals" value={filtered.length} sub={`${kpis.importedDeals.toLocaleString()} imported`} />
           <MiniMetric label="Strong Opportunities" value={kpis.greenCandidates} sub={`${kpis.verifiedGreens} top opportunities`} />
@@ -162,6 +177,7 @@ export default function AllDeals() {
               setConfidence("all");
               setPipelineStatus("all");
               setFreshnessFilter("all");
+              setStrategyMode("general-investment");
               setSearch("");
               setLocationQuery("");
               setMinYield(0);
@@ -171,12 +187,13 @@ export default function AllDeals() {
             </Button>
             {locationQuery && <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">Location: {locationQuery}</span>}
             {rating !== "all" && <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">{filterChipLabel(rating)}</span>}
+            {strategyMode !== "general-investment" && <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs text-primary">{strategyModeById(strategyMode).shortLabel}</span>}
           </div>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2">
-          <FeatureList title="Recently Added" deals={recentlyAdded} empty="No recently added imported deals match these filters." areaIndex={areaIndex} />
-          <FeatureList title="Requires Due Diligence" deals={dueDiligenceDeals} empty="No diligence-required deals match these filters." areaIndex={areaIndex} />
+          <FeatureList title="Recently Added" deals={recentlyAdded} empty="No recently added imported deals match these filters." areaIndex={areaIndex} strategyMode={strategyMode} />
+          <FeatureList title="Requires Due Diligence" deals={dueDiligenceDeals} empty="No diligence-required deals match these filters." areaIndex={areaIndex} strategyMode={strategyMode} />
         </section>
 
         <section className="ds-card overflow-hidden">
@@ -206,14 +223,14 @@ export default function AllDeals() {
   );
 }
 
-function FeatureList({ title, deals, empty, areaIndex }: { title: string; deals: ReturnType<typeof useRealDeals>["deals"]; empty: string; areaIndex: ReturnType<typeof buildAreaIntelligenceIndex> }) {
+function FeatureList({ title, deals, empty, areaIndex, strategyMode }: { title: string; deals: ReturnType<typeof useRealDeals>["deals"]; empty: string; areaIndex: ReturnType<typeof buildAreaIntelligenceIndex>; strategyMode: StrategyModeId }) {
   return (
     <div className="space-y-3">
       <h2 className="font-display text-2xl">{title}</h2>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
         {deals.map((deal) => (
           <div key={deal.id} className="space-y-2">
-            <DealCard deal={deal} areaIntelligence={getAreaIntelligenceFromIndex(deal, areaIndex)} />
+            <DealCard deal={deal} areaIntelligence={getAreaIntelligenceFromIndex(deal, areaIndex)} strategyMode={strategyMode} />
             {title === "Recently Added" && <div className="text-[11px] text-muted-foreground">Imported {formatImportDate(deal.postedAt)}</div>}
           </div>
         ))}
@@ -309,6 +326,7 @@ function hasExplicitDealFilter(searchParams: URLSearchParams) {
     "confidence",
     "pipeline",
     "sort",
+    "strategyMode",
     "minYield",
     "maxPrice",
   ].some((key) => searchParams.has(key));

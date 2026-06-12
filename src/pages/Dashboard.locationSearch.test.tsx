@@ -271,6 +271,41 @@ describe("Dashboard focused overview", () => {
     expect(screen.queryByText("Inventory audit")).not.toBeInTheDocument();
   });
 
+  it("filters dashboard recommendations with the High Street Conversion strategy mode", () => {
+    dealsState.deals = [
+      dashboardDeal({
+        id: "conversion",
+        title: "Former bank on High Street with upper parts",
+        assetType: "Retail",
+        location: "Bournemouth town centre",
+        score: 78,
+        rating: "amber",
+        dataConfidenceScore: 82,
+        enrichment: {
+          status: "Enriched",
+          investmentSummary: "Town centre retail with vacant upper floors, rear access and residential conversion potential.",
+        },
+      }),
+      dashboardDeal({
+        id: "industrial",
+        title: "Industrial warehouse estate",
+        assetType: "Industrial",
+        location: "Out of town logistics park",
+        score: 82,
+        rating: "green",
+      }),
+    ];
+
+    renderDashboard();
+    fireEvent.click(screen.getByRole("tab", { name: "High Street Conversion" }));
+
+    expect(screen.getByText(/High Street Conversion feed/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Former bank on High Street with upper parts").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Industrial warehouse estate")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Why this fits the strategy").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/High street location mentioned|Upper-floor accommodation indicated|Residential conversion potential mentioned/i).length).toBeGreaterThanOrEqual(1);
+  });
+
   it("excludes seeded demo deals in Supabase mode", () => {
     dealsState.deals = [
       dashboardDeal({ id: "ds-demo", title: "Seed Demo Deal", isSeed: true }),
