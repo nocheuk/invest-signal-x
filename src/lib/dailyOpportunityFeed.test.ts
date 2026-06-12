@@ -58,6 +58,7 @@ describe("daily opportunity feed", () => {
   it("calculates rank percentiles and top percentage", () => {
     expect(percentileForRank(1, 10)).toBe(100);
     expect(percentileForRank(10, 10)).toBe(10);
+    expect(percentileForRank(2, 2091)).toBe(99.9);
     expect(topPercentForRank(1, 10)).toBe(10);
     expect(topPercentForRank(3, 10)).toBe(30);
   });
@@ -76,6 +77,8 @@ describe("daily opportunity feed", () => {
     expect(rankings[0].percentile).toBe(100);
     expect(rankings[0].topPercent).toBe(34);
     expect(rankings[0].whyMadeList.join(" ")).toMatch(/Yield|classification|tenant|lease/i);
+    expect(rankings[0].scoreBreakdown.explanation).toContain("DealSignal score");
+    expect(rankings[0].scoreBreakdown.positives.map((item) => item.label)).toEqual(expect.arrayContaining(["Yield", "Tenant", "Lease"]));
   });
 
   it("generates top today, top this week, strong opportunities, and new high-ranking feeds", () => {

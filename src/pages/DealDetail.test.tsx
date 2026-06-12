@@ -146,4 +146,19 @@ describe("DealDetail", () => {
     expect(screen.getByText(/Top \d+% nationally/)).toBeInTheDocument();
     expect(screen.getByText("Why it made the list")).toBeInTheDocument();
   });
+
+  it("renders analyst score breakdown contributors", () => {
+    render(
+      <MemoryRouter initialEntries={["/deal/imp-10a4m7"]}>
+        <Routes>
+          <Route path="/deal/:id" element={<DealDetail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("heading", { name: "Why this scored highly" })).toBeInTheDocument();
+    expect(screen.getByText("Positive contributors")).toBeInTheDocument();
+    expect(screen.getByText("Negative contributors")).toBeInTheDocument();
+    expect(screen.getByText(/DealSignal score 77\/100/i)).toBeInTheDocument();
+  });
 });

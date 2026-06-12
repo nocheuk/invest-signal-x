@@ -92,6 +92,11 @@ const nationalRanking: NationalRanking = {
   rankingScore: 88,
   verdict: "Review Immediately",
   whyMadeList: ["Yield above benchmark", "Long lease income visibility", "Rent reviews recorded"],
+  scoreBreakdown: {
+    positives: [{ label: "Yield", value: 20, detail: "16.89% yield is above the 8% investment benchmark." }],
+    negatives: [{ label: "Limited comparable evidence", value: -6, detail: "Comparable evidence is limited." }],
+    explanation: "DealSignal score 77/100 is mainly supported by yield, while limited comparable evidence keeps the ranking cautious.",
+  },
 };
 
 describe("investment pack PDF data", () => {
@@ -192,9 +197,13 @@ describe("investment pack PDF data", () => {
     ]));
     expect(sections.nationalRanking).toEqual(expect.arrayContaining([
       "Rank: #4 of 1024 imported acquisition opportunities",
-      "Percentile: 100th",
+      "Percentile: 100 percentile",
       "Top band: Top 1% nationally",
       "Why it made the list: Yield above benchmark",
+    ]));
+    expect(sections.scoreBreakdown).toEqual(expect.arrayContaining([
+      expect.stringContaining("DealSignal score"),
+      expect.stringContaining("Yield"),
     ]));
   });
 

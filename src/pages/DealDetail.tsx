@@ -31,6 +31,7 @@ import {
 } from "@/lib/financialAnalysis";
 import { getNationalRankingForDeal } from "@/lib/dailyOpportunityFeed";
 import { useUsageTracking } from "@/lib/usageTracking";
+import { buildAnalystScoreBreakdown } from "@/lib/analystScoreBreakdown";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -83,6 +84,7 @@ export default function DealDetail() {
   const comparableEvidence = buildComparableEvidence(deal, allDeals);
   const nationalRanking = getNationalRankingForDeal(deal, allDeals);
   const investmentThesis = buildInvestmentThesis(deal, { areaIntelligence, comparableEvidence });
+  const analystScoreBreakdown = buildAnalystScoreBreakdown(deal, { comparableEvidence });
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
   const primarySourceUrl = trackedSourceUrl;
@@ -209,7 +211,7 @@ export default function DealDetail() {
             <>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <SnapshotMetric label="Rank" value={`#${nationalRanking.rank} of ${nationalRanking.total}`} />
-                <SnapshotMetric label="Percentile" value={`${nationalRanking.percentile}th`} />
+                <SnapshotMetric label="Percentile" value={`${formatPercentile(nationalRanking.percentile)} percentile`} />
                 <SnapshotMetric label="Top band" value={`Top ${nationalRanking.topPercent}%`} />
                 <SnapshotMetric label="Feed score" value={`${nationalRanking.rankingScore}/100`} />
               </div>
@@ -404,6 +406,18 @@ export default function DealDetail() {
           <ReasonList title="Evidence statements" items={comparableEvidence.statements} fallback="Comparable evidence is not available from imported DealSignal data yet." tone="primary" />
         </section>
 
+        <section className="ds-premium-panel p-6 space-y-4">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-primary font-medium">Analyst Score Breakdown</div>
+            <h2 className="font-display text-2xl mt-1">Why this scored highly</h2>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{analystScoreBreakdown.explanation}</p>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <ScoreContributorList title="Positive contributors" items={analystScoreBreakdown.positives} tone="positive" />
+            <ScoreContributorList title="Negative contributors" items={analystScoreBreakdown.negatives} tone="negative" />
+          </div>
+        </section>
+
 
         <section className="ds-card p-6 space-y-3">
           <h2 className="font-display text-2xl">Diligence classification</h2>
@@ -536,6 +550,42 @@ function HeroStat({ label, value }: { label: React.ReactNode; value: string }) {
   );
 }
 
+function ScoreContributorList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: ReturnType<typeof buildAnalystScoreBreakdown>["positives"];
+  tone: "positive" | "negative";
+}) {
+  const dot = tone === "positive" ? "bg-signal-green" : "bg-signal-amber";
+  const valueClass = tone === "positive" ? "text-signal-green" : "text-signal-amber";
+  return (
+    <div className="rounded-lg border border-border/60 bg-surface-2/40 p-4">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{title}</div>
+      <div className="mt-3 space-y-3">
+        {items.length ? items.map((item) => (
+          <div key={`${item.label}-${item.detail}`} className="grid grid-cols-[auto_1fr] gap-2 text-sm">
+            <span className={cn("mt-2 h-1.5 w-1.5 rounded-full", dot)} />
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium">{item.label}</span>
+                <span className={cn("font-mono text-xs font-semibold tabular", valueClass)}>
+                  {item.value > 0 ? `+${item.value}` : item.value}
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.detail}</p>
+            </div>
+          </div>
+        )) : (
+          <p className="text-xs text-muted-foreground">No major {tone === "positive" ? "positive" : "negative"} contributors recorded.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SnapshotMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-white/10 bg-surface-2/60 p-3 transition-colors hover:border-primary/30">
@@ -660,6 +710,10 @@ function UWCard({ icon: Icon, title, rows }: { icon: React.ComponentType<{ class
       </div>
     </div>
   );
+}
+
+function formatPercentile(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 

@@ -13,7 +13,7 @@ import { ALL_REAL_DEALS_FILTER, filterAndSortDeals, sourceLabel } from "@/lib/da
 import { classifyDeal, classificationLabel } from "@/lib/dealClassification";
 import { buildFreshnessMetrics, formatAddedAgo, isNewThisWeek } from "@/lib/freshness";
 import { EMPTY_AREA_INTELLIGENCE_INDEX, buildAreaIntelligenceIndex } from "@/lib/areaIntelligence";
-import { buildComparableEvidence } from "@/lib/comparableEvidence";
+import { buildComparableEvidence, type ComparableEvidence } from "@/lib/comparableEvidence";
 import { top10ThisWeek, top25Opportunities, type RankedOpportunity } from "@/lib/investorShortlist";
 import { useAuth } from "@/lib/auth";
 import { matchReasons, personalisedScore, useStrategy } from "@/lib/strategy";
@@ -29,6 +29,7 @@ import { formatGBP, formatPct, type Deal } from "@/lib/deals";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } from "@/lib/financialAnalysis";
 import { buildDailyOpportunityFeed, type NationalRanking } from "@/lib/dailyOpportunityFeed";
+import { buildAnalystScoreBreakdown } from "@/lib/analystScoreBreakdown";
 import { useUsageTracking, type UserEventType } from "@/lib/usageTracking";
 import { cn } from "@/lib/utils";
 
@@ -378,7 +379,8 @@ function DailyOpportunityCard({ item }: { item: NationalRanking }) {
         <div>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">National rank</div>
           <div className="mt-1 font-mono text-2xl font-semibold text-primary tabular">#{item.rank}</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">Top {item.topPercent}% nationally</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">Rank #{item.rank} of {item.total.toLocaleString()}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">{formatPercentile(item.percentile)} percentile</div>
         </div>
         <ScorePill score={deal.score} rating={deal.rating} />
       </div>
@@ -396,7 +398,9 @@ function DailyOpportunityCard({ item }: { item: NationalRanking }) {
         <div className="mt-0.5 text-xs font-semibold">{item.verdict}</div>
       </div>
       <div className="mt-3">
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Why it made the list</div>
+        <div className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-primary">
+          Why ranked?
+        </div>
         <ul className="mt-2 space-y-1">
           {(item.whyMadeList.length ? item.whyMadeList : ["High relative DealSignal rank"]).slice(0, 3).map((reason) => (
             <li key={reason} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
@@ -494,7 +498,7 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
         <Metric label="Strategy match" value={`${strategyMatch}%`} emphasis={strategyMatch >= 72} />
       </div>
 
-      <ScoreExplanation deal={deal} strategyScore={strategyMatch} />
+      <ScoreExplanation deal={deal} strategyScore={strategyMatch} comparableEvidence={comparableEvidence} />
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <SignalList title="Why DealSignal likes this" items={why} tone="positive" />
@@ -513,18 +517,8 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
   );
 }
 
-function ScoreExplanation({ deal, strategyScore }: { deal: Deal; strategyScore: number }) {
-  const positive = [
-    { label: "Yield", value: Math.round((deal.scoreBreakdown.incomeQuality ?? 0) * 0.22) },
-    { label: "Area Value", value: Math.round((deal.scoreBreakdown.marketPricing ?? 0) * 0.18) },
-    { label: "Confidence", value: Math.round((deal.dataConfidenceScore ?? 0) * 0.12) },
-    { label: "Strategy Match", value: Math.round(strategyScore * 0.1) },
-  ].filter((item) => item.value > 0);
-  const negative = [
-    { label: "Missing Lease", value: !deal.leaseLength && !deal.wault ? -6 : 0 },
-    { label: "Missing Tenant", value: !deal.tenant || deal.tenant === "Unknown" ? -4 : 0 },
-    { label: "Low Confidence", value: (deal.dataConfidenceScore ?? 0) < 60 ? -8 : 0 },
-  ].filter((item) => item.value < 0);
+function ScoreExplanation({ deal, strategyScore, comparableEvidence }: { deal: Deal; strategyScore: number; comparableEvidence: ComparableEvidence | null }) {
+  const breakdown = buildAnalystScoreBreakdown(deal, { comparableEvidence, strategyMatch: strategyScore });
 
   return (
     <div className="mt-4 rounded-lg border border-border/60 bg-surface-2/60 p-3">
@@ -532,10 +526,11 @@ function ScoreExplanation({ deal, strategyScore }: { deal: Deal; strategyScore: 
         <div className="text-xs uppercase tracking-wide text-muted-foreground">Score Explanation</div>
         <div className="font-mono text-sm font-semibold tabular">Score: {deal.score}</div>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">{breakdown.explanation}</p>
       <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">Contributors</div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
-        {positive.map((item) => <span key={item.label} className="text-signal-green">+{item.value} {item.label}</span>)}
-        {negative.map((item) => <span key={item.label} className="text-signal-amber">{item.value} {item.label}</span>)}
+        {breakdown.positives.slice(0, 4).map((item) => <span key={item.label} className="text-signal-green">+{item.value} {item.label}</span>)}
+        {breakdown.negatives.slice(0, 3).map((item) => <span key={item.label} className="text-signal-amber">{item.value} {item.label}</span>)}
       </div>
     </div>
   );
@@ -653,6 +648,10 @@ function dashboardDealsRoute(params: { classification?: string; freshness?: stri
   if (params.location?.trim()) searchParams.set("location", params.location.trim());
   const query = searchParams.toString();
   return query ? `/deals?${query}` : "/deals";
+}
+
+function formatPercentile(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function logDealFilterDebug(event: string, payload: Record<string, unknown>) {
