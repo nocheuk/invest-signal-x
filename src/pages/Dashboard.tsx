@@ -8,6 +8,7 @@ import { ClassificationBadge, ScorePill } from "@/components/RatingBadge";
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StrategyModeSelector } from "@/components/StrategyModeSelector";
 import { buildDashboardKpis } from "@/lib/dashboardKpis";
 import { ALL_REAL_DEALS_FILTER, filterAndSortDeals, sourceLabel } from "@/lib/dashboardFilters";
 import { classifyDeal, classificationLabel } from "@/lib/dealClassification";
@@ -32,6 +33,7 @@ import { buildDailyOpportunityFeed, type NationalRanking } from "@/lib/dailyOppo
 import { buildAnalystScoreBreakdown } from "@/lib/analystScoreBreakdown";
 import { useUsageTracking, type UserEventType } from "@/lib/usageTracking";
 import { buildAcquisitionReadiness } from "@/lib/acquisitionReadiness";
+import { isGeneralStrategyMode, scoreStrategyMode, strategyModeDescription, type StrategyModeId } from "@/lib/strategyModes";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -56,6 +58,7 @@ function DashboardContent() {
   const [locationEdited, setLocationEdited] = useState(false);
   const [locationImportResult, setLocationImportResult] = useState<LocationImportResult | null>(null);
   const [onboardingWarning, setOnboardingWarning] = useState<string | null>(null);
+  const [strategyMode, setStrategyMode] = useState<StrategyModeId>("general-investment");
   const search = searchParams.get("q") ?? "";
   const now = useMemo(() => new Date(), []);
   const firstName = (profile.data?.full_name || auth.user?.user_metadata?.full_name || auth.user?.email || "there").split(/\s|@/)[0];
@@ -85,8 +88,9 @@ function DashboardContent() {
       search,
       locationQuery,
       sort: "score",
+      strategyMode,
     }, weights);
-  }, [deals, locationQuery, search, weights]);
+  }, [deals, locationQuery, search, strategyMode, weights]);
 
   const kpis = useMemo(() => buildDashboardKpis({
     allDeals: deals,
@@ -131,7 +135,8 @@ function DashboardContent() {
   const dashboardSearchParams = useMemo(() => ({
     q: search,
     location: locationQuery.trim(),
-  }), [locationQuery, search]);
+    strategyMode,
+  }), [locationQuery, search, strategyMode]);
 
   const runLiveLocationSearch = async () => {
     if (!locationQuery.trim()) return;
@@ -154,12 +159,22 @@ function DashboardContent() {
           </div>
         )}
 
+        <section className="ds-card p-4 space-y-3">
+          <StrategyModeSelector value={strategyMode} onChange={setStrategyMode} />
+          <p className="text-sm text-muted-foreground">{strategyModeDescription(strategyMode)}</p>
+          {strategyMode === "high-street-conversion" && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+              High Street Conversion feed: retail, town-centre, mixed-use and upper-floor conversion signals are prioritised.
+            </div>
+          )}
+        </section>
+
         <section className="space-y-4">
           <SectionHeader
             eyebrow="Today's Opportunities"
             title={`Daily Opportunity Feed: ${dailyFeed.top5Today.length || todaysOpportunityCards.length} deals to review first.`}
             description="A national ranked feed of fresh and high-ranking acquisition opportunities, generated from imported data without changing the underlying score."
-            action={<Button asChild variant="outline" size="sm" className="gap-2"><Link to="/deals?sort=score">Open ranked workbench <ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
+            action={<Button asChild variant="outline" size="sm" className="gap-2"><Link to={dashboardDealsRoute(dashboardSearchParams)}>Open ranked workbench <ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
           />
           {dailyFeed.top5Today.length === 0 && todaysOpportunityCards.length > 0 && (
             <div className="rounded-lg border border-signal-amber/30 bg-signal-amber/10 px-4 py-3 text-sm text-muted-foreground">
@@ -209,7 +224,7 @@ function DashboardContent() {
             eyebrow="Today's Best Opportunities"
             title={`Today, DealSignal found ${bestOpportunities.length} ${bestOpportunities.length === 1 ? "opportunity" : "opportunities"} worth your attention.`}
             description="Ranked from live imported data using score, confidence, yield, source freshness, area value, and your current strategy."
-            action={<Button asChild variant="outline" size="sm" className="gap-2"><Link to="/deals?sort=score">Browse ranked list <ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
+            action={<Button asChild variant="outline" size="sm" className="gap-2"><Link to={dashboardDealsRoute(dashboardSearchParams)}>Browse ranked list <ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
           />
           {kpis.verifiedGreens === 0 && (
             <div className="rounded-lg border border-signal-amber/30 bg-signal-amber/10 px-4 py-3 text-sm text-muted-foreground">
@@ -218,7 +233,7 @@ function DashboardContent() {
           )}
           <div className="grid gap-4 xl:grid-cols-2">
             {bestOpportunities.length > 0 ? bestOpportunities.map((item) => (
-              <AnalystOpportunityCard key={item.deal.id} item={item} allDeals={deals} investorPreferences={investorPreferences} weights={weights} />
+              <AnalystOpportunityCard key={item.deal.id} item={item} allDeals={deals} investorPreferences={investorPreferences} weights={weights} strategyMode={strategyMode} />
             )) : (
               <EmptyPanel loading={dealsQuery.isLoading} message="No analyst-ranked opportunities yet. Imports will populate this section as scans complete." />
             )}
@@ -450,7 +465,7 @@ function SectionHeader({ eyebrow, title, description, action }: { eyebrow: strin
   );
 }
 
-function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }: { item: RankedOpportunity; allDeals: Deal[]; investorPreferences: InvestorPreferences; weights: ReturnType<typeof useStrategy>["weights"] }) {
+function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights, strategyMode }: { item: RankedOpportunity; allDeals: Deal[]; investorPreferences: InvestorPreferences; weights: ReturnType<typeof useStrategy>["weights"]; strategyMode: StrategyModeId }) {
   const deal = item.deal;
   const classification = classifyDeal(deal);
   const strategyScore = personalisedScore(deal, weights);
@@ -478,6 +493,7 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
   const defaultFinanceScenario = financialAnalysis.scenarios.find((scenario) => scenario.name === "60% LTV") ?? financialAnalysis.scenarios[0];
   const readiness = buildAcquisitionReadiness(deal, comparableEvidence);
   const missingReadiness = readiness.missingLabels.slice(0, 3);
+  const strategyModeMatch = isGeneralStrategyMode(strategyMode) ? null : scoreStrategyMode(deal, strategyMode);
 
   return (
     <Link to={`/deal/${deal.id}`} className="ds-card-elevated block p-5 transition-all hover:-translate-y-0.5 hover:border-primary/40">
@@ -515,6 +531,28 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
           {missingReadiness.length ? `Missing: ${missingReadiness.join(", ")}` : readiness.band}
         </div>
       </div>
+
+      {strategyModeMatch?.matches && (
+        <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Why this fits the strategy</div>
+            <div className="font-mono text-sm font-semibold tabular text-primary">{strategyModeMatch.score}% match</div>
+          </div>
+          <ul className="mt-2 space-y-1">
+            {strategyModeMatch.reasons.slice(0, 3).map((reason) => (
+              <li key={reason} className="flex items-start gap-2 text-xs text-muted-foreground">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-signal-green" />
+                <span>{reason}</span>
+              </li>
+            ))}
+          </ul>
+          {strategyModeMatch.missingDiligence.length > 0 && (
+            <div className="mt-2 text-xs text-signal-amber">
+              Strategy diligence missing: {strategyModeMatch.missingDiligence.slice(0, 4).join(", ")}
+            </div>
+          )}
+        </div>
+      )}
 
       <ScoreExplanation deal={deal} strategyScore={strategyMatch} comparableEvidence={comparableEvidence} />
 
@@ -658,12 +696,13 @@ function Metric({ label, value, emphasis }: { label: string; value: string; emph
   );
 }
 
-function dashboardDealsRoute(params: { classification?: string; freshness?: string; q?: string; location?: string }) {
+function dashboardDealsRoute(params: { classification?: string; freshness?: string; q?: string; location?: string; strategyMode?: StrategyModeId }) {
   const searchParams = new URLSearchParams();
   if (params.classification) searchParams.set("classification", params.classification);
   if (params.freshness) searchParams.set("freshness", params.freshness);
   if (params.q?.trim()) searchParams.set("q", params.q.trim());
   if (params.location?.trim()) searchParams.set("location", params.location.trim());
+  if (params.strategyMode && params.strategyMode !== "general-investment") searchParams.set("strategyMode", params.strategyMode);
   const query = searchParams.toString();
   return query ? `/deals?${query}` : "/deals";
 }

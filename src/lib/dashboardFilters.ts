@@ -1,6 +1,7 @@
 import type { Deal } from "@/lib/deals";
 import { classifyDeal, type DealClassification } from "@/lib/dealClassification";
 import { personalisedScore, type StrategyWeights } from "@/lib/strategy";
+import { filterDealsForStrategyMode, type StrategyModeId } from "@/lib/strategyModes";
 
 export const IMPORTED_SOURCE_FILTER = "Imported";
 export const DEMO_SOURCE_FILTER = "Demo/Seed";
@@ -45,6 +46,7 @@ export type DashboardFilters = {
   search: string;
   locationQuery: string;
   sort: "score" | "yield" | "price" | "confidence" | "newest";
+  strategyMode?: StrategyModeId;
 };
 
 export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, weights: StrategyWeights) {
@@ -61,6 +63,8 @@ export function filterAndSortDeals(deals: Deal[], filters: DashboardFilters, wei
     (!query || searchableText(deal).includes(query))
     && (!locationQuery || locationSearchableText(deal).includes(locationQuery))
   ));
+
+  result = filterDealsForStrategyMode(result, filters.strategyMode ?? "general-investment");
 
   if (filters.sort === "score") result = [...result].sort((a, b) => personalisedScore(b, weights) - personalisedScore(a, weights));
   if (filters.sort === "yield") result = [...result].sort((a, b) => b.netInitialYield - a.netInitialYield);
@@ -94,6 +98,8 @@ export function buildFilterDebugSteps(deals: Deal[], filters: DashboardFilters) 
   steps.push({ label: "after search", count: result.length });
   result = result.filter((deal) => !locationQuery || locationSearchableText(deal).includes(locationQuery));
   steps.push({ label: "after location", count: result.length });
+  result = filterDealsForStrategyMode(result, filters.strategyMode ?? "general-investment");
+  steps.push({ label: "after strategy mode", count: result.length });
 
   return steps;
 }

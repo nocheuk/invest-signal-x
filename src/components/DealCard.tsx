@@ -13,9 +13,10 @@ import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/
 import { formatAddedAgo } from "@/lib/freshness";
 import { formatAreaDelta, type AreaIntelligence } from "@/lib/areaIntelligence";
 import { buildAcquisitionReadiness } from "@/lib/acquisitionReadiness";
+import { isGeneralStrategyMode, scoreStrategyMode, type StrategyModeId } from "@/lib/strategyModes";
 import { cn } from "@/lib/utils";
 
-export function DealCard({ deal, variant = "default", areaIntelligence }: { deal: Deal; variant?: "default" | "feature"; areaIntelligence?: AreaIntelligence }) {
+export function DealCard({ deal, variant = "default", areaIntelligence, strategyMode = "general-investment" }: { deal: Deal; variant?: "default" | "feature"; areaIntelligence?: AreaIntelligence; strategyMode?: StrategyModeId }) {
   const { isWatched, getPipelineStatus, saveToPipeline } = useWatchlist();
   const { weights } = useStrategy();
   const yourScore = personalisedScore(deal, weights);
@@ -36,6 +37,7 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
   const pricePerSqft = deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0);
   const readiness = buildAcquisitionReadiness(deal);
   const missingReadiness = readiness.missingLabels.slice(0, 3);
+  const strategyModeMatch = isGeneralStrategyMode(strategyMode) ? null : scoreStrategyMode(deal, strategyMode);
 
   useEffect(() => {
     setImageAvailable(Boolean(deal.imageUrl));
@@ -146,6 +148,13 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
         {candidateReasons.length > 0 && (
           <div className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
             Strong Opportunity: {candidateReasons.slice(0, 2).join("; ")}.
+          </div>
+        )}
+
+        {strategyModeMatch?.matches && (
+          <div className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2 text-[11px] text-primary">
+            <div className="font-medium">Why this fits the strategy</div>
+            <div className="mt-1 text-primary/90">{strategyModeMatch.reasons.slice(0, 2).join("; ")}.</div>
           </div>
         )}
 

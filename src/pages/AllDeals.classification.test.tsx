@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -170,5 +170,45 @@ describe("AllDeals classification filters", () => {
 
     expect(screen.getByText("No deals found in this location.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /clear all filters/i })).toHaveAttribute("href", "/deals");
+  });
+
+  it("filters the workbench from the rendered High Street Conversion strategy tab", () => {
+    profileState.data = { preferences: { onboarding_completed: true, investor_onboarding: {} } };
+    dealsState.deals = [
+      deal({
+        id: "conversion",
+        title: "Former bank on High Street with upper parts",
+        enrichment: { status: "Enriched", investmentSummary: "Town centre retail with vacant upper floors, rear access and residential conversion potential." },
+      }),
+      deal({ id: "industrial", title: "Industrial warehouse estate", assetType: "Industrial", location: "Out of town logistics park" }),
+    ];
+
+    renderAllDeals("/deals?strategyMode=general-investment");
+    expect(screen.getAllByTestId("deal-row")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("tab", { name: "High Street Conversion" }));
+
+    expect(screen.getAllByTestId("deal-row")).toHaveLength(1);
+    expect(within(screen.getAllByTestId("deal-row")[0]).getByText("Former bank on High Street with upper parts")).toBeInTheDocument();
+    expect(screen.queryByText("Industrial warehouse estate")).not.toBeInTheDocument();
+    expect(screen.getByText(/High Street Conversion feed/i)).toBeInTheDocument();
+  });
+
+  it("honours a High Street Conversion URL filter without applying acquisition brief defaults", () => {
+    dealsState.deals = [
+      deal({
+        id: "conversion",
+        title: "Retail with accommodation above",
+        location: "Bournemouth town centre",
+        enrichment: { status: "Enriched", extractedPayload: { description: "Upper floors and residential conversion potential." } },
+      }),
+      deal({ id: "office", title: "Manchester office investment", location: "Manchester", assetType: "Office" }),
+    ];
+
+    renderAllDeals("/deals?strategyMode=high-street-conversion");
+
+    expect(screen.getAllByTestId("deal-row")).toHaveLength(1);
+    expect(screen.getAllByText("Retail with accommodation above").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Manchester office investment")).not.toBeInTheDocument();
   });
 });
