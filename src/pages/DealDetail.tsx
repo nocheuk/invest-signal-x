@@ -29,6 +29,7 @@ import {
   type FinancialAssumptions,
   type FinanceScenario,
 } from "@/lib/financialAnalysis";
+import { getNationalRankingForDeal } from "@/lib/dailyOpportunityFeed";
 
 const WEIGHTS = [
   { key: "incomeQuality", label: "Yield & income quality", w: 30 },
@@ -72,6 +73,7 @@ export default function DealDetail() {
   const dealAnalysis = getDealAnalysis(deal);
   const areaIntelligence = getAreaIntelligence(deal, allDeals);
   const comparableEvidence = buildComparableEvidence(deal, allDeals);
+  const nationalRanking = getNationalRankingForDeal(deal, allDeals);
   const investmentThesis = buildInvestmentThesis(deal, { areaIntelligence, comparableEvidence });
   const classification = classifyDeal(deal);
   const candidateReasons = classification === "green-candidate" ? greenCandidateReasons(deal) : [];
@@ -84,7 +86,7 @@ export default function DealDetail() {
   const handleDownloadMemo = async () => {
     setMemoStatus("loading");
     try {
-      await downloadDealMemoPdf(deal, { comparableEvidence });
+      await downloadDealMemoPdf(deal, { comparableEvidence, nationalRanking });
       setMemoStatus("idle");
     } catch (error) {
       console.error("Could not generate investment pack", error);
@@ -176,6 +178,36 @@ export default function DealDetail() {
               {memoStatus === "loading" ? "Generating..." : "Download pack"}
             </Button>
           </div>
+        </section>
+
+        <section className="ds-glass p-5 lg:p-6 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">National Ranking</div>
+              <h2 className="font-display text-2xl mt-1">Where this deal sits in the DealSignal feed</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Ranked nationally against imported acquisition opportunities using the existing score, confidence, yield, area value and diligence signals.</p>
+            </div>
+            {nationalRanking && (
+              <div className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                Top {nationalRanking.topPercent}% nationally
+              </div>
+            )}
+          </div>
+          {nationalRanking ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <SnapshotMetric label="Rank" value={`#${nationalRanking.rank} of ${nationalRanking.total}`} />
+                <SnapshotMetric label="Percentile" value={`${nationalRanking.percentile}th`} />
+                <SnapshotMetric label="Top band" value={`Top ${nationalRanking.topPercent}%`} />
+                <SnapshotMetric label="Feed score" value={`${nationalRanking.rankingScore}/100`} />
+              </div>
+              <ReasonList title="Why it made the list" items={nationalRanking.whyMadeList} fallback="High relative DealSignal rank." tone="primary" />
+            </>
+          ) : (
+            <p className="rounded-lg border border-border/60 bg-surface-2/40 p-4 text-sm text-muted-foreground">
+              This deal is not currently ranked in the national opportunity feed, usually because it is not an imported acquisition opportunity.
+            </p>
+          )}
         </section>
 
         <section className="ds-glass p-5 lg:p-6 space-y-4">

@@ -28,6 +28,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { formatGBP, formatPct, type Deal } from "@/lib/deals";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } from "@/lib/financialAnalysis";
+import { buildDailyOpportunityFeed, type NationalRanking } from "@/lib/dailyOpportunityFeed";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -111,6 +112,11 @@ function DashboardContent() {
   }, [areaIndex, deals, now, visibleDeals]);
   const greenCandidates = useMemo(() => visibleDeals.filter((deal) => classifyDeal(deal) === "green-candidate"), [visibleDeals]);
   const analystDeals = useMemo(() => visibleDeals.filter((deal) => classifyDeal(deal) !== "low-priority"), [visibleDeals]);
+  const dailyFeed = useMemo(() => buildDailyOpportunityFeed(visibleDeals, deals, now), [deals, now, visibleDeals]);
+  const reviewableDailyRankings = useMemo(() => dailyFeed.rankings.filter((item) => classifyDeal(item.deal) !== "low-priority"), [dailyFeed.rankings]);
+  const todaysOpportunityCards = dailyFeed.top5Today.length
+    ? dailyFeed.top5Today
+    : (dailyFeed.top10ThisWeek.length ? dailyFeed.top10ThisWeek : reviewableDailyRankings).slice(0, 5);
   const bestOpportunities = useMemo(() => mergeRankedDeals(shortlist, greenCandidates, analystDeals, areaIndex, deals).slice(0, 5), [analystDeals, areaIndex, deals, greenCandidates, shortlist]);
   const acquisitionBriefMatches = useMemo(() => rankAgainstAcquisitionBrief(analystDeals, investorPreferences, weights).slice(0, 5), [analystDeals, investorPreferences, weights]);
   const newThisWeekDeals = useMemo(() => analystDeals.filter((deal) => isNewThisWeek(deal, now)).sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime()).slice(0, 5), [analystDeals, now]);
@@ -141,6 +147,35 @@ function DashboardContent() {
             {onboardingWarning}
           </div>
         )}
+
+        <section className="space-y-4">
+          <SectionHeader
+            eyebrow="Today's Opportunities"
+            title={`Daily Opportunity Feed: ${dailyFeed.top5Today.length || todaysOpportunityCards.length} deals to review first.`}
+            description="A national ranked feed of fresh and high-ranking acquisition opportunities, generated from imported data without changing the underlying score."
+            action={<Button asChild variant="outline" size="sm" className="gap-2"><Link to="/deals?sort=score">Open ranked workbench <ArrowRight className="h-3.5 w-3.5" /></Link></Button>}
+          />
+          {dailyFeed.top5Today.length === 0 && todaysOpportunityCards.length > 0 && (
+            <div className="rounded-lg border border-signal-amber/30 bg-signal-amber/10 px-4 py-3 text-sm text-muted-foreground">
+              No fresh Top 5 Today items are available in the current view yet. Showing the highest-ranked current opportunities instead.
+            </div>
+          )}
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {todaysOpportunityCards.length > 0 ? todaysOpportunityCards.map((item) => (
+              <DailyOpportunityCard key={item.deal.id} item={item} />
+            )) : (
+              <div className="xl:col-span-5">
+                <EmptyPanel loading={dealsQuery.isLoading} message="No opportunities available for the daily feed yet." />
+              </div>
+            )}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <FeedStat label="Top 5 Today" value={dailyFeed.top5Today.length} />
+            <FeedStat label="Top 10 This Week" value={dailyFeed.top10ThisWeek.length} />
+            <FeedStat label="Strong Opportunities" value={dailyFeed.strongOpportunities.length} />
+            <FeedStat label="New High-Ranking" value={dailyFeed.newHighRankingOpportunities.length} />
+          </div>
+        </section>
 
         <section className="ds-card-elevated overflow-hidden p-5 md:p-6">
           <div className="grid gap-6 lg:grid-cols-[1fr_0.95fr] lg:items-end">
@@ -326,6 +361,56 @@ function NationalScanSummary({ isLoading, isError, data }: { isLoading: boolean;
       <Button asChild variant="outline" size="sm" className="gap-2">
         <Link to="/sources">Open Sources / Scans <ArrowRight className="h-3.5 w-3.5" /></Link>
       </Button>
+    </div>
+  );
+}
+
+function DailyOpportunityCard({ item }: { item: NationalRanking }) {
+  const deal = item.deal;
+  const visibleYield = deal.netInitialYield || deal.grossYield;
+  return (
+    <Link to={`/deal/${deal.id}`} className="ds-card block p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">National rank</div>
+          <div className="mt-1 font-mono text-2xl font-semibold text-primary tabular">#{item.rank}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">Top {item.topPercent}% nationally</div>
+        </div>
+        <ScorePill score={deal.score} rating={deal.rating} />
+      </div>
+      <div className="mt-3">
+        <ClassificationBadge classification={classifyDeal(deal)} />
+        <h3 className="mt-2 line-clamp-2 text-sm font-semibold">{deal.title}</h3>
+        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{deal.location}</p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Metric label="Guide" value={deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "N/A"} />
+        <Metric label="Yield" value={visibleYield ? formatPct(visibleYield, 2) : "N/A"} emphasis={Boolean(visibleYield)} />
+      </div>
+      <div className="mt-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Verdict</div>
+        <div className="mt-0.5 text-xs font-semibold">{item.verdict}</div>
+      </div>
+      <div className="mt-3">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Why it made the list</div>
+        <ul className="mt-2 space-y-1">
+          {(item.whyMadeList.length ? item.whyMadeList : ["High relative DealSignal rank"]).slice(0, 3).map((reason) => (
+            <li key={reason} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+              <Check className="mt-0.5 h-3 w-3 shrink-0 text-signal-green" />
+              <span>{reason}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Link>
+  );
+}
+
+function FeedStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-surface/70 px-4 py-3">
+      <div className="font-mono text-2xl font-semibold tabular">{value.toLocaleString()}</div>
+      <div className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
     </div>
   );
 }

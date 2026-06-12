@@ -6,6 +6,7 @@ import { classificationLabel, classifyDeal } from "@/lib/dealClassification";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import { type ComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
 import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } from "@/lib/financialAnalysis";
+import type { NationalRanking } from "@/lib/dailyOpportunityFeed";
 
 type JsPdfDocument = {
   setProperties: (properties: Record<string, string>) => void;
@@ -22,14 +23,14 @@ type JsPdfDocument = {
   internal: { pageSize: { getHeight: () => number; getWidth: () => number } };
 };
 
-export async function downloadDealMemoPdf(deal: Deal, options: { comparableEvidence?: ComparableEvidence | null } = {}) {
+export async function downloadDealMemoPdf(deal: Deal, options: { comparableEvidence?: ComparableEvidence | null; nationalRanking?: NationalRanking | null } = {}) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" }) as JsPdfDocument;
   const filename = buildMemoFilename(deal.title);
   const generatedAt = new Date();
   const imageDataUrl = deal.imageUrl ? await fetchImageAsDataUrl(deal.imageUrl).catch(() => undefined) : undefined;
 
-  renderMemo(doc, deal, { generatedAt, imageDataUrl, comparableEvidence: options.comparableEvidence });
+  renderMemo(doc, deal, { generatedAt, imageDataUrl, comparableEvidence: options.comparableEvidence, nationalRanking: options.nationalRanking });
   doc.save(filename);
 }
 
@@ -46,7 +47,7 @@ export function buildMemoFilename(title: string) {
   return `dealsignal-investment-pack-${slug || "property"}.pdf`;
 }
 
-export function buildMemoSections(deal: Deal, options: { comparableEvidence?: ComparableEvidence | null } = {}) {
+export function buildMemoSections(deal: Deal, options: { comparableEvidence?: ComparableEvidence | null; nationalRanking?: NationalRanking | null } = {}) {
   const reasons = deal.scoreReasons;
   const analysis = getDealAnalysis(deal);
   const thesis = buildInvestmentThesis(deal, { comparableEvidence: options.comparableEvidence });
@@ -77,6 +78,7 @@ export function buildMemoSections(deal: Deal, options: { comparableEvidence?: Co
     investmentSummary: analysis.investmentSummary,
     investmentThesis: thesis,
     tenantLeaseIncome: memoTenantLeaseIncome(deal),
+    nationalRanking: memoNationalRanking(options.nationalRanking),
     financialAnalysis: memoFinancialAnalysis(financialAnalysis),
     comparableEvidence: memoComparableEvidence(options.comparableEvidence),
     opportunitySignals: analysis.opportunitySignals.length ? analysis.opportunitySignals : ["No opportunity signal available from imported data yet."],
@@ -106,11 +108,11 @@ export function buildMemoSections(deal: Deal, options: { comparableEvidence?: Co
   };
 }
 
-function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date; imageDataUrl?: string; comparableEvidence?: ComparableEvidence | null }) {
+function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date; imageDataUrl?: string; comparableEvidence?: ComparableEvidence | null; nationalRanking?: NationalRanking | null }) {
   const page = { width: doc.internal.pageSize.getWidth(), height: doc.internal.pageSize.getHeight() };
   const margin = 16;
   let y = 16;
-  const sections = buildMemoSections(deal, { comparableEvidence: options.comparableEvidence });
+  const sections = buildMemoSections(deal, { comparableEvidence: options.comparableEvidence, nationalRanking: options.nationalRanking });
 
   doc.setProperties({
     title: `DealSignal Investment Pack - ${deal.title}`,
@@ -159,6 +161,7 @@ function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date
   y = writeListSection(doc, "Potential upside", sections.investmentThesis.potentialUpside, margin, y, page);
   y = writeListSection(doc, "Key risks", sections.investmentThesis.keyRisks, margin, y, page);
   y = writeListSection(doc, "Investor verdict", [`${sections.investmentThesis.investorVerdict} (${sections.investmentThesis.confidenceLevel} confidence)`], margin, y, page);
+  y = writeListSection(doc, "National Ranking", sections.nationalRanking, margin, y, page);
   y = writeListSection(doc, "Tenant / Lease / Income", sections.tenantLeaseIncome, margin, y, page);
   y = writeListSection(doc, "Comparable Evidence", sections.comparableEvidence, margin, y, page);
   y = writeListSection(doc, "Financial Analysis", sections.financialAnalysis, margin, y, page);
@@ -262,6 +265,18 @@ function memoTenantLeaseIncome(deal: Deal) {
     `Lease length: ${deal.leaseLength > 0 ? `${deal.leaseLength.toFixed(1)} years` : "Not available"}`,
     `Rent reviews: ${rentReviews.length ? formatRentReviews(rentReviews) : deal.rentReview !== "None" ? deal.rentReview : "Not available"}`,
     `Covenant note: ${covenantNote}`,
+  ];
+}
+
+function memoNationalRanking(ranking: NationalRanking | null | undefined) {
+  if (!ranking) return ["National ranking was not available for this investment pack export."];
+  return [
+    `Rank: #${ranking.rank} of ${ranking.total} imported acquisition opportunities`,
+    `Percentile: ${ranking.percentile}th`,
+    `Top band: Top ${ranking.topPercent}% nationally`,
+    `Feed score: ${ranking.rankingScore}/100`,
+    `Investor verdict: ${ranking.verdict}`,
+    ...ranking.whyMadeList.map((reason) => `Why it made the list: ${reason}`),
   ];
 }
 

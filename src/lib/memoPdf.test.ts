@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Deal } from "@/lib/deals";
 import type { ComparableEvidence } from "@/lib/comparableEvidence";
+import type { NationalRanking } from "@/lib/dailyOpportunityFeed";
 import { buildMemoFilename, buildMemoSections } from "@/lib/memoPdf";
 
 function deal(overrides: Partial<Deal> = {}): Deal {
@@ -82,6 +83,17 @@ const comparableEvidence: ComparableEvidence = {
   shortEvidenceLine: "+21% vs area yield",
 };
 
+const nationalRanking: NationalRanking = {
+  deal: deal({ id: "asda-rank" }),
+  rank: 4,
+  total: 1024,
+  percentile: 100,
+  topPercent: 1,
+  rankingScore: 88,
+  verdict: "Review Immediately",
+  whyMadeList: ["Yield above benchmark", "Long lease income visibility", "Rent reviews recorded"],
+};
+
 describe("investment pack PDF data", () => {
   it("builds a clean investment pack filename", () => {
     expect(buildMemoFilename("Telecom House, 35 Holdenhurst Road / Bournemouth")).toBe("dealsignal-investment-pack-telecom-house-35-holdenhurst-road-bournemouth.pdf");
@@ -150,7 +162,7 @@ describe("investment pack PDF data", () => {
           ],
         },
       },
-    }), { comparableEvidence });
+    }), { comparableEvidence, nationalRanking });
 
     expect(sections.investmentThesis.summary).toContain("Tenant recorded as ASDA Stores Ltd");
     expect(sections.investmentThesis.potentialUpside).toEqual(expect.arrayContaining([expect.stringContaining("Rent review uplift exists")]));
@@ -177,6 +189,12 @@ describe("investment pack PDF data", () => {
       "Yield difference: +21%",
       "GBP/sqft difference: -18%",
       "Yield is 21% above the local average based on 14 comparable imported opportunities.",
+    ]));
+    expect(sections.nationalRanking).toEqual(expect.arrayContaining([
+      "Rank: #4 of 1024 imported acquisition opportunities",
+      "Percentile: 100th",
+      "Top band: Top 1% nationally",
+      "Why it made the list: Yield above benchmark",
     ]));
   });
 
