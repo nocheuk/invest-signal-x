@@ -12,6 +12,7 @@ import { getDealAnalysis } from "@/lib/dealAnalysis";
 import { classificationLabel, classifyDeal, greenCandidateReasons } from "@/lib/dealClassification";
 import { formatAddedAgo } from "@/lib/freshness";
 import { formatAreaDelta, type AreaIntelligence } from "@/lib/areaIntelligence";
+import { buildAcquisitionReadiness } from "@/lib/acquisitionReadiness";
 import { cn } from "@/lib/utils";
 
 export function DealCard({ deal, variant = "default", areaIntelligence }: { deal: Deal; variant?: "default" | "feature"; areaIntelligence?: AreaIntelligence }) {
@@ -33,6 +34,8 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
   const addedAgo = deal.isImported || deal.importSourceName ? formatAddedAgo(deal.postedAt) : "";
   const visibleYield = deal.netInitialYield || deal.grossYield;
   const pricePerSqft = deal.pricePerSqft || (deal.guidePrice > 0 && deal.sqft > 0 ? deal.guidePrice / deal.sqft : 0);
+  const readiness = buildAcquisitionReadiness(deal);
+  const missingReadiness = readiness.missingLabels.slice(0, 3);
 
   useEffect(() => {
     setImageAvailable(Boolean(deal.imageUrl));
@@ -110,6 +113,16 @@ export function DealCard({ deal, variant = "default", areaIntelligence }: { deal
         <div className="flex items-center justify-between gap-2">
           <div className="text-[11px] text-muted-foreground">Confidence</div>
           <ConfidenceBadge level={deal.confidenceLevel} score={deal.dataConfidenceScore} compact />
+        </div>
+
+        <div className="rounded-lg border border-border/60 bg-surface-2/50 p-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[11px] text-muted-foreground">Readiness</div>
+            <div className="font-mono text-xs font-semibold tabular">{readiness.score}%</div>
+          </div>
+          <div className="mt-1 text-[11px] text-muted-foreground">
+            {missingReadiness.length ? `Missing: ${missingReadiness.join(", ")}` : "Core fields present"}
+          </div>
         </div>
 
         {areaIntelligence?.stats && (

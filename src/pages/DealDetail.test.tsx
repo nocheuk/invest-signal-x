@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -128,11 +128,11 @@ describe("DealDetail", () => {
 
     expect(screen.getByRole("button", { name: /Download Investment Pack/i })).toBeInTheDocument();
     expect(screen.getByText("A structured pack for investor review")).toBeInTheDocument();
-    expect(screen.getByText(/executive summary, investment thesis, tenant and lease data/i)).toBeInTheDocument();
+    expect(screen.getByText(/verdict, readiness, investment thesis, tenant and lease data/i)).toBeInTheDocument();
     expect(screen.queryByText(/Download Memo PDF/i)).not.toBeInTheDocument();
   });
 
-  it("renders national ranking evidence on the deal detail page", () => {
+  it("renders the triage verdict, key numbers, and readiness checklist", () => {
     render(
       <MemoryRouter initialEntries={["/deal/imp-10a4m7"]}>
         <Routes>
@@ -141,13 +141,16 @@ describe("DealDetail", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("heading", { name: "Where this deal sits in the DealSignal feed" })).toBeInTheDocument();
-    expect(screen.getByText("National Ranking")).toBeInTheDocument();
-    expect(screen.getByText(/Top \d+% nationally/)).toBeInTheDocument();
-    expect(screen.getByText("Why it made the list")).toBeInTheDocument();
+    expect(screen.getByText("Investment Verdict")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Review Immediately" })).toBeInTheDocument();
+    expect(screen.getByText("Key Numbers")).toBeInTheDocument();
+    expect(screen.getByText("Acquisition Readiness")).toBeInTheDocument();
+    expect(screen.getByText("Review ready")).toBeInTheDocument();
+    expect(screen.getByText("EPC missing")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Where this deal sits in the DealSignal feed" })).not.toBeInTheDocument();
   });
 
-  it("renders analyst score breakdown contributors", () => {
+  it("collapses secondary analysis into accordions", () => {
     render(
       <MemoryRouter initialEntries={["/deal/imp-10a4m7"]}>
         <Routes>
@@ -156,7 +159,16 @@ describe("DealDetail", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole("heading", { name: "Why this scored highly" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Analyst Score Breakdown" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Full Investment Thesis" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Underwriting Details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Source Attribution" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verification Checklist" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Deal analysis" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Diligence classification" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Professional underwriting breakdown" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Analyst Score Breakdown" }));
     expect(screen.getByText("Positive contributors")).toBeInTheDocument();
     expect(screen.getByText("Negative contributors")).toBeInTheDocument();
     expect(screen.getByText(/DealSignal score 77\/100/i)).toBeInTheDocument();
