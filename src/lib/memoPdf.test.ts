@@ -130,10 +130,13 @@ describe("investment pack PDF data", () => {
       "60% LTV cash-on-cash return: Not available",
     ]));
     expect(sections.acquisitionReadiness).toEqual(expect.arrayContaining([
-      "Readiness: 33% (Not ready)",
-      expect.stringContaining("Rent: missing"),
-      expect.stringContaining("Tenant: missing"),
-      expect.stringContaining("Source URL: present"),
+      "Status: Limited Information",
+      "Information completeness: 33%",
+      "Available: Price, Floor area, Source URL",
+      "Missing: Rent, Tenant, Lease, WAULT, EPC, Comparable evidence",
+      expect.stringContaining("Missing - Rent"),
+      expect.stringContaining("Missing - Tenant"),
+      expect.stringContaining("Available - Source URL"),
     ]));
     expect(sections.opportunitySignals).toEqual(expect.arrayContaining(["Guide price and floor area available"]));
     expect(sections.riskSignals).toEqual(expect.arrayContaining(["Passing rent missing", "Tenant covenant unknown"]));
@@ -212,10 +215,11 @@ describe("investment pack PDF data", () => {
       expect.stringContaining("Yield"),
     ]));
     expect(sections.acquisitionReadiness).toEqual(expect.arrayContaining([
-      "Readiness: 89% (Review ready)",
-      expect.stringContaining("Tenant: present"),
-      expect.stringContaining("Rent: present"),
-      expect.stringContaining("EPC: missing"),
+      "Status: Mostly Verified",
+      "Information completeness: 89%",
+      expect.stringContaining("Available - Tenant"),
+      expect.stringContaining("Available - Rent"),
+      expect.stringContaining("Missing - EPC"),
     ]));
   });
 

@@ -380,10 +380,10 @@ function DailyOpportunityCard({ item }: { item: NationalRanking }) {
     <Link to={`/deal/${deal.id}`} className="ds-card block p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Acquisition readiness</div>
-          <div className="mt-1 font-mono text-2xl font-semibold text-primary tabular">Readiness: {readiness.score}%</div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Due diligence status</div>
+          <div className="mt-1 text-lg font-semibold text-primary">{missing.length ? "Missing" : readiness.band}</div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">
-            {missing.length ? `Missing: ${missing.join(", ")}` : "Core fields present"}
+            {missing.length ? missing.join(", ") : "Core fields present"}
           </div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">Top {item.topPercent}% nationally</div>
         </div>
@@ -503,16 +503,16 @@ function AnalystOpportunityCard({ item, allDeals, investorPreferences, weights }
         <Metric label="Source" value={sourceLabel(deal)} />
         <Metric label="Confidence" value={`${deal.dataConfidenceScore ?? 0}%`} emphasis={(deal.dataConfidenceScore ?? 0) >= 75} />
         <Metric label="Strategy match" value={`${strategyMatch}%`} emphasis={strategyMatch >= 72} />
-        <Metric label="Readiness" value={`${readiness.score}%`} emphasis={readiness.score >= 70} />
+        <Metric label="Due diligence status" value={readiness.band} emphasis={readiness.score >= 70} />
       </div>
 
       <div className="mt-3 rounded-lg border border-border/60 bg-surface-2/60 p-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Acquisition readiness</div>
-          <div className="font-mono text-sm font-semibold tabular text-primary">{readiness.score}%</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Due diligence status</div>
+          <div className="text-sm font-semibold text-primary">{readiness.band}</div>
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
-          {missingReadiness.length ? `Missing: ${missingReadiness.join(", ")}` : "Core fields present"}
+          {missingReadiness.length ? `Missing: ${missingReadiness.join(", ")}` : readiness.band}
         </div>
       </div>
 

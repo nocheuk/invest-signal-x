@@ -8,7 +8,7 @@ describe("acquisition readiness", () => {
     const readiness = buildAcquisitionReadiness(deal(), evidence({ cleanedSampleSize: 12, isLimited: false }));
 
     expect(readiness.score).toBe(100);
-    expect(readiness.band).toBe("Offer ready");
+    expect(readiness.band).toBe("Ready For Review");
     expect(readiness.missingLabels).toEqual([]);
     expect(readiness.checklist.every((item) => item.present)).toBe(true);
   });
@@ -24,7 +24,7 @@ describe("acquisition readiness", () => {
       enrichment: undefined,
     }), evidence({ cleanedSampleSize: 2, isLimited: true }));
 
-    expect(readiness.band).toBe("Not ready");
+    expect(readiness.band).toBe("Limited Information");
     expect(readiness.missingLabels).toEqual(expect.arrayContaining(["Rent", "Tenant", "Lease", "WAULT", "EPC", "Floor area", "Comparable evidence", "Source URL"]));
     expect(readiness.checklist.find((item) => item.label === "Price")?.present).toBe(true);
     expect(readiness.summary).toContain("Missing");

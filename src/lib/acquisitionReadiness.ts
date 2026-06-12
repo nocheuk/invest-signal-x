@@ -1,7 +1,7 @@
 import type { ComparableEvidence } from "@/lib/comparableEvidence";
 import type { Deal } from "@/lib/deals";
 
-export type ReadinessBand = "Not ready" | "Needs verification" | "Review ready" | "Offer ready";
+export type ReadinessBand = "Limited Information" | "Partial Information" | "Mostly Verified" | "Ready For Review";
 
 export type ReadinessChecklistItem = {
   key: string;
@@ -40,16 +40,16 @@ export function buildAcquisitionReadiness(deal: Deal, comparableEvidence?: Compa
     checklist,
     missingLabels,
     summary: missingLabels.length
-      ? `${band}: ${present} of ${checklist.length} core diligence fields are present. Missing ${missingLabels.slice(0, 3).join(", ")}${missingLabels.length > 3 ? " and more" : ""}.`
-      : "Offer ready: all core diligence fields are present, subject to independent verification.",
+      ? `${band}: ${present} of ${checklist.length} diligence information fields are available. Missing ${missingLabels.slice(0, 3).join(", ")}${missingLabels.length > 3 ? " and more" : ""}.`
+      : "Ready For Review: all core diligence information fields are available, subject to independent verification.",
   };
 }
 
 export function readinessBand(score: number): ReadinessBand {
-  if (score < 40) return "Not ready";
-  if (score < 70) return "Needs verification";
-  if (score < 90) return "Review ready";
-  return "Offer ready";
+  if (score < 40) return "Limited Information";
+  if (score < 70) return "Partial Information";
+  if (score < 90) return "Mostly Verified";
+  return "Ready For Review";
 }
 
 function item(key: string, label: string, present: boolean, detail: string): ReadinessChecklistItem {
