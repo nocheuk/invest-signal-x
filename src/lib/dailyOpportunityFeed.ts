@@ -5,6 +5,7 @@ import { sourceLabel } from "@/lib/dashboardFilters";
 import { isNewThisWeek, isNewToday } from "@/lib/freshness";
 import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import { buildInvestorShortlist, type RankedOpportunity } from "@/lib/investorShortlist";
+import { buildAnalystScoreBreakdown, type AnalystScoreBreakdown } from "@/lib/analystScoreBreakdown";
 
 export type NationalRanking = {
   deal: Deal;
@@ -15,6 +16,7 @@ export type NationalRanking = {
   rankingScore: number;
   verdict: string;
   whyMadeList: string[];
+  scoreBreakdown: AnalystScoreBreakdown;
 };
 
 export type DailyOpportunityFeed = {
@@ -59,6 +61,7 @@ export function buildNationalOpportunityRankings(deals: Deal[], allDeals = deals
     const topPercent = topPercentForRank(rank, total);
     const evidence = buildComparableEvidence(item.deal, allDeals);
     const thesis = buildInvestmentThesis(item.deal, { comparableEvidence: evidence });
+    const scoreBreakdown = buildAnalystScoreBreakdown(item.deal, { comparableEvidence: evidence });
     return {
       deal: item.deal,
       rank,
@@ -68,6 +71,7 @@ export function buildNationalOpportunityRankings(deals: Deal[], allDeals = deals
       rankingScore: item.shortlistScore,
       verdict: thesis.investorVerdict,
       whyMadeList: whyMadeList(item.deal, item.reasons, thesis.whyInteresting, evidence.shortEvidenceLine),
+      scoreBreakdown,
     };
   });
 }
@@ -78,7 +82,8 @@ export function getNationalRankingForDeal(deal: Deal, deals: Deal[]): NationalRa
 
 export function percentileForRank(rank: number, total: number) {
   if (total <= 0 || rank <= 0) return 0;
-  return Math.max(1, Math.min(100, Math.round(((total - rank + 1) / total) * 100)));
+  if (rank === 1) return 100;
+  return Math.max(0.1, Math.min(100, Math.floor(((total - rank + 1) / total) * 1000) / 10));
 }
 
 export function topPercentForRank(rank: number, total: number) {

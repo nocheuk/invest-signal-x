@@ -7,6 +7,7 @@ import { buildInvestmentThesis } from "@/lib/investmentThesis";
 import { type ComparableEvidence, formatComparableMetric } from "@/lib/comparableEvidence";
 import { buildFinancialAnalysis, formatFinancialMoney, formatFinancialPercent } from "@/lib/financialAnalysis";
 import type { NationalRanking } from "@/lib/dailyOpportunityFeed";
+import { buildAnalystScoreBreakdown, scoreBreakdownLines } from "@/lib/analystScoreBreakdown";
 
 type JsPdfDocument = {
   setProperties: (properties: Record<string, string>) => void;
@@ -52,6 +53,7 @@ export function buildMemoSections(deal: Deal, options: { comparableEvidence?: Co
   const analysis = getDealAnalysis(deal);
   const thesis = buildInvestmentThesis(deal, { comparableEvidence: options.comparableEvidence });
   const financialAnalysis = buildFinancialAnalysis(deal);
+  const analystScoreBreakdown = buildAnalystScoreBreakdown(deal, { comparableEvidence: options.comparableEvidence });
   const verificationChecklist = memoVerificationChecklist(deal, thesis.verifyNext, reasons?.verifyBeforeTrusting ?? []);
   return {
     executiveSummary: [
@@ -77,6 +79,10 @@ export function buildMemoSections(deal: Deal, options: { comparableEvidence?: Co
     ],
     investmentSummary: analysis.investmentSummary,
     investmentThesis: thesis,
+    scoreBreakdown: [
+      analystScoreBreakdown.explanation,
+      ...scoreBreakdownLines(analystScoreBreakdown),
+    ],
     tenantLeaseIncome: memoTenantLeaseIncome(deal),
     nationalRanking: memoNationalRanking(options.nationalRanking),
     financialAnalysis: memoFinancialAnalysis(financialAnalysis),
@@ -162,6 +168,7 @@ function renderMemo(doc: JsPdfDocument, deal: Deal, options: { generatedAt: Date
   y = writeListSection(doc, "Key risks", sections.investmentThesis.keyRisks, margin, y, page);
   y = writeListSection(doc, "Investor verdict", [`${sections.investmentThesis.investorVerdict} (${sections.investmentThesis.confidenceLevel} confidence)`], margin, y, page);
   y = writeListSection(doc, "National Ranking", sections.nationalRanking, margin, y, page);
+  y = writeListSection(doc, "Analyst Score Breakdown", sections.scoreBreakdown, margin, y, page);
   y = writeListSection(doc, "Tenant / Lease / Income", sections.tenantLeaseIncome, margin, y, page);
   y = writeListSection(doc, "Comparable Evidence", sections.comparableEvidence, margin, y, page);
   y = writeListSection(doc, "Financial Analysis", sections.financialAnalysis, margin, y, page);
@@ -247,6 +254,10 @@ function percentOrUnavailable(value: number) {
   return value > 0 ? formatPct(value, 2) : "Not available";
 }
 
+function formatPercentile(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function memoTenantLeaseIncome(deal: Deal) {
   const tenant = deal.tenant && deal.tenant !== "Unknown" ? deal.tenant : "Not available";
   const leaseExpiry = extractedString(deal, "leaseExpiryText") || "Not available";
@@ -272,7 +283,7 @@ function memoNationalRanking(ranking: NationalRanking | null | undefined) {
   if (!ranking) return ["National ranking was not available for this investment pack export."];
   return [
     `Rank: #${ranking.rank} of ${ranking.total} imported acquisition opportunities`,
-    `Percentile: ${ranking.percentile}th`,
+    `Percentile: ${formatPercentile(ranking.percentile)} percentile`,
     `Top band: Top ${ranking.topPercent}% nationally`,
     `Feed score: ${ranking.rankingScore}/100`,
     `Investor verdict: ${ranking.verdict}`,
