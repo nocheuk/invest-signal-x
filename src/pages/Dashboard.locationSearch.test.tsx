@@ -46,6 +46,10 @@ const acquisitionBriefState = vi.hoisted(() => ({
   activeBrief: null as null | import("@/lib/acquisitionBriefs").AcquisitionBrief,
 }));
 
+const watchlistState = vi.hoisted(() => ({
+  ids: [] as string[],
+}));
+
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -76,10 +80,10 @@ vi.mock("@/hooks/useRealDeals", () => ({
 vi.mock("@/lib/watchlist", () => ({
   PIPELINE_STATUSES: ["New", "Reviewing", "Agent Contacted", "Brochure Requested", "Planning Review", "Financial Review", "Offer Submitted", "Under Offer", "Acquired", "Rejected"],
   useWatchlist: () => ({
-    ids: [],
+    ids: watchlistState.ids,
     pipelineItems: {},
     pipelineCounts: {
-      New: 0,
+      New: watchlistState.ids.length,
       Reviewing: 0,
       "Agent Contacted": 0,
       "Brochure Requested": 0,
@@ -237,6 +241,7 @@ describe("Dashboard focused overview", () => {
     nationalScanState.isLoading = false;
     nationalScanState.isError = false;
     acquisitionBriefState.activeBrief = null;
+    watchlistState.ids = [];
   });
 
   it("renders the compact acquisition desk dashboard", () => {
@@ -248,23 +253,28 @@ describe("Dashboard focused overview", () => {
     renderDashboard();
 
     expect(screen.getByText("Acquisition desk")).toBeInTheDocument();
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText.indexOf("Ranked opportunities")).toBeLessThan(bodyText.indexOf("Strategy mode"));
+    expect(bodyText.indexOf("Ranked opportunities")).toBeLessThan(bodyText.indexOf("Analyst brief"));
     expect(screen.getByText("Strategy mode")).toBeInTheDocument();
-    expect(screen.getByText("Pipeline summary")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Open board/i })).toHaveAttribute("href", "/pipeline");
+    expect(screen.queryByText("Pipeline summary")).not.toBeInTheDocument();
     expect(screen.getByText("Analyst brief")).toBeInTheDocument();
     expect(screen.getByText("Ranked opportunities")).toBeInTheDocument();
     expect(screen.getByText("First 10 to compare")).toBeInTheDocument();
     expect(screen.getByText("Score")).toBeInTheDocument();
     expect(screen.getByText("Opportunity")).toBeInTheDocument();
+    expect(screen.getByText("Why It Matters")).toBeInTheDocument();
     expect(screen.getByText("Yield")).toBeInTheDocument();
     expect(screen.getByText("Guide Price")).toBeInTheDocument();
     expect(screen.getByText("Due Diligence Status")).toBeInTheDocument();
     expect(screen.getAllByText("Strategy Fit").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("View Deal").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Strong Opportunity Deal")).toBeInTheDocument();
+    expect(screen.getByText(/Office acquisition candidate in Bournemouth with price and yield available for first-pass review/)).toBeInTheDocument();
     expect(screen.getByText("Total analysed")).toBeInTheDocument();
     expect(screen.getByText("Quick location search")).toBeInTheDocument();
     expect(screen.getByText("Last scan status")).toBeInTheDocument();
+    expect(bodyText.indexOf("Last scan status")).toBeGreaterThan(bodyText.indexOf("Quick location search"));
     expect(screen.queryByText("Daily Opportunity Feed")).not.toBeInTheDocument();
     expect(screen.queryByText("Top 5 Today")).not.toBeInTheDocument();
     expect(screen.queryByText("Top 10 This Week")).not.toBeInTheDocument();
@@ -275,6 +285,18 @@ describe("Dashboard focused overview", () => {
     expect(screen.queryByText("All live opportunities")).not.toBeInTheDocument();
     expect(screen.queryByText("My Alerts")).not.toBeInTheDocument();
     expect(screen.queryByText("Inventory audit")).not.toBeInTheDocument();
+  });
+
+  it("shows pipeline summary only once the user has tracked deals", () => {
+    watchlistState.ids = ["candidate"];
+    dealsState.deals = [
+      dashboardDeal({ id: "candidate", title: "Tracked deal", score: 73, rating: "amber", dataConfidenceScore: 80, confidenceLevel: "high" }),
+    ];
+
+    renderDashboard();
+
+    expect(screen.getByText("Pipeline summary")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open board/i })).toHaveAttribute("href", "/pipeline");
   });
 
   it("filters dashboard recommendations with the High Street Conversion strategy mode", () => {
@@ -311,6 +333,8 @@ describe("Dashboard focused overview", () => {
     expect(screen.getByText("Best Strategy Opportunities")).toBeInTheDocument();
     expect(screen.getByText("All Strategy Matches")).toBeInTheDocument();
     expect(screen.getAllByText("Former bank on High Street with upper parts").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Top Strategy Match").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Retail in Bournemouth town centre with/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Industrial warehouse estate")).not.toBeInTheDocument();
     expect(screen.getAllByText("Strategy Fit").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Strong fit").length).toBeGreaterThanOrEqual(1);
