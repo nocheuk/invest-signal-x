@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, RadioTower, Search } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
+import { AcquisitionBriefControl } from "@/components/AcquisitionBriefControl";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ClassificationBadge } from "@/components/RatingBadge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,9 @@ import { buildComparableEvidence } from "@/lib/comparableEvidence";
 import { top25Opportunities, type RankedOpportunity } from "@/lib/investorShortlist";
 import { useAuth } from "@/lib/auth";
 import { personalisedScore, useStrategy } from "@/lib/strategy";
-import { useWatchlist } from "@/lib/watchlist";
+import { PIPELINE_STATUSES, useWatchlist, type PipelineStatus } from "@/lib/watchlist";
 import { useProfile } from "@/hooks/useProfile";
+import { useAcquisitionBriefs } from "@/hooks/useAcquisitionBriefs";
 import { useRealDeals } from "@/hooks/useRealDeals";
 import { LocationImportError, useLocationImport, type LocationImportResult } from "@/hooks/useLocationImport";
 import { formatNationalScanTime, useNationalScanStatus } from "@/hooks/useNationalScanStatus";
@@ -25,6 +27,7 @@ import { isAdminUser } from "@/lib/admin";
 import { dashboardDefaultsFromPreferences, getInvestorPreferences, type InvestorPreferences } from "@/lib/onboarding";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { formatGBP, formatPct, type Deal } from "@/lib/deals";
+import { countBriefMatches, scoreDealAgainstBrief, type AcquisitionBrief } from "@/lib/acquisitionBriefs";
 import { useUsageTracking } from "@/lib/usageTracking";
 import { buildAcquisitionReadiness } from "@/lib/acquisitionReadiness";
 import { buildHighStreetConversionDiagnostics, isGeneralStrategyMode, scoreStrategyMode, strategyModeDescription, type StrategyModeId } from "@/lib/strategyModes";
@@ -44,6 +47,7 @@ function DashboardContent() {
   const { weights } = useStrategy();
   const auth = useAuth();
   const profile = useProfile();
+  const { activeBrief } = useAcquisitionBriefs();
   const nationalScanStatus = useNationalScanStatus();
   const locationImport = useLocationImport();
   const { trackEvent } = useUsageTracking();
@@ -113,7 +117,16 @@ function DashboardContent() {
   }, [areaIndex, deals, visibleDeals]);
   const greenCandidates = useMemo(() => visibleDeals.filter((deal) => classifyDeal(deal) === "green-candidate"), [visibleDeals]);
   const analystDeals = useMemo(() => visibleDeals.filter((deal) => classifyDeal(deal) !== "low-priority"), [visibleDeals]);
-  const rankedOpportunityPool = useMemo(() => mergeRankedDeals(shortlist, greenCandidates, analystDeals, areaIndex, deals), [analystDeals, areaIndex, deals, greenCandidates, shortlist]);
+  const briefMatchCount = useMemo(() => countBriefMatches(visibleDeals, activeBrief), [activeBrief, visibleDeals]);
+  const rankedOpportunityPool = useMemo(() => {
+    const pool = mergeRankedDeals(shortlist, greenCandidates, analystDeals, areaIndex, deals);
+    if (!activeBrief) return pool;
+    return [...pool].sort((a, b) => {
+      const aMatch = scoreDealAgainstBrief(a.deal, activeBrief).score;
+      const bMatch = scoreDealAgainstBrief(b.deal, activeBrief).score;
+      return bMatch - aMatch || b.shortlistScore - a.shortlistScore || b.deal.score - a.deal.score;
+    });
+  }, [activeBrief, analystDeals, areaIndex, deals, greenCandidates, shortlist]);
   const rankedOpportunities = useMemo(() => rankedOpportunityPool.slice(0, 10), [rankedOpportunityPool]);
   const highStreetDiagnostics = useMemo(() => buildHighStreetConversionDiagnostics(deals), [deals]);
   const bestStrategyOpportunities = useMemo(
@@ -176,6 +189,10 @@ function DashboardContent() {
           )}
         </section>
 
+        <AcquisitionBriefControl matchCount={briefMatchCount} />
+
+        <PipelineSummary counts={pipelineCounts} total={ids.length} />
+
         <details className="ds-card overflow-hidden">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
             <div>
@@ -208,6 +225,7 @@ function DashboardContent() {
               allDeals={deals}
               weights={weights}
               strategyMode={strategyMode}
+              activeBrief={activeBrief}
               loading={dealsQuery.isLoading}
               empty="No high-confidence High Street Conversion matches yet. Review all strategy matches below."
             />
@@ -218,6 +236,7 @@ function DashboardContent() {
               allDeals={deals}
               weights={weights}
               strategyMode={strategyMode}
+              activeBrief={activeBrief}
               loading={dealsQuery.isLoading}
               empty="No High Street Conversion discovery matches yet."
             />
@@ -231,6 +250,7 @@ function DashboardContent() {
             allDeals={deals}
             weights={weights}
             strategyMode={strategyMode}
+            activeBrief={activeBrief}
             loading={dealsQuery.isLoading}
             empty="No ranked opportunities yet. Imports will populate this table as scans complete."
           />
@@ -331,6 +351,34 @@ function NationalScanSummary({ isLoading, isError, data }: { isLoading: boolean;
   );
 }
 
+function PipelineSummary({ counts, total }: { counts: Record<PipelineStatus, number>; total: number }) {
+  const active = counts.Reviewing
+    + counts["Agent Contacted"]
+    + counts["Brochure Requested"]
+    + counts["Planning Review"]
+    + counts["Financial Review"]
+    + counts["Offer Submitted"]
+    + counts["Under Offer"];
+  return (
+    <section className="ds-card p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-primary font-medium">Pipeline summary</div>
+          <p className="mt-0.5 text-xs text-muted-foreground">{total.toLocaleString()} deals tracked, {active.toLocaleString()} active acquisitions.</p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="gap-2">
+          <Link to="/pipeline">Open board <ArrowRight className="h-3.5 w-3.5" /></Link>
+        </Button>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-5">
+        {PIPELINE_STATUSES.slice(0, 5).map((status) => (
+          <CompactStat key={status} label={status} value={(counts[status] ?? 0).toLocaleString()} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function HighStreetStrategyDiagnostics({ diagnostics }: { diagnostics: ReturnType<typeof buildHighStreetConversionDiagnostics> }) {
   return (
     <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-3">
@@ -392,6 +440,7 @@ function RankedOpportunitySection({
   allDeals,
   weights,
   strategyMode,
+  activeBrief,
   loading,
   empty,
 }: {
@@ -402,6 +451,7 @@ function RankedOpportunitySection({
   allDeals: Deal[];
   weights: ReturnType<typeof useStrategy>["weights"];
   strategyMode: StrategyModeId;
+  activeBrief: AcquisitionBrief | null;
   loading: boolean;
   empty: string;
 }) {
@@ -415,7 +465,7 @@ function RankedOpportunitySection({
         <div className="max-w-2xl text-xs text-muted-foreground">{description}</div>
       </div>
       {items.length > 0 ? (
-        <OpportunityDeskTable items={items} allDeals={allDeals} weights={weights} strategyMode={strategyMode} />
+        <OpportunityDeskTable items={items} allDeals={allDeals} weights={weights} strategyMode={strategyMode} activeBrief={activeBrief} />
       ) : (
         <EmptyPanel loading={loading} message={empty} compact />
       )}
@@ -423,7 +473,7 @@ function RankedOpportunitySection({
   );
 }
 
-function OpportunityDeskTable({ items, allDeals, weights, strategyMode }: { items: RankedOpportunity[]; allDeals: Deal[]; weights: ReturnType<typeof useStrategy>["weights"]; strategyMode: StrategyModeId }) {
+function OpportunityDeskTable({ items, allDeals, weights, strategyMode, activeBrief }: { items: RankedOpportunity[]; allDeals: Deal[]; weights: ReturnType<typeof useStrategy>["weights"]; strategyMode: StrategyModeId; activeBrief: AcquisitionBrief | null }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[920px] text-left text-sm">
@@ -434,13 +484,13 @@ function OpportunityDeskTable({ items, allDeals, weights, strategyMode }: { item
             <th className="px-4 py-2 font-medium">Yield</th>
             <th className="px-4 py-2 font-medium">Guide Price</th>
             <th className="px-4 py-2 font-medium">Due Diligence Status</th>
-            <th className="px-4 py-2 font-medium">Strategy Fit</th>
+            <th className="px-4 py-2 font-medium">{activeBrief ? "Brief Match" : "Strategy Fit"}</th>
             <th className="px-4 py-2 text-right font-medium">View Deal</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/50">
           {items.map((item) => (
-            <OpportunityDeskRow key={item.deal.id} item={item} allDeals={allDeals} weights={weights} strategyMode={strategyMode} />
+            <OpportunityDeskRow key={item.deal.id} item={item} allDeals={allDeals} weights={weights} strategyMode={strategyMode} activeBrief={activeBrief} />
           ))}
         </tbody>
       </table>
@@ -448,7 +498,7 @@ function OpportunityDeskTable({ items, allDeals, weights, strategyMode }: { item
   );
 }
 
-function OpportunityDeskRow({ item, allDeals, weights, strategyMode }: { item: RankedOpportunity; allDeals: Deal[]; weights: ReturnType<typeof useStrategy>["weights"]; strategyMode: StrategyModeId }) {
+function OpportunityDeskRow({ item, allDeals, weights, strategyMode, activeBrief }: { item: RankedOpportunity; allDeals: Deal[]; weights: ReturnType<typeof useStrategy>["weights"]; strategyMode: StrategyModeId; activeBrief: AcquisitionBrief | null }) {
   const deal = item.deal;
   const classification = classifyDeal(deal);
   const visibleYield = deal.netInitialYield || deal.grossYield;
@@ -457,7 +507,16 @@ function OpportunityDeskRow({ item, allDeals, weights, strategyMode }: { item: R
   const strategyFit = isGeneralStrategyMode(strategyMode)
     ? Math.round(personalisedScore(deal, weights))
     : scoreStrategyMode(deal, strategyMode).score;
+  const briefMatch = scoreDealAgainstBrief(deal, activeBrief);
   const missing = readiness.missingLabels.slice(0, 3);
+  const fitScore = activeBrief ? briefMatch.score : strategyFit;
+  const fitLabel = activeBrief
+    ? briefMatch.matches ? "Matches brief" : "Partial match"
+    : strategyFit >= 72 ? "Strong fit" : "Moderate fit";
+  const fitReason = activeBrief
+    ? briefMatch.whyMatches[0] ?? briefMatch.whyNotFullyMatched[0] ?? "Brief criteria not fully matched"
+    : undefined;
+  const gapReason = activeBrief ? briefMatch.whyNotFullyMatched[0] : undefined;
 
   return (
     <tr className="transition-colors hover:bg-primary/5">
@@ -481,8 +540,10 @@ function OpportunityDeskRow({ item, allDeals, weights, strategyMode }: { item: R
         </div>
       </td>
       <td className="px-4 py-3 align-top">
-        <div className={cn("font-mono text-sm font-semibold tabular", strategyFit >= 72 && "text-primary")}>{strategyFit}%</div>
-        <div className="text-[11px] text-muted-foreground">{strategyFit >= 72 ? "Strong fit" : "Moderate fit"}</div>
+        <div className={cn("font-mono text-sm font-semibold tabular", fitScore >= 72 && "text-primary")}>{fitScore}%</div>
+        <div className="text-[11px] text-muted-foreground">{fitLabel}</div>
+        {fitReason && <div className="mt-1 max-w-[220px] truncate text-[11px] text-muted-foreground">Why: {fitReason}</div>}
+        {gapReason && <div className="mt-0.5 max-w-[220px] truncate text-[11px] text-muted-foreground">Gap: {gapReason}</div>}
       </td>
       <td className="px-4 py-3 text-right align-top">
         <Button asChild variant="outline" size="sm">

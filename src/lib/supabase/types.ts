@@ -78,9 +78,14 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["watchlists"]["Insert"]>;
       };
       watchlist_items: {
-        Row: { id: string; watchlist_id: string; user_id: string; deal_id: string; status: string; notes: string; created_at: string; updated_at: string };
-        Insert: { id?: string; watchlist_id: string; user_id: string; deal_id: string; status?: string; notes?: string };
+        Row: { id: string; watchlist_id: string; user_id: string; deal_id: string; status: string; notes: string; next_action_date: string | null; assigned_owner: string; created_at: string; updated_at: string };
+        Insert: { id?: string; watchlist_id: string; user_id: string; deal_id: string; status?: string; notes?: string; next_action_date?: string | null; assigned_owner?: string };
         Update: Partial<Database["public"]["Tables"]["watchlist_items"]["Insert"]>;
+      };
+      watchlist_stage_history: {
+        Row: { id: string; user_id: string; deal_id: string; old_stage: string | null; new_stage: string; changed_at: string };
+        Insert: { id?: string; user_id: string; deal_id: string; old_stage?: string | null; new_stage: string; changed_at?: string };
+        Update: Partial<Database["public"]["Tables"]["watchlist_stage_history"]["Insert"]>;
       };
       watchlist_notes: {
         Row: { id: string; watchlist_id: string; deal_id: string; note: string; created_at: string; updated_at: string };
@@ -91,6 +96,43 @@ export type Database = {
         Row: { id: string; user_id: string; name: string; filters: Json; alert_enabled: boolean; alert_frequency: string; created_at: string; updated_at: string };
         Insert: { id?: string; user_id: string; name: string; filters?: Json; alert_enabled?: boolean; alert_frequency?: string };
         Update: Partial<Database["public"]["Tables"]["saved_searches"]["Insert"]>;
+      };
+      acquisition_briefs: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          strategy_mode: string;
+          regions: string[];
+          budget_min: number;
+          budget_max: number;
+          asset_types: string[];
+          yield_min: number;
+          floor_area_min: number;
+          floor_area_max: number;
+          keywords_preferred: string[];
+          keywords_excluded: string[];
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          strategy_mode?: string;
+          regions?: string[];
+          budget_min?: number;
+          budget_max?: number;
+          asset_types?: string[];
+          yield_min?: number;
+          floor_area_min?: number;
+          floor_area_max?: number;
+          keywords_preferred?: string[];
+          keywords_excluded?: string[];
+          is_active?: boolean;
+        };
+        Update: Partial<Omit<Database["public"]["Tables"]["acquisition_briefs"]["Insert"], "user_id">>;
       };
       saved_alerts: {
         Row: { id: string; user_id: string; name: string; location_query: string; min_yield: number; max_price: number; asset_type: string; min_score: number; enabled: boolean; created_at: string; updated_at: string };

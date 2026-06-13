@@ -99,12 +99,16 @@ describe("buildDashboardKpis", () => {
       filteredDeals: allDeals,
       watchlistIds: ["verified", "candidate"],
       pipelineCounts: {
-        Saved: 1,
+        New: 1,
         Reviewing: 2,
-        "Viewing Booked": 1,
+        "Agent Contacted": 1,
+        "Brochure Requested": 0,
+        "Planning Review": 0,
+        "Financial Review": 0,
         "Offer Submitted": 1,
-        Passed: 4,
-        Purchased: 1,
+        "Under Offer": 1,
+        Acquired: 1,
+        Rejected: 4,
       },
       totalDatabaseDeals: 1401,
     });
@@ -120,7 +124,7 @@ describe("buildDashboardKpis", () => {
       lowPriority: 1,
       yieldSampleSize: 3,
       watchlistedDeals: 2,
-      activeWatchlistDeals: 4,
+      activeWatchlistDeals: 5,
       topScore: 84,
     });
     expect(metrics.averageYield).toBeCloseTo(7.5);

@@ -28,7 +28,7 @@ const CAPABILITIES = [
   {
     icon: Bookmark,
     title: "Pipeline tracking",
-    body: "Move saved deals from Saved to Reviewing, Viewing Booked, Offer Submitted, Passed or Purchased with private notes.",
+    body: "Move saved deals from New to Reviewing, Agent Contacted, Financial Review, Offer Submitted, Under Offer, Acquired or Rejected with private notes.",
   },
   {
     icon: ShieldCheck,

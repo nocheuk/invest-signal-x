@@ -1,23 +1,30 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Bookmark, MapPin, Trash2 } from "lucide-react";
+import { ArrowRight, Bookmark, CalendarDays, MapPin, Trash2, UserRound } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { RatingBadge, ScorePill } from "@/components/RatingBadge";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatGBP, formatPct } from "@/lib/deals";
 import { PIPELINE_STATUSES, type PipelineStatus, useWatchlist } from "@/lib/watchlist";
 import { useRealDeals } from "@/hooks/useRealDeals";
 
 export default function Watchlist() {
-  const { ids, notes, setNote, remove, error, getPipelineStatus, setStatus, pipelineCounts } = useWatchlist();
+  const { ids, notes, pipelineItems, setNote, setPipelineItem, remove, error, getPipelineStatus, setStatus, pipelineCounts } = useWatchlist();
   const { dealsQuery, deals } = useRealDeals();
   const watched = deals.filter((deal) => ids.includes(deal.id));
   const grouped = PIPELINE_STATUSES.map((status) => ({
     status,
-    deals: watched.filter((deal) => (getPipelineStatus(deal.id) ?? "Saved") === status),
+    deals: watched.filter((deal) => (getPipelineStatus(deal.id) ?? "New") === status),
   }));
-  const activeOpportunities = pipelineCounts.Reviewing + pipelineCounts["Viewing Booked"] + pipelineCounts["Offer Submitted"];
+  const activeOpportunities = pipelineCounts.Reviewing
+    + pipelineCounts["Agent Contacted"]
+    + pipelineCounts["Brochure Requested"]
+    + pipelineCounts["Planning Review"]
+    + pipelineCounts["Financial Review"]
+    + pipelineCounts["Offer Submitted"]
+    + pipelineCounts["Under Offer"];
 
   return (
     <AppLayout>
@@ -37,8 +44,8 @@ export default function Watchlist() {
         <section className="grid gap-4 md:grid-cols-4">
           <Metric label="Total saved" value={ids.length} />
           <Metric label="Active opportunities" value={activeOpportunities} />
-          <Metric label="Offers submitted" value={pipelineCounts["Offer Submitted"]} />
-          <Metric label="Purchased" value={pipelineCounts.Purchased} />
+          <Metric label="Offers / under offer" value={pipelineCounts["Offer Submitted"] + pipelineCounts["Under Offer"]} />
+          <Metric label="Acquired" value={pipelineCounts.Acquired} />
         </section>
 
         {dealsQuery.isLoading ? (
@@ -55,7 +62,8 @@ export default function Watchlist() {
             </Button>
           </div>
         ) : (
-          <section className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-6">
+          <section className="overflow-x-auto pb-3">
+            <div className="grid min-w-[2200px] grid-cols-10 gap-4">
             {grouped.map(({ status, deals: statusDeals }) => (
               <div key={status} className="ds-card p-3 space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -68,9 +76,13 @@ export default function Watchlist() {
                       key={deal.id}
                       deal={deal}
                       note={notes[deal.id] || ""}
-                      status={getPipelineStatus(deal.id) ?? "Saved"}
+                      status={getPipelineStatus(deal.id) ?? "New"}
+                      nextActionDate={pipelineItems[deal.id]?.nextActionDate ?? ""}
+                      assignedOwner={pipelineItems[deal.id]?.assignedOwner ?? ""}
                       onStatus={(value) => void setStatus(deal.id, value)}
                       onNote={(value) => void setNote(deal.id, value)}
+                      onNextActionDate={(value) => void setPipelineItem(deal.id, { nextActionDate: value || null })}
+                      onAssignedOwner={(value) => void setPipelineItem(deal.id, { assignedOwner: value })}
                       onRemove={() => void remove(deal.id)}
                     />
                   ))}
@@ -78,6 +90,7 @@ export default function Watchlist() {
                 </div>
               </div>
             ))}
+            </div>
           </section>
         )}
       </div>
@@ -89,15 +102,23 @@ function PipelineCard({
   deal,
   note,
   status,
+  nextActionDate,
+  assignedOwner,
   onStatus,
   onNote,
+  onNextActionDate,
+  onAssignedOwner,
   onRemove,
 }: {
   deal: ReturnType<typeof useRealDeals>["deals"][number];
   note: string;
   status: PipelineStatus;
+  nextActionDate: string;
+  assignedOwner: string;
   onStatus: (status: PipelineStatus) => void;
   onNote: (note: string) => void;
+  onNextActionDate: (date: string) => void;
+  onAssignedOwner: (owner: string) => void;
   onRemove: () => void;
 }) {
   return (
@@ -131,6 +152,16 @@ function PipelineCard({
           {PIPELINE_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
         </SelectContent>
       </Select>
+      <div className="grid gap-2">
+        <label className="space-y-1">
+          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground"><CalendarDays className="h-3 w-3" />Next action</span>
+          <Input type="date" value={nextActionDate} onChange={(event) => onNextActionDate(event.target.value)} className="h-8 bg-background/70 text-xs" />
+        </label>
+        <label className="space-y-1">
+          <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground"><UserRound className="h-3 w-3" />Owner</span>
+          <Input value={assignedOwner} onChange={(event) => onAssignedOwner(event.target.value)} placeholder="Assigned owner" className="h-8 bg-background/70 text-xs" />
+        </label>
+      </div>
       <Textarea
         placeholder="Notes - viewing booked, target price, contact..."
         value={note}
