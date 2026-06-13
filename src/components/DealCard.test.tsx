@@ -13,7 +13,7 @@ vi.mock("@/lib/watchlist", () => ({
   useWatchlist: () => ({
     isWatched: () => watchlistMock.saved,
     toggle: vi.fn(),
-    getPipelineStatus: () => watchlistMock.saved ? "Saved" : undefined,
+    getPipelineStatus: () => watchlistMock.saved ? "New" : undefined,
     saveToPipeline: watchlistMock.saveToPipeline,
   }),
 }));
@@ -146,7 +146,7 @@ describe("DealCard", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Pipeline: Saved" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pipeline: New" }));
     expect(watchlistMock.saveToPipeline).toHaveBeenCalledTimes(1);
   });
 

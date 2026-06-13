@@ -81,11 +81,13 @@ vi.mock("@/hooks/useDealSourceLinks", () => ({
 }));
 
 vi.mock("@/lib/watchlist", () => ({
-  PIPELINE_STATUSES: ["Saved", "Reviewing", "Viewing Booked", "Offer Submitted", "Passed", "Purchased"],
+  PIPELINE_STATUSES: ["New", "Reviewing", "Agent Contacted", "Brochure Requested", "Planning Review", "Financial Review", "Offer Submitted", "Under Offer", "Acquired", "Rejected"],
   useWatchlist: () => ({
     isWatched: () => false,
+    pipelineItems: {},
     notes: {},
     setNote: vi.fn(),
+    setPipelineItem: vi.fn(),
     getPipelineStatus: () => undefined,
     setStatus: vi.fn(),
     saveToPipeline: vi.fn(),

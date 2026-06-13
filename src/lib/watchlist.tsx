@@ -4,13 +4,26 @@ import { useAuth } from "@/lib/auth";
 import { isSupabaseConfigured, requireSupabase } from "@/lib/supabase/client";
 import { trackUserEvent } from "@/lib/usageTracking";
 
-export const PIPELINE_STATUSES = ["Saved", "Reviewing", "Viewing Booked", "Offer Submitted", "Passed", "Purchased"] as const;
+export const PIPELINE_STATUSES = [
+  "New",
+  "Reviewing",
+  "Agent Contacted",
+  "Brochure Requested",
+  "Planning Review",
+  "Financial Review",
+  "Offer Submitted",
+  "Under Offer",
+  "Acquired",
+  "Rejected",
+] as const;
 export type PipelineStatus = typeof PIPELINE_STATUSES[number];
 
 export type PipelineItem = {
   dealId: string;
   status: PipelineStatus;
   notes: string;
+  nextActionDate?: string;
+  assignedOwner?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -25,6 +38,8 @@ type WatchlistState = {
 type PipelinePatch = {
   status?: PipelineStatus;
   notes?: string;
+  nextActionDate?: string | null;
+  assignedOwner?: string;
 };
 
 type WatchlistContextType = WatchlistState & {
@@ -53,11 +68,22 @@ function isPipelineStatus(value: unknown): value is PipelineStatus {
   return typeof value === "string" && PIPELINE_STATUSES.includes(value as PipelineStatus);
 }
 
+function normalizePipelineStatus(value: unknown): PipelineStatus {
+  if (isPipelineStatus(value)) return value;
+  if (value === "Saved") return "New";
+  if (value === "Viewing Booked") return "Agent Contacted";
+  if (value === "Passed") return "Rejected";
+  if (value === "Purchased") return "Acquired";
+  return "New";
+}
+
 function normalizePipelineItem(item: Partial<PipelineItem> & { dealId: string }): PipelineItem {
   return {
     dealId: item.dealId,
-    status: isPipelineStatus(item.status) ? item.status : "Saved",
+    status: normalizePipelineStatus(item.status),
     notes: item.notes ?? "",
+    nextActionDate: item.nextActionDate ?? undefined,
+    assignedOwner: item.assignedOwner ?? "",
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
@@ -95,6 +121,8 @@ function readLocalState(): WatchlistState {
     dealId,
     status: storedItems[dealId]?.status,
     notes: storedItems[dealId]?.notes ?? notes[dealId] ?? "",
+    nextActionDate: storedItems[dealId]?.nextActionDate,
+    assignedOwner: storedItems[dealId]?.assignedOwner,
     createdAt: storedItems[dealId]?.createdAt,
     updatedAt: storedItems[dealId]?.updatedAt,
   })));
@@ -125,8 +153,10 @@ function nextStateFromPatch(state: WatchlistState, dealId: string, patch: Pipeli
   const existing = state.pipelineItems[dealId];
   const item = normalizePipelineItem({
     dealId,
-    status: patch.status ?? existing?.status ?? "Saved",
+    status: patch.status ?? existing?.status ?? "New",
     notes: patch.notes ?? existing?.notes ?? "",
+    nextActionDate: patch.nextActionDate === null ? undefined : patch.nextActionDate ?? existing?.nextActionDate,
+    assignedOwner: patch.assignedOwner ?? existing?.assignedOwner ?? "",
     createdAt: existing?.createdAt,
     updatedAt: new Date().toISOString(),
   });
@@ -157,7 +187,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       const watchlist = await ensureWatchlist(auth.user!.id);
       const { data: items, error: itemsError } = await requireSupabase()
         .from("watchlist_items")
-        .select("deal_id,status,notes,created_at,updated_at")
+        .select("deal_id,status,notes,next_action_date,assigned_owner,created_at,updated_at")
         .eq("user_id", auth.user!.id)
         .order("updated_at", { ascending: false });
       if (itemsError) throw itemsError;
@@ -165,6 +195,8 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
         dealId: item.deal_id,
         status: item.status,
         notes: item.notes ?? "",
+        nextActionDate: item.next_action_date ?? undefined,
+        assignedOwner: item.assigned_owner ?? "",
         createdAt: item.created_at,
         updatedAt: item.updated_at,
       })));
@@ -180,7 +212,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const upsertMutation = useMutation({
-    mutationFn: async ({ dealId, patch }: { dealId: string; patch: PipelinePatch }) => {
+    mutationFn: async ({ dealId, patch, previousStatus }: { dealId: string; patch: PipelinePatch; previousStatus?: PipelineStatus }) => {
       if (!isSupabaseConfigured) return;
       if (!auth.user) throw new Error("Cannot update pipeline without an authenticated Supabase user.");
       const watchlist = state.watchlistId ? { id: state.watchlistId } : await ensureWatchlist(auth.user.id);
@@ -189,21 +221,36 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
         watchlist_id: watchlist.id,
         user_id: auth.user.id,
         deal_id: dealId,
-        status: patch.status ?? existing?.status ?? "Saved",
+        status: patch.status ?? existing?.status ?? "New",
         notes: patch.notes ?? existing?.notes ?? "",
+        next_action_date: patch.nextActionDate === null ? null : patch.nextActionDate ?? existing?.nextActionDate ?? null,
+        assigned_owner: patch.assignedOwner ?? existing?.assignedOwner ?? "",
       };
       const { data, error: upsertError } = await requireSupabase()
         .from("watchlist_items")
         .upsert(payload, { onConflict: "user_id,deal_id" })
-        .select("deal_id,status,notes,created_at,updated_at")
+        .select("deal_id,status,notes,next_action_date,assigned_owner,created_at,updated_at")
         .single();
       if (upsertError) throw upsertError;
+      if (patch.status && patch.status !== previousStatus) {
+        const { error: historyError } = await requireSupabase()
+          .from("watchlist_stage_history")
+          .insert({
+            user_id: auth.user.id,
+            deal_id: dealId,
+            old_stage: previousStatus ?? null,
+            new_stage: patch.status,
+          });
+        if (historyError) console.warn("Could not record pipeline stage history", historyError.message);
+      }
       return {
         watchlistId: watchlist.id,
         item: normalizePipelineItem({
           dealId: data.deal_id,
           status: data.status,
           notes: data.notes ?? "",
+          nextActionDate: data.next_action_date ?? undefined,
+          assignedOwner: data.assigned_owner ?? "",
           createdAt: data.created_at,
           updatedAt: data.updated_at,
         }),
@@ -293,12 +340,12 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
     error,
     toggle: async (id) => {
       if (state.ids.includes(id)) await removeMutation.mutateAsync({ dealId: id });
-      else await upsertMutation.mutateAsync({ dealId: id, patch: { status: "Saved" } });
+      else await upsertMutation.mutateAsync({ dealId: id, patch: { status: "New" }, previousStatus: state.pipelineItems[id]?.status });
     },
     isWatched: (id) => state.ids.includes(id),
     getPipelineStatus: (id) => state.pipelineItems[id]?.status,
-    saveToPipeline: async (id, status = "Saved") => {
-      await upsertMutation.mutateAsync({ dealId: id, patch: { status } });
+    saveToPipeline: async (id, status = "New") => {
+      await upsertMutation.mutateAsync({ dealId: id, patch: { status }, previousStatus: state.pipelineItems[id]?.status });
       void trackUserEvent(auth.user?.id, {
         eventType: "saved_to_pipeline",
         dealId: id,
@@ -307,13 +354,13 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
       });
     },
     setStatus: async (id, status) => {
-      await upsertMutation.mutateAsync({ dealId: id, patch: { status } });
+      await upsertMutation.mutateAsync({ dealId: id, patch: { status }, previousStatus: state.pipelineItems[id]?.status });
     },
     setPipelineItem: async (id, patch) => {
-      await upsertMutation.mutateAsync({ dealId: id, patch });
+      await upsertMutation.mutateAsync({ dealId: id, patch, previousStatus: state.pipelineItems[id]?.status });
     },
     setNote: async (id, note) => {
-      await upsertMutation.mutateAsync({ dealId: id, patch: { notes: note } });
+      await upsertMutation.mutateAsync({ dealId: id, patch: { notes: note }, previousStatus: state.pipelineItems[id]?.status });
     },
     remove: async (id) => {
       await removeMutation.mutateAsync({ dealId: id });

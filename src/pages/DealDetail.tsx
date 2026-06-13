@@ -47,7 +47,7 @@ export default function DealDetail() {
   const navigate = useNavigate();
   const { deal, data: allDeals = [], isLoading, isError } = useDeal(id);
   const sourceLinks = useDealSourceLinks(deal?.id);
-  const { isWatched, notes, setNote, getPipelineStatus, setStatus, saveToPipeline } = useWatchlist();
+  const { isWatched, notes, pipelineItems, setNote, getPipelineStatus, setStatus, setPipelineItem, saveToPipeline } = useWatchlist();
   const { trackEvent } = useUsageTracking();
   const [memoStatus, setMemoStatus] = useState<"idle" | "loading" | "error">("idle");
   const [financialAssumptions, setFinancialAssumptions] = useState<FinancialAssumptions>(DEFAULT_FINANCIAL_ASSUMPTIONS);
@@ -79,7 +79,8 @@ export default function DealDetail() {
 
   const watched = isWatched(deal.id);
   const note = notes[deal.id] || "";
-  const pipelineStatus = getPipelineStatus(deal.id) ?? "Saved";
+  const pipelineItem = pipelineItems[deal.id];
+  const pipelineStatus = getPipelineStatus(deal.id) ?? "New";
   const dealAnalysis = getDealAnalysis(deal);
   const areaIntelligence = getAreaIntelligence(deal, allDeals);
   const comparableEvidence = buildComparableEvidence(deal, allDeals);
@@ -531,6 +532,26 @@ export default function DealDetail() {
                 {PIPELINE_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-1 text-sm">
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">Next action date</span>
+              <Input
+                type="date"
+                value={pipelineItem?.nextActionDate ?? ""}
+                onChange={(event) => void setPipelineItem(deal.id, { nextActionDate: event.target.value || null })}
+                className="bg-surface-2 border-border/60"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">Assigned owner</span>
+              <Input
+                value={pipelineItem?.assignedOwner ?? ""}
+                onChange={(event) => void setPipelineItem(deal.id, { assignedOwner: event.target.value })}
+                placeholder="Owner name"
+                className="bg-surface-2 border-border/60"
+              />
+            </label>
           </div>
           <Textarea
             value={note}

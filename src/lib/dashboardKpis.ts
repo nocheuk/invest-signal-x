@@ -52,10 +52,14 @@ export function buildDashboardKpis({
     yieldSampleSize: yieldSamples.length,
     topScore: topDeal?.score ?? 0,
     watchlistedDeals: watchlistIds.length,
-    activeWatchlistDeals:
+  activeWatchlistDeals:
       (pipelineCounts.Reviewing ?? 0) +
-      (pipelineCounts["Viewing Booked"] ?? 0) +
-      (pipelineCounts["Offer Submitted"] ?? 0),
+      (pipelineCounts["Agent Contacted"] ?? 0) +
+      (pipelineCounts["Brochure Requested"] ?? 0) +
+      (pipelineCounts["Planning Review"] ?? 0) +
+      (pipelineCounts["Financial Review"] ?? 0) +
+      (pipelineCounts["Offer Submitted"] ?? 0) +
+      (pipelineCounts["Under Offer"] ?? 0),
   };
 }
 

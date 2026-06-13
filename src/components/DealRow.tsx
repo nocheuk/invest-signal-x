@@ -71,7 +71,7 @@ export function DealRow({ deal }: { deal: Deal }) {
             "h-8 w-8 grid place-items-center rounded-md transition-colors",
             watched ? "text-primary" : "text-muted-foreground hover:text-foreground"
           )}
-          aria-label={watched ? `Saved to pipeline as ${pipelineStatus ?? "Saved"}` : "Save to Pipeline"}
+          aria-label={watched ? `Saved to pipeline as ${pipelineStatus ?? "New"}` : "Save to Pipeline"}
         >
           <Bookmark className={cn("h-4 w-4", watched && "fill-current")} />
         </button>

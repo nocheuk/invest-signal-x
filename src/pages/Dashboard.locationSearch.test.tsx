@@ -42,6 +42,10 @@ const nationalScanState = vi.hoisted(() => ({
   isError: false,
 }));
 
+const acquisitionBriefState = vi.hoisted(() => ({
+  activeBrief: null as null | import("@/lib/acquisitionBriefs").AcquisitionBrief,
+}));
+
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -70,17 +74,21 @@ vi.mock("@/hooks/useRealDeals", () => ({
 }));
 
 vi.mock("@/lib/watchlist", () => ({
-  PIPELINE_STATUSES: ["Saved", "Reviewing", "Viewing Booked", "Offer Submitted", "Passed", "Purchased"],
+  PIPELINE_STATUSES: ["New", "Reviewing", "Agent Contacted", "Brochure Requested", "Planning Review", "Financial Review", "Offer Submitted", "Under Offer", "Acquired", "Rejected"],
   useWatchlist: () => ({
     ids: [],
     pipelineItems: {},
     pipelineCounts: {
-      Saved: 0,
+      New: 0,
       Reviewing: 0,
-      "Viewing Booked": 0,
+      "Agent Contacted": 0,
+      "Brochure Requested": 0,
+      "Planning Review": 0,
+      "Financial Review": 0,
       "Offer Submitted": 0,
-      Passed: 0,
-      Purchased: 0,
+      "Under Offer": 0,
+      Acquired: 0,
+      Rejected: 0,
     },
   }),
 }));
@@ -126,6 +134,19 @@ vi.mock("@/hooks/useLocationImport", async () => {
 vi.mock("@/lib/usageTracking", () => ({
   useUsageTracking: () => ({
     trackEvent: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useAcquisitionBriefs", () => ({
+  useAcquisitionBriefs: () => ({
+    briefs: acquisitionBriefState.activeBrief ? [acquisitionBriefState.activeBrief] : [],
+    activeBrief: acquisitionBriefState.activeBrief,
+    isLoading: false,
+    isSaving: false,
+    saveBrief: vi.fn(),
+    deleteBrief: vi.fn(),
+    selectBrief: vi.fn(),
+    error: null,
   }),
 }));
 
@@ -215,6 +236,7 @@ describe("Dashboard focused overview", () => {
     };
     nationalScanState.isLoading = false;
     nationalScanState.isError = false;
+    acquisitionBriefState.activeBrief = null;
   });
 
   it("renders the compact acquisition desk dashboard", () => {
@@ -227,6 +249,8 @@ describe("Dashboard focused overview", () => {
 
     expect(screen.getByText("Acquisition desk")).toBeInTheDocument();
     expect(screen.getByText("Strategy mode")).toBeInTheDocument();
+    expect(screen.getByText("Pipeline summary")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open board/i })).toHaveAttribute("href", "/pipeline");
     expect(screen.getByText("Analyst brief")).toBeInTheDocument();
     expect(screen.getByText("Ranked opportunities")).toBeInTheDocument();
     expect(screen.getByText("First 10 to compare")).toBeInTheDocument();
@@ -313,6 +337,36 @@ describe("Dashboard focused overview", () => {
 
     await waitFor(() => expect(locationImportState.mutateAsync).toHaveBeenCalledWith({ locationQuery: "Southampton" }));
     expect(await screen.findByText(/Added 2 new deals/)).toBeInTheDocument();
+  });
+
+  it("shows active acquisition brief match count and row reasons", () => {
+    acquisitionBriefState.activeBrief = {
+      id: "brief-1",
+      name: "Bournemouth retail income",
+      strategyMode: "general-investment",
+      regions: ["Bournemouth"],
+      budgetMin: 0,
+      budgetMax: 500000,
+      assetTypes: ["Office"],
+      yieldMin: 7,
+      floorAreaMin: 0,
+      floorAreaMax: 0,
+      keywordsPreferred: ["rightmove"],
+      keywordsExcluded: [],
+      isActive: true,
+    };
+    dealsState.deals = [
+      dashboardDeal({ id: "match", title: "Rightmove Bournemouth Office", location: "Bournemouth, BH1", assetType: "Office" }),
+      dashboardDeal({ id: "miss", title: "Manchester Industrial", location: "Manchester", assetType: "Industrial", guidePrice: 900000, grossYield: 4, netInitialYield: 4 }),
+    ];
+
+    renderDashboard();
+
+    expect(screen.getAllByText("Bournemouth retail income").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("1 opportunities match your brief")).toBeInTheDocument();
+    expect(screen.getByText("Brief Match")).toBeInTheDocument();
+    expect(screen.getByText(/Why: Location matches target region/)).toBeInTheDocument();
+    expect(screen.getByText(/Gap: Outside target regions/)).toBeInTheDocument();
   });
 
   it("shows real national scan status and no-run state", () => {

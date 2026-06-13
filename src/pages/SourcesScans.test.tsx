@@ -85,12 +85,16 @@ vi.mock("@/lib/watchlist", () => ({
   useWatchlist: () => ({
     ids: [],
     pipelineCounts: {
-      Saved: 0,
+      New: 0,
       Reviewing: 0,
-      "Viewing Booked": 0,
+      "Agent Contacted": 0,
+      "Brochure Requested": 0,
+      "Planning Review": 0,
+      "Financial Review": 0,
       "Offer Submitted": 0,
-      Passed: 0,
-      Purchased: 0,
+      "Under Offer": 0,
+      Acquired: 0,
+      Rejected: 0,
     },
   }),
 }));

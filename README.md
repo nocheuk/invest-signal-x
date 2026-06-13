@@ -596,13 +596,20 @@ Selector output maps into the normalized import row fields:
 - enforces one pipeline item per user/deal with `watchlist_items_user_deal_unique`
 - restricts item reads/writes with an owner-only RLS policy
 
+`20260613123000_acquisition_pipeline_v2.sql` expands the acquisition workflow:
+
+- replaces the original saved-deal stages with `New`, `Reviewing`, `Agent Contacted`, `Brochure Requested`, `Planning Review`, `Financial Review`, `Offer Submitted`, `Under Offer`, `Acquired`, and `Rejected`
+- adds `next_action_date` and `assigned_owner` to `watchlist_items`
+- adds `watchlist_stage_history` so stage transitions can be audited per user/deal
+- keeps owner-only RLS for user pipeline records and stage history
+
 All public tables have RLS enabled. User-owned tables are restricted to the authenticated owner. Deal/source/comparable reads are public where they support the product browsing experience; write access is intentionally not granted to `anon`.
 
 ## Watchlist Pipeline
 
-Deal cards and detail pages now save deals into "My Pipeline". Each authenticated user gets one private `watchlist_items` row per deal, with a stage of `Saved`, `Reviewing`, `Viewing Booked`, `Offer Submitted`, `Passed`, or `Purchased`. Pipeline notes are stored on the same row and are visible only to that user.
+Deal cards and detail pages now save deals into "My Pipeline". Each authenticated user gets one private `watchlist_items` row per deal, with a stage of `New`, `Reviewing`, `Agent Contacted`, `Brochure Requested`, `Planning Review`, `Financial Review`, `Offer Submitted`, `Under Offer`, `Acquired`, or `Rejected`. Pipeline notes, next action date, and assigned owner are stored on the same row and are visible only to that user.
 
-The dashboard shows pipeline counts, active-opportunity analytics, and a pipeline-stage filter that combines with source, confidence, rating, location, and strategy sorting.
+The dashboard shows pipeline summary counts. The `/pipeline` board provides a Kanban-style workflow grouped by stage, with editable notes, next action dates, assigned owner fields, and explicit remove actions. The All Deals workbench includes a pipeline-stage filter that combines with source, confidence, rating, location, and strategy sorting.
 
 ## Auth UX
 
