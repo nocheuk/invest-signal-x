@@ -1,10 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Deal } from "@/lib/deals";
-import AllDeals from "@/pages/AllDeals";
 import Dashboard from "@/pages/Dashboard";
 
 const dealsState = vi.hoisted(() => ({
@@ -144,19 +143,6 @@ function renderDashboard() {
   );
 }
 
-function renderDashboardWithDealsRoute() {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={["/"]}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/deals" element={<AllDeals />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
-}
-
 function dashboardDeal(overrides: Partial<Deal> = {}): Deal {
   return {
     id: "imp-live",
@@ -231,7 +217,7 @@ describe("Dashboard focused overview", () => {
     nationalScanState.isError = false;
   });
 
-  it("keeps the dashboard focused on overview sections", () => {
+  it("renders the compact acquisition desk dashboard", () => {
     dealsState.deals = [
       dashboardDeal({ id: "candidate", title: "Strong Opportunity Deal", score: 73, rating: "amber", dataConfidenceScore: 80, confidenceLevel: "high" }),
       dashboardDeal({ id: "review", title: "Needs Review Deal", score: 42, rating: "red", needsReview: true }),
@@ -239,32 +225,28 @@ describe("Dashboard focused overview", () => {
 
     renderDashboard();
 
-    expect(screen.getByText("DealSignal Analyst Brief")).toBeInTheDocument();
-    expect(screen.getByText("Today's Opportunities")).toBeInTheDocument();
-    expect(screen.getByText(/Daily Opportunity Feed:/)).toBeInTheDocument();
-    expect(screen.getByText(/Today DealSignal analysed/)).toBeInTheDocument();
+    expect(screen.getByText("Acquisition desk")).toBeInTheDocument();
+    expect(screen.getByText("Strategy mode")).toBeInTheDocument();
+    expect(screen.getByText("Analyst brief")).toBeInTheDocument();
+    expect(screen.getByText("Ranked opportunities")).toBeInTheDocument();
+    expect(screen.getByText("First 10 to compare")).toBeInTheDocument();
+    expect(screen.getByText("Score")).toBeInTheDocument();
+    expect(screen.getByText("Opportunity")).toBeInTheDocument();
+    expect(screen.getByText("Yield")).toBeInTheDocument();
+    expect(screen.getByText("Guide Price")).toBeInTheDocument();
+    expect(screen.getByText("Due Diligence Status")).toBeInTheDocument();
+    expect(screen.getByText("Strategy Fit")).toBeInTheDocument();
+    expect(screen.getAllByText("View Deal").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Strong Opportunity Deal")).toBeInTheDocument();
     expect(screen.getByText("Total analysed")).toBeInTheDocument();
-    expect(screen.getByText("Today's Best Opportunities")).toBeInTheDocument();
-    expect(screen.getByText(/Today, DealSignal found/)).toBeInTheDocument();
-    expect(screen.getByText("Matches Your Acquisition Brief")).toBeInTheDocument();
-    expect(screen.getByText("Acquisition Brief Match")).toBeInTheDocument();
-    expect(screen.getByText("New This Week")).toBeInTheDocument();
-    expect(screen.getByText("Browse All Opportunities")).toBeInTheDocument();
-    expect(screen.getAllByText("Score Explanation").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Contributors").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Why ranked?").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Due diligence status").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/Missing: Tenant, Lease/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Why DealSignal likes this").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Key Risks").length).toBeGreaterThanOrEqual(1);
-    const links = screen.getAllByRole("link");
-    expect(links.some((link) => link.getAttribute("href") === "/deals?classification=verified-green")).toBe(true);
-    expect(links.some((link) => link.getAttribute("href") === "/deals?classification=green-candidate")).toBe(true);
-    expect(screen.getAllByText("Strong Opportunities").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("New Today").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("New This Week").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Quick location search")).toBeInTheDocument();
     expect(screen.getByText("Last scan status")).toBeInTheDocument();
+    expect(screen.queryByText("Daily Opportunity Feed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Top 5 Today")).not.toBeInTheDocument();
+    expect(screen.queryByText("Top 10 This Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("New High-Ranking")).not.toBeInTheDocument();
+    expect(screen.queryByText("Today's Best Opportunities")).not.toBeInTheDocument();
+    expect(screen.queryByText("Browse All Opportunities")).not.toBeInTheDocument();
     expect(screen.queryByText("Low Priority")).not.toBeInTheDocument();
     expect(screen.queryByText("All live opportunities")).not.toBeInTheDocument();
     expect(screen.queryByText("My Alerts")).not.toBeInTheDocument();
@@ -302,8 +284,8 @@ describe("Dashboard focused overview", () => {
     expect(screen.getByText(/High Street Conversion feed/i)).toBeInTheDocument();
     expect(screen.getAllByText("Former bank on High Street with upper parts").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Industrial warehouse estate")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Why this fits the strategy").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/High street location mentioned|Upper-floor accommodation indicated|Residential conversion potential mentioned/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Strategy Fit")).toBeInTheDocument();
+    expect(screen.getByText("Strong fit")).toBeInTheDocument();
   });
 
   it("excludes seeded demo deals in Supabase mode", () => {
@@ -327,31 +309,6 @@ describe("Dashboard focused overview", () => {
 
     await waitFor(() => expect(locationImportState.mutateAsync).toHaveBeenCalledWith({ locationQuery: "Southampton" }));
     expect(await screen.findByText(/Added 2 new deals/)).toBeInTheDocument();
-  });
-
-  it("clicks opportunity KPIs into matching deal results", async () => {
-    dealsState.deals = [
-      dashboardDeal({ id: "top", title: "Top Opportunity Deal", score: 82, rating: "green", dataConfidenceScore: 86, confidenceLevel: "high" }),
-      dashboardDeal({ id: "strong", title: "Strong Opportunity Deal", score: 73, rating: "amber", dataConfidenceScore: 85, confidenceLevel: "high" }),
-      dashboardDeal({ id: "low", title: "Low Priority Deal", score: 30, rating: "red", dataConfidenceScore: 25, confidenceLevel: "low", guidePrice: 0 }),
-    ];
-
-    const { unmount } = renderDashboardWithDealsRoute();
-    fireEvent.change(screen.getByLabelText("Location filter"), { target: { value: "Bournemouth" } });
-    fireEvent.click(linkByHref("/deals?classification=verified-green"));
-    await waitFor(() => expect(screen.getByText("Deal workbench")).toBeInTheDocument());
-    expect(within(screen.getAllByTestId("deal-row")[0]).getByText("Top Opportunity Deal")).toBeInTheDocument();
-    expect(screen.queryByText("Strong Opportunity Deal")).not.toBeInTheDocument();
-    expect(screen.getAllByTestId("deal-row")).toHaveLength(1);
-    unmount();
-
-    renderDashboardWithDealsRoute();
-    fireEvent.change(screen.getByLabelText("Location filter"), { target: { value: "Bournemouth" } });
-    fireEvent.click(linkByHref("/deals?classification=green-candidate"));
-    await waitFor(() => expect(screen.getByText("Deal workbench")).toBeInTheDocument());
-    expect(within(screen.getAllByTestId("deal-row")[0]).getByText("Strong Opportunity Deal")).toBeInTheDocument();
-    expect(screen.queryByText("Top Opportunity Deal")).not.toBeInTheDocument();
-    expect(screen.getAllByTestId("deal-row")).toHaveLength(1);
   });
 
   it("shows real national scan status and no-run state", () => {
@@ -382,9 +339,3 @@ describe("Dashboard focused overview", () => {
     expect(screen.getAllByText("Live Deal Still Visible").length).toBeGreaterThanOrEqual(1);
   });
 });
-
-function linkByHref(href: string) {
-  const link = screen.getAllByRole("link").find((item) => item.getAttribute("href") === href || item.getAttribute("href") === `${href}&location=Bournemouth`);
-  if (!link) throw new Error(`Missing link ${href}`);
-  return link;
-}
