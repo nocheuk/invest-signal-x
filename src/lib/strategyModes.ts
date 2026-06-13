@@ -19,8 +19,29 @@ export type StrategyModeMatch = {
   mode: StrategyMode;
   score: number;
   matches: boolean;
+  tier: "best" | "match" | "none";
   reasons: string[];
+  matchedSignals: string[];
+  missingSignals: string[];
   missingDiligence: string[];
+};
+
+export type StrategyDiagnosticsEntry = {
+  deal: Deal;
+  score: number;
+  tier: StrategyModeMatch["tier"];
+  matchedSignals: string[];
+  missingSignals: string[];
+};
+
+export type StrategyDiagnostics = {
+  totalImportedDeals: number;
+  score20Plus: number;
+  score30Plus: number;
+  score40Plus: number;
+  score50Plus: number;
+  entries: StrategyDiagnosticsEntry[];
+  nearMisses: StrategyDiagnosticsEntry[];
 };
 
 export const STRATEGY_MODES: StrategyMode[] = [
@@ -65,19 +86,22 @@ export const STRATEGY_MODES: StrategyMode[] = [
 const GENERAL_MODE = STRATEGY_MODES[0];
 const HIGH_STREET_MODE = STRATEGY_MODES[1];
 
-const HIGH_STREET_SIGNALS: Array<{ pattern: RegExp; reason: string; weight: number }> = [
-  { pattern: /\bhigh street\b/i, reason: "High street location mentioned", weight: 22 },
-  { pattern: /\btown centre\b|\bcity centre\b/i, reason: "Town-centre location mentioned", weight: 18 },
-  { pattern: /\bretail\b.*\bupper\b|\bupper\b.*\bretail\b/i, reason: "Retail with upper parts indicated", weight: 22 },
-  { pattern: /\bupper parts?\b|\bupper floors?\b|\baccommodation above\b/i, reason: "Upper-floor accommodation indicated", weight: 24 },
-  { pattern: /\bvacant upper\b|\bvacant accommodation\b|\bunderused upper\b/i, reason: "Vacant or underused upper floors mentioned", weight: 24 },
-  { pattern: /\bresidential conversion\b|\bconversion potential\b|\bconvert(?:ed|ible)? to residential\b/i, reason: "Residential conversion potential mentioned", weight: 28 },
-  { pattern: /\bdevelopment potential\b|\bredevelopment\b|\bplanning potential\b/i, reason: "Development or planning potential mentioned", weight: 20 },
-  { pattern: /\bmixed[- ]use\b/i, reason: "Mixed-use potential indicated", weight: 18 },
-  { pattern: /\bformer bank\b|\bformer department store\b/i, reason: "Former bank or department-store format may suit upper-floor reuse", weight: 18 },
-  { pattern: /\bclass e\b|\bpermitted development\b/i, reason: "Use-class or permitted-development signal mentioned", weight: 18 },
-  { pattern: /\brear access\b|\bself-contained upper access\b|\bseparate access\b/i, reason: "Access arrangement may support upper-floor conversion", weight: 18 },
-  { pattern: /\bstock rooms?\b|\bancillary accommodation\b/i, reason: "Ancillary or stock-room space mentioned", weight: 12 },
+const HIGH_STREET_DISCOVERY_THRESHOLD = 20;
+const HIGH_STREET_BEST_THRESHOLD = 40;
+
+const HIGH_STREET_SIGNALS: Array<{ label: string; pattern: RegExp; reason: string; weight: number }> = [
+  { label: "high street", pattern: /\bhigh street\b/i, reason: "High street location mentioned", weight: 22 },
+  { label: "town centre", pattern: /\btown centre\b|\bcity centre\b/i, reason: "Town-centre location mentioned", weight: 18 },
+  { label: "retail with upper parts", pattern: /\bretail\b.*\bupper\b|\bupper\b.*\bretail\b|\bretail\b.*\bupper parts?\b/i, reason: "Retail with upper parts indicated", weight: 22 },
+  { label: "upper floors", pattern: /\bupper parts?\b|\bupper floors?\b|\bself[- ]contained upper floors?\b|\baccommodation above\b/i, reason: "Upper-floor accommodation indicated", weight: 24 },
+  { label: "vacant upper floors", pattern: /\bvacant upper\b|\bvacant accommodation\b|\bunderused upper\b|\bvacant possession\b|\bvp\b/i, reason: "Vacant or underused upper floors mentioned", weight: 24 },
+  { label: "residential conversion", pattern: /\bresidential conversion\b|\bconversion potential\b|\bconvert(?:ed|ible)? to residential\b|\bretail and residential\b/i, reason: "Residential conversion potential mentioned", weight: 28 },
+  { label: "development opportunity", pattern: /\bdevelopment potential\b|\bdevelopment opportunity\b|\bredevelopment\b|\bredevelopment potential\b|\bplanning potential\b|\bstpp\b/i, reason: "Development or planning potential mentioned", weight: 20 },
+  { label: "mixed-use", pattern: /\bmixed[- ]use\b|\bmixed use\b/i, reason: "Mixed-use potential indicated", weight: 18 },
+  { label: "former bank or department store", pattern: /\bformer bank\b|\bformer department store\b/i, reason: "Former bank or department-store format may suit upper-floor reuse", weight: 18 },
+  { label: "Class E / permitted development", pattern: /\bclass e\b|\bpermitted development\b/i, reason: "Use-class or permitted-development signal mentioned", weight: 18 },
+  { label: "upper access", pattern: /\brear access\b|\bself[- ]contained upper access\b|\bseparate access\b|\bself[- ]contained upper floors?\b/i, reason: "Access arrangement may support upper-floor conversion", weight: 18 },
+  { label: "ancillary / storage above", pattern: /\bstock rooms?\b|\bancillary accommodation\b|\bstorage above\b/i, reason: "Ancillary, storage or stock-room space mentioned", weight: 12 },
 ];
 
 const STRATEGY_DILIGENCE: Array<{ label: string; pattern: RegExp }> = [
@@ -106,7 +130,7 @@ export function isGeneralStrategyMode(id: StrategyModeId) {
 
 export function scoreStrategyMode(deal: Deal, modeId: StrategyModeId): StrategyModeMatch {
   if (modeId === "general-investment") {
-    return { mode: GENERAL_MODE, score: 100, matches: true, reasons: ["Uses DealSignal's standard investment scoring."], missingDiligence: [] };
+    return { mode: GENERAL_MODE, score: 100, matches: true, tier: "best", reasons: ["Uses DealSignal's standard investment scoring."], matchedSignals: [], missingSignals: [], missingDiligence: [] };
   }
   if (modeId === "high-street-conversion") return scoreHighStreetConversion(deal);
   return scorePlaceholderMode(deal, strategyModeById(modeId));
@@ -123,6 +147,32 @@ export function filterDealsForStrategyMode(deals: Deal[], modeId: StrategyModeId
 
 export function strategyModeDescription(id: StrategyModeId) {
   return strategyModeById(id).description;
+}
+
+export function buildHighStreetConversionDiagnostics(deals: Deal[]): StrategyDiagnostics {
+  const importedDeals = deals.filter((deal) => deal.isImported);
+  const entries = importedDeals
+    .map((deal) => {
+      const match = scoreHighStreetConversion(deal);
+      return {
+        deal,
+        score: match.score,
+        tier: match.tier,
+        matchedSignals: match.matchedSignals,
+        missingSignals: match.missingSignals,
+      };
+    })
+    .sort((a, b) => b.score - a.score || b.deal.score - a.deal.score);
+
+  return {
+    totalImportedDeals: importedDeals.length,
+    score20Plus: entries.filter((entry) => entry.score >= 20).length,
+    score30Plus: entries.filter((entry) => entry.score >= 30).length,
+    score40Plus: entries.filter((entry) => entry.score >= 40).length,
+    score50Plus: entries.filter((entry) => entry.score >= 50).length,
+    entries,
+    nearMisses: entries.filter((entry) => entry.score >= 20 && entry.score < 40).slice(0, 50),
+  };
 }
 
 function scoreHighStreetConversion(deal: Deal): StrategyModeMatch {
@@ -150,11 +200,17 @@ function scoreHighStreetConversion(deal: Deal): StrategyModeMatch {
     .map((item) => item.label);
 
   const uniqueReasons = unique(reasons).slice(0, 5);
+  const matchedSignals = HIGH_STREET_SIGNALS.filter((signal) => signal.pattern.test(text)).map((signal) => signal.label);
+  const missingSignals = HIGH_STREET_SIGNALS.filter((signal) => !signal.pattern.test(text)).map((signal) => signal.label);
+  const safeScore = Math.min(100, score);
   return {
     mode: HIGH_STREET_MODE,
-    score: Math.min(100, score),
-    matches: score >= 40 && uniqueReasons.length > 0,
+    score: safeScore,
+    matches: safeScore >= HIGH_STREET_DISCOVERY_THRESHOLD && uniqueReasons.length > 0,
+    tier: safeScore >= HIGH_STREET_BEST_THRESHOLD ? "best" : safeScore >= HIGH_STREET_DISCOVERY_THRESHOLD ? "match" : "none",
     reasons: uniqueReasons,
+    matchedSignals,
+    missingSignals,
     missingDiligence,
   };
 }
@@ -173,7 +229,10 @@ function scorePlaceholderMode(deal: Deal, mode: StrategyMode): StrategyModeMatch
     mode,
     score,
     matches: score >= 50,
+    tier: score >= 50 ? "best" : "none",
     reasons: score >= 50 ? [`${mode.shortLabel} signal detected from existing deal fields.`] : [],
+    matchedSignals: score >= 50 ? [mode.shortLabel] : [],
+    missingSignals: score >= 50 ? [] : [mode.shortLabel],
     missingDiligence: [],
   };
 }

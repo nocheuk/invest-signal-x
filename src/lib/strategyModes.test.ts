@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Deal } from "@/lib/deals";
-import { filterDealsForStrategyMode, parseStrategyMode, scoreStrategyMode } from "@/lib/strategyModes";
+import { buildHighStreetConversionDiagnostics, filterDealsForStrategyMode, parseStrategyMode, scoreStrategyMode } from "@/lib/strategyModes";
 
 function deal(overrides: Partial<Deal> = {}): Deal {
   return {
@@ -76,6 +76,66 @@ describe("strategy modes", () => {
     const ignored = deal({ id: "ignored", title: "Warehouse", assetType: "Industrial" });
 
     expect(filterDealsForStrategyMode([weak, ignored, strong], "high-street-conversion").map((item) => item.id)).toEqual(["strong"]);
+  });
+
+  it("includes lower-scoring discovery matches at 20+ without marking them as best tier", () => {
+    const discovery = deal({
+      id: "discovery",
+      title: "Town centre shop with development opportunity STPP",
+      assetType: "Office",
+      isImported: true,
+    });
+
+    const match = scoreStrategyMode(discovery, "high-street-conversion");
+    expect(match.matches).toBe(true);
+    expect(match.tier).toBe("match");
+    expect(match.score).toBeGreaterThanOrEqual(20);
+    expect(match.score).toBeLessThan(40);
+    expect(filterDealsForStrategyMode([discovery], "high-street-conversion")).toHaveLength(1);
+  });
+
+  it("detects expanded High Street Conversion vocabulary", () => {
+    const match = scoreStrategyMode(deal({
+      title: "Former department store mixed use opportunity",
+      enrichment: {
+        status: "Enriched",
+        extractedPayload: {
+          description: "Retail and residential redevelopment potential with storage above, self contained upper floors, vacant possession and STPP.",
+        },
+      },
+    }), "high-street-conversion");
+
+    expect(match.matches).toBe(true);
+    expect(match.matchedSignals).toEqual(expect.arrayContaining([
+      "mixed-use",
+      "former bank or department store",
+      "upper floors",
+      "residential conversion",
+      "development opportunity",
+      "ancillary / storage above",
+    ]));
+  });
+
+  it("builds High Street Conversion diagnostics and near-miss buckets for imported deals", () => {
+    const strong = deal({
+      id: "strong",
+      isImported: true,
+      title: "Former bank on high street with accommodation above",
+      enrichment: { status: "Enriched", extractedPayload: { description: "Residential conversion potential and vacant upper floors." } },
+    });
+    const nearMiss = deal({ id: "near", isImported: true, title: "Town centre shop development opportunity", assetType: "Office" });
+    const ignored = deal({ id: "ignored", isImported: true, title: "Suburban office suite", assetType: "Office" });
+    const demo = deal({ id: "demo", isImported: false, title: "High Street retail with upper floors" });
+
+    const diagnostics = buildHighStreetConversionDiagnostics([strong, nearMiss, ignored, demo]);
+
+    expect(diagnostics.totalImportedDeals).toBe(3);
+    expect(diagnostics.score20Plus).toBe(2);
+    expect(diagnostics.score30Plus).toBe(2);
+    expect(diagnostics.score40Plus).toBe(1);
+    expect(diagnostics.score50Plus).toBe(1);
+    expect(diagnostics.nearMisses.map((entry) => entry.deal.id)).toEqual(["near"]);
+    expect(diagnostics.nearMisses[0].matchedSignals).toEqual(expect.arrayContaining(["town centre", "development opportunity"]));
   });
 
   it("parses unknown modes back to general investment", () => {
