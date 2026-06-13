@@ -27,7 +27,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { formatGBP, formatPct, type Deal } from "@/lib/deals";
 import { useUsageTracking } from "@/lib/usageTracking";
 import { buildAcquisitionReadiness } from "@/lib/acquisitionReadiness";
-import { isGeneralStrategyMode, scoreStrategyMode, strategyModeDescription, type StrategyModeId } from "@/lib/strategyModes";
+import { buildHighStreetConversionDiagnostics, isGeneralStrategyMode, scoreStrategyMode, strategyModeDescription, type StrategyModeId } from "@/lib/strategyModes";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
@@ -113,7 +113,17 @@ function DashboardContent() {
   }, [areaIndex, deals, visibleDeals]);
   const greenCandidates = useMemo(() => visibleDeals.filter((deal) => classifyDeal(deal) === "green-candidate"), [visibleDeals]);
   const analystDeals = useMemo(() => visibleDeals.filter((deal) => classifyDeal(deal) !== "low-priority"), [visibleDeals]);
-  const rankedOpportunities = useMemo(() => mergeRankedDeals(shortlist, greenCandidates, analystDeals, areaIndex, deals).slice(0, 10), [analystDeals, areaIndex, deals, greenCandidates, shortlist]);
+  const rankedOpportunityPool = useMemo(() => mergeRankedDeals(shortlist, greenCandidates, analystDeals, areaIndex, deals), [analystDeals, areaIndex, deals, greenCandidates, shortlist]);
+  const rankedOpportunities = useMemo(() => rankedOpportunityPool.slice(0, 10), [rankedOpportunityPool]);
+  const highStreetDiagnostics = useMemo(() => buildHighStreetConversionDiagnostics(deals), [deals]);
+  const bestStrategyOpportunities = useMemo(
+    () => rankedOpportunityPool.filter((item) => scoreStrategyMode(item.deal, "high-street-conversion").tier === "best").slice(0, 10),
+    [rankedOpportunityPool],
+  );
+  const allStrategyOpportunities = useMemo(
+    () => rankedOpportunityPool.filter((item) => scoreStrategyMode(item.deal, "high-street-conversion").score >= 20).slice(0, 10),
+    [rankedOpportunityPool],
+  );
   const showLocationSearchCta = isSupabaseConfigured && locationQuery.trim().length > 0 && visibleDeals.length < 3;
   const canRunLiveLocationSearch = Boolean(auth.user && auth.session?.access_token);
   const canShowDebug = import.meta.env.DEV || isAdminUser(auth.user);
@@ -162,9 +172,7 @@ function DashboardContent() {
           <StrategyModeSelector value={strategyMode} onChange={setStrategyMode} />
           <p className="text-xs text-muted-foreground">{strategyModeDescription(strategyMode)}</p>
           {strategyMode === "high-street-conversion" && (
-            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-primary">
-              High Street Conversion feed: retail, town-centre, mixed-use and upper-floor conversion signals are prioritised.
-            </div>
+            <HighStreetStrategyDiagnostics diagnostics={highStreetDiagnostics} />
           )}
         </section>
 
@@ -191,22 +199,42 @@ function DashboardContent() {
           </div>
         </details>
 
-        <section className="ds-card overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-primary font-medium">Ranked opportunities</div>
-              <h2 className="font-display text-xl">First 10 to compare</h2>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Ranked by existing DealSignal score, confidence, source freshness, area value, and current strategy.
-            </div>
-          </div>
-          {rankedOpportunities.length > 0 ? (
-            <OpportunityDeskTable items={rankedOpportunities} allDeals={deals} weights={weights} strategyMode={strategyMode} />
-          ) : (
-            <EmptyPanel loading={dealsQuery.isLoading} message="No ranked opportunities yet. Imports will populate this table as scans complete." compact />
-          )}
-        </section>
+        {strategyMode === "high-street-conversion" ? (
+          <>
+            <RankedOpportunitySection
+              title="Best Strategy Opportunities"
+              description="Highest-scoring High Street Conversion matches, still ranked by the existing DealSignal opportunity model."
+              items={bestStrategyOpportunities}
+              allDeals={deals}
+              weights={weights}
+              strategyMode={strategyMode}
+              loading={dealsQuery.isLoading}
+              empty="No high-confidence High Street Conversion matches yet. Review all strategy matches below."
+            />
+            <RankedOpportunitySection
+              title="All Strategy Matches"
+              description="Discovery tier showing High Street Conversion matches scoring 20+, including lower-signal near misses worth reviewing."
+              items={allStrategyOpportunities}
+              allDeals={deals}
+              weights={weights}
+              strategyMode={strategyMode}
+              loading={dealsQuery.isLoading}
+              empty="No High Street Conversion discovery matches yet."
+            />
+          </>
+        ) : (
+          <RankedOpportunitySection
+            title="First 10 to compare"
+            eyebrow="Ranked opportunities"
+            description="Ranked by existing DealSignal score, confidence, source freshness, area value, and current strategy."
+            items={rankedOpportunities}
+            allDeals={deals}
+            weights={weights}
+            strategyMode={strategyMode}
+            loading={dealsQuery.isLoading}
+            empty="No ranked opportunities yet. Imports will populate this table as scans complete."
+          />
+        )}
 
         <section className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
           <div className="ds-card p-4 space-y-3">
@@ -300,6 +328,98 @@ function NationalScanSummary({ isLoading, isError, data }: { isLoading: boolean;
         <Link to="/sources">Open Sources / Scans <ArrowRight className="h-3.5 w-3.5" /></Link>
       </Button>
     </div>
+  );
+}
+
+function HighStreetStrategyDiagnostics({ diagnostics }: { diagnostics: ReturnType<typeof buildHighStreetConversionDiagnostics> }) {
+  return (
+    <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-3">
+      <div>
+        <div className="text-xs font-medium text-primary">High Street Conversion feed</div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Retail, town-centre, mixed-use and upper-floor conversion signals are prioritised. Discovery matches now include scores of 20+.
+        </p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-5">
+        <CompactStat label="Imported deals" value={diagnostics.totalImportedDeals.toLocaleString()} />
+        <CompactStat label="Score 20+" value={diagnostics.score20Plus.toLocaleString()} />
+        <CompactStat label="Score 30+" value={diagnostics.score30Plus.toLocaleString()} />
+        <CompactStat label="Score 40+" value={diagnostics.score40Plus.toLocaleString()} />
+        <CompactStat label="Score 50+" value={diagnostics.score50Plus.toLocaleString()} />
+      </div>
+      <details className="rounded-md border border-border/60 bg-background/60">
+        <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-foreground">
+          Top near-misses scoring 20-39 ({diagnostics.nearMisses.length})
+        </summary>
+        <div className="max-h-80 overflow-auto border-t border-border/60">
+          {diagnostics.nearMisses.length > 0 ? (
+            <table className="w-full min-w-[720px] text-left text-xs">
+              <thead className="bg-surface-2/60 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Deal title</th>
+                  <th className="px-3 py-2 font-medium">Source</th>
+                  <th className="px-3 py-2 font-medium">Strategy score</th>
+                  <th className="px-3 py-2 font-medium">Matching signals</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {diagnostics.nearMisses.map((entry) => (
+                  <tr key={entry.deal.id}>
+                    <td className="max-w-[280px] truncate px-3 py-2">
+                      <Link to={`/deal/${entry.deal.id}`} className="hover:text-primary">{entry.deal.title}</Link>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{sourceLabel(entry.deal)}</td>
+                    <td className="px-3 py-2 font-mono tabular">{entry.score}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{entry.matchedSignals.join(", ") || "No named signal"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="px-3 py-3 text-xs text-muted-foreground">No near misses in the current imported dataset.</div>
+          )}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function RankedOpportunitySection({
+  eyebrow = "Strategy feed",
+  title,
+  description,
+  items,
+  allDeals,
+  weights,
+  strategyMode,
+  loading,
+  empty,
+}: {
+  eyebrow?: string;
+  title: string;
+  description: string;
+  items: RankedOpportunity[];
+  allDeals: Deal[];
+  weights: ReturnType<typeof useStrategy>["weights"];
+  strategyMode: StrategyModeId;
+  loading: boolean;
+  empty: string;
+}) {
+  return (
+    <section className="ds-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-primary font-medium">{eyebrow}</div>
+          <h2 className="font-display text-xl">{title}</h2>
+        </div>
+        <div className="max-w-2xl text-xs text-muted-foreground">{description}</div>
+      </div>
+      {items.length > 0 ? (
+        <OpportunityDeskTable items={items} allDeals={allDeals} weights={weights} strategyMode={strategyMode} />
+      ) : (
+        <EmptyPanel loading={loading} message={empty} compact />
+      )}
+    </section>
   );
 }
 

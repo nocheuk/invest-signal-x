@@ -235,7 +235,7 @@ describe("Dashboard focused overview", () => {
     expect(screen.getByText("Yield")).toBeInTheDocument();
     expect(screen.getByText("Guide Price")).toBeInTheDocument();
     expect(screen.getByText("Due Diligence Status")).toBeInTheDocument();
-    expect(screen.getByText("Strategy Fit")).toBeInTheDocument();
+    expect(screen.getAllByText("Strategy Fit").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("View Deal").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Strong Opportunity Deal")).toBeInTheDocument();
     expect(screen.getByText("Total analysed")).toBeInTheDocument();
@@ -282,10 +282,14 @@ describe("Dashboard focused overview", () => {
     fireEvent.click(screen.getByRole("tab", { name: "High Street Conversion" }));
 
     expect(screen.getByText(/High Street Conversion feed/i)).toBeInTheDocument();
+    expect(screen.getByText("Score 20+")).toBeInTheDocument();
+    expect(screen.getByText("Score 40+")).toBeInTheDocument();
+    expect(screen.getByText("Best Strategy Opportunities")).toBeInTheDocument();
+    expect(screen.getByText("All Strategy Matches")).toBeInTheDocument();
     expect(screen.getAllByText("Former bank on High Street with upper parts").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText("Industrial warehouse estate")).not.toBeInTheDocument();
-    expect(screen.getByText("Strategy Fit")).toBeInTheDocument();
-    expect(screen.getByText("Strong fit")).toBeInTheDocument();
+    expect(screen.getAllByText("Strategy Fit").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Strong fit").length).toBeGreaterThanOrEqual(1);
   });
 
   it("excludes seeded demo deals in Supabase mode", () => {
