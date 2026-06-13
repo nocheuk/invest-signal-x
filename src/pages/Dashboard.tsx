@@ -13,7 +13,7 @@ import { ALL_REAL_DEALS_FILTER, filterAndSortDeals, sourceLabel } from "@/lib/da
 import { classifyDeal } from "@/lib/dealClassification";
 import { buildFreshnessMetrics } from "@/lib/freshness";
 import { EMPTY_AREA_INTELLIGENCE_INDEX, buildAreaIntelligenceIndex } from "@/lib/areaIntelligence";
-import { buildComparableEvidence } from "@/lib/comparableEvidence";
+import { buildComparableEvidence, type ComparableEvidence } from "@/lib/comparableEvidence";
 import { top25Opportunities, type RankedOpportunity } from "@/lib/investorShortlist";
 import { useAuth } from "@/lib/auth";
 import { personalisedScore, useStrategy } from "@/lib/strategy";
@@ -181,41 +181,6 @@ function DashboardContent() {
           </Button>
         </header>
 
-        <section className="ds-card p-3 space-y-2">
-          <StrategyModeSelector value={strategyMode} onChange={setStrategyMode} />
-          <p className="text-xs text-muted-foreground">{strategyModeDescription(strategyMode)}</p>
-          {strategyMode === "high-street-conversion" && (
-            <HighStreetStrategyDiagnostics diagnostics={highStreetDiagnostics} />
-          )}
-        </section>
-
-        <AcquisitionBriefControl matchCount={briefMatchCount} />
-
-        <PipelineSummary counts={pipelineCounts} total={ids.length} />
-
-        <details className="ds-card overflow-hidden">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-primary font-medium">Analyst brief</div>
-              <div className="mt-0.5 text-sm text-muted-foreground">
-                {kpis.totalDatabaseDeals.toLocaleString()} opportunities analysed across England. Expand for context.
-              </div>
-            </div>
-            <span className="text-xs text-primary">Details</span>
-          </summary>
-          <div className="border-t border-border/60 px-4 py-3">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <CompactStat label="Total analysed" value={kpis.totalDatabaseDeals.toLocaleString()} />
-              <CompactStat label="Top opportunities" value={kpis.verifiedGreens.toLocaleString()} />
-              <CompactStat label="Strong candidates" value={kpis.greenCandidates.toLocaleString()} />
-              <CompactStat label="New this week" value={freshness.newThisWeek.toLocaleString()} />
-            </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Acquisition brief: {briefDescription(investorPreferences)}
-            </p>
-          </div>
-        </details>
-
         {strategyMode === "high-street-conversion" ? (
           <>
             <RankedOpportunitySection
@@ -256,7 +221,42 @@ function DashboardContent() {
           />
         )}
 
-        <section className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+        <section className="ds-card p-3 space-y-2">
+          <StrategyModeSelector value={strategyMode} onChange={setStrategyMode} />
+          <p className="text-xs text-muted-foreground">{strategyModeDescription(strategyMode)}</p>
+          {strategyMode === "high-street-conversion" && (
+            <HighStreetStrategyDiagnostics diagnostics={highStreetDiagnostics} />
+          )}
+        </section>
+
+        <AcquisitionBriefControl matchCount={briefMatchCount} />
+
+        {ids.length > 0 && <PipelineSummary counts={pipelineCounts} total={ids.length} />}
+
+        <details className="ds-card overflow-hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-primary font-medium">Analyst brief</div>
+              <div className="mt-0.5 text-sm text-muted-foreground">
+                {kpis.totalDatabaseDeals.toLocaleString()} opportunities analysed across England. Expand for context.
+              </div>
+            </div>
+            <span className="text-xs text-primary">Details</span>
+          </summary>
+          <div className="border-t border-border/60 px-4 py-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <CompactStat label="Total analysed" value={kpis.totalDatabaseDeals.toLocaleString()} />
+              <CompactStat label="Top opportunities" value={kpis.verifiedGreens.toLocaleString()} />
+              <CompactStat label="Strong candidates" value={kpis.greenCandidates.toLocaleString()} />
+              <CompactStat label="New this week" value={freshness.newThisWeek.toLocaleString()} />
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Acquisition brief: {briefDescription(investorPreferences)}
+            </p>
+          </div>
+        </details>
+
+        <section>
           <div className="ds-card p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -311,9 +311,9 @@ function DashboardContent() {
               </div>
             )}
           </div>
-
-          <NationalScanSummary isLoading={nationalScanStatus.isLoading} isError={nationalScanStatus.isError} data={nationalScanStatus.data} />
         </section>
+
+        <NationalScanSummary isLoading={nationalScanStatus.isLoading} isError={nationalScanStatus.isError} data={nationalScanStatus.data} />
       </div>
     </AppLayout>
   );
@@ -476,11 +476,12 @@ function RankedOpportunitySection({
 function OpportunityDeskTable({ items, allDeals, weights, strategyMode, activeBrief }: { items: RankedOpportunity[]; allDeals: Deal[]; weights: ReturnType<typeof useStrategy>["weights"]; strategyMode: StrategyModeId; activeBrief: AcquisitionBrief | null }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[920px] text-left text-sm">
+      <table className="w-full min-w-[1120px] text-left text-sm">
         <thead className="border-b border-border/60 bg-surface-2/60 text-[10px] uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-medium">Score</th>
             <th className="px-4 py-2 font-medium">Opportunity</th>
+            <th className="px-4 py-2 font-medium">Why It Matters</th>
             <th className="px-4 py-2 font-medium">Yield</th>
             <th className="px-4 py-2 font-medium">Guide Price</th>
             <th className="px-4 py-2 font-medium">Due Diligence Status</th>
@@ -508,6 +509,7 @@ function OpportunityDeskRow({ item, allDeals, weights, strategyMode, activeBrief
     ? Math.round(personalisedScore(deal, weights))
     : scoreStrategyMode(deal, strategyMode).score;
   const briefMatch = scoreDealAgainstBrief(deal, activeBrief);
+  const modeMatch = isGeneralStrategyMode(strategyMode) ? null : scoreStrategyMode(deal, strategyMode);
   const missing = readiness.missingLabels.slice(0, 3);
   const fitScore = activeBrief ? briefMatch.score : strategyFit;
   const fitLabel = activeBrief
@@ -517,6 +519,10 @@ function OpportunityDeskRow({ item, allDeals, weights, strategyMode, activeBrief
     ? briefMatch.whyMatches[0] ?? briefMatch.whyNotFullyMatched[0] ?? "Brief criteria not fully matched"
     : undefined;
   const gapReason = activeBrief ? briefMatch.whyNotFullyMatched[0] : undefined;
+  const whyItMatters = acquisitionSummary(deal, comparableEvidence, modeMatch?.reasons ?? []);
+  const topStrategyMatch = activeBrief
+    ? briefMatch.score >= 80
+    : modeMatch ? modeMatch.tier === "best" || modeMatch.score >= 50 : strategyFit >= 85;
 
   return (
     <tr className="transition-colors hover:bg-primary/5">
@@ -526,11 +532,13 @@ function OpportunityDeskRow({ item, allDeals, weights, strategyMode, activeBrief
       <td className="max-w-[360px] px-4 py-3 align-top">
         <div className="flex flex-wrap items-center gap-2">
           <ClassificationBadge classification={classification} />
+          {topStrategyMatch && <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">Top Strategy Match</span>}
           <span className="text-xs text-muted-foreground">{sourceLabel(deal)}</span>
         </div>
         <Link to={`/deal/${deal.id}`} className="mt-1 block truncate font-semibold text-foreground hover:text-primary">{deal.title}</Link>
         <div className="truncate text-xs text-muted-foreground">{deal.location}</div>
       </td>
+      <td className="max-w-[300px] px-4 py-3 align-top text-xs leading-relaxed text-muted-foreground">{whyItMatters}</td>
       <td className="px-4 py-3 align-top font-mono tabular">{visibleYield ? formatPct(visibleYield, 2) : "N/A"}</td>
       <td className="px-4 py-3 align-top font-mono tabular">{deal.guidePrice > 0 ? formatGBP(deal.guidePrice) : "N/A"}</td>
       <td className="px-4 py-3 align-top">
@@ -552,6 +560,44 @@ function OpportunityDeskRow({ item, allDeals, weights, strategyMode, activeBrief
       </td>
     </tr>
   );
+}
+
+function acquisitionSummary(deal: Deal, evidence: ComparableEvidence, strategyReasons: string[]) {
+  const text = `${deal.title} ${deal.location} ${deal.assetType} ${deal.enrichment?.investmentSummary ?? ""}`.toLowerCase();
+  const place = shortLocation(deal.location);
+  if (strategyReasons.length > 0) {
+    const reason = strategyReasons[0].replace(/\.$/, "");
+    return `${deal.assetType} in ${place} with ${reason.toLowerCase()}.`;
+  }
+  if (/former bank/.test(text)) return `Former bank in ${place} with potential alternative-use diligence to investigate.`;
+  if (/upper floors|upper parts|accommodation above|ancillary accommodation|storage above/.test(text)) {
+    return `${deal.assetType} with upper-floor or accommodation-above signals in ${place}.`;
+  }
+  if (/multi-let|multi let|re-gear|regear|rent review/.test(text)) {
+    return `Multi-let or rent-review led income opportunity in ${place}.`;
+  }
+  if (evidence.yieldDifferencePercent !== null && evidence.yieldDifferencePercent >= 20) {
+    return `${deal.assetType} investment with yield ${Math.round(evidence.yieldDifferencePercent)}% above cleaned local comparable evidence.`;
+  }
+  if (evidence.pricePerSqftDifferencePercent !== null && evidence.pricePerSqftDifferencePercent <= -15) {
+    return `${deal.assetType} priced ${Math.abs(Math.round(evidence.pricePerSqftDifferencePercent))}% below cleaned local pound-per-square-foot evidence.`;
+  }
+  if (knownTenant(deal) && deal.passingRent > 0) {
+    return `Tenanted ${deal.assetType.toLowerCase()} investment with ${formatGBP(deal.passingRent)} passing rent to verify.`;
+  }
+  if (deal.guidePrice > 0 && (deal.netInitialYield || deal.grossYield)) {
+    return `${deal.assetType} acquisition candidate in ${place} with price and yield available for first-pass review.`;
+  }
+  return `${deal.assetType} opportunity in ${place} ranked by DealSignal for score, confidence and available diligence data.`;
+}
+
+function knownTenant(deal: Deal) {
+  return Boolean(deal.tenant && deal.tenant !== "Unknown" && !/unknown|not available/i.test(deal.tenant));
+}
+
+function shortLocation(location: string) {
+  const first = location.split(",").map((part) => part.trim()).find(Boolean);
+  return first || "this location";
 }
 
 function CompactStat({ label, value }: { label: string; value: string }) {
